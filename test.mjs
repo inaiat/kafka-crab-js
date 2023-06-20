@@ -1,4 +1,4 @@
-import { KafkaClient, tsfnReturnPromise } from './index.js'
+import { KafkaClient } from './index.js'
 import timersPromises from 'node:timers/promises'
 import { Buffer } from 'node:buffer';
 
