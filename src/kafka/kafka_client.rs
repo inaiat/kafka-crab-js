@@ -1,5 +1,6 @@
 use std::fmt;
 
+use log::info;
 use napi::bindgen_prelude::*;
 use rdkafka::{
   client::ClientContext,
@@ -8,7 +9,6 @@ use rdkafka::{
   error::KafkaResult,
   topic_partition_list::TopicPartitionList,
 };
-use tracing::info;
 
 use super::{kafka_consumer::KafkaConsumer, kafka_producer::KafkaProducer};
 
@@ -66,11 +66,11 @@ pub struct KafkaClient {
   #[napi(readonly)]
   pub kafka_configuration: KafkaConfiguration,
 }
-
 #[napi]
 impl KafkaClient {
   #[napi(constructor)]
   pub fn new(brokers: String, client_id: String) -> Self {
+    env_logger::init();
     KafkaClient::with_kafka_configuration(KafkaConfiguration {
       brokers,
       client_id,
@@ -117,6 +117,7 @@ impl KafkaClient {
     KafkaProducer::new(self.rdkafka_client_config.clone())
   }
 
+  #[napi]
   pub fn create_consumer(&self, group_id: String) -> KafkaConsumer {
     KafkaConsumer::new(self.clone(), group_id, None, None)
   }

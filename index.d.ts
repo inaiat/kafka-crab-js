@@ -31,6 +31,25 @@ export const enum AutoOffsetReset {
   End = 'End',
   Error = 'Error'
 }
+export interface ConsumerConfiguration {
+  topic: string
+  retryStrategy?: RetryStrategy
+  offset?: OffsetModel
+}
+export const enum PartitionPosition {
+  Beginning = 0,
+  End = 1,
+  Stored = 2
+}
+export interface OffsetModel {
+  offset?: number
+  position?: PartitionPosition
+}
+export interface RetryStrategy {
+  retries: number
+  nextTopicOnFail: string
+  pauseConsumerDuration?: number
+}
 export class KafkaConfiguration {
   brokers: string
   clientId: string
@@ -41,12 +60,13 @@ export class KafkaClient {
   readonly kafkaConfiguration: KafkaConfiguration
   constructor(brokers: string, clientId: string)
   createProducer(): KafkaProducer
+  createConsumer(groupId: string): KafkaConsumer
 }
 export class KafkaConsumer {
   groupId: string
   enableAutoCommit?: boolean
   autoOffsetReset?: AutoOffsetReset
-  startConsumer(value: string): Promise<void>
+  startConsumer(consumerConfiguration: ConsumerConfiguration, callback: (err: Error | null, result: Buffer) => void): void
 }
 export class KafkaProducer {
   send(topic: string, message: MessageModel): Promise<OwnedDelivery>

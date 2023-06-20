@@ -1,22 +1,25 @@
+use napi::{
+  bindgen_prelude::Buffer,
+  threadsafe_function::{ThreadsafeFunction, ThreadsafeFunctionCallMode},
+  JsFunction, Result,
+};
 use rdkafka::{
   client::ClientContext,
   config::RDKafkaLogLevel,
   consumer::{stream_consumer::StreamConsumer, Consumer, ConsumerContext, Rebalance},
   error::KafkaResult,
   topic_partition_list::TopicPartitionList,
-  Offset,
+  Message, Offset,
 };
 
+use log::{info, warn};
 use std::{time::Duration, vec};
-use tracing::{info};
 
 use super::{
   kafka_admin::KafkaAdmin,
   kafka_client::KafkaClient,
-  model::{AutoOffsetReset, ConsumerModel},
+  model::{AutoOffsetReset, ConsumerConfiguration, ConsumerModel},
 };
-
-
 
 type LoggingConsumer = StreamConsumer<CustomContext>;
 
@@ -63,9 +66,47 @@ impl KafkaConsumer {
     }
   }
 
-  #[napi]
-  pub async fn start_consumer(&self, _value: String) {
-    unimplemented!()
+  #[napi(
+    ts_args_type = "consumerConfiguration: ConsumerConfiguration, callback: (err: Error | null, result: Buffer) => void"
+  )]
+  pub fn start_consumer(
+    &self,
+    consumer_configuration: ConsumerConfiguration,
+    callback: JsFunction,
+  ) -> Result<()> {
+    let tsfn: ThreadsafeFunction<Buffer> =
+      callback.create_threadsafe_function(0, |ctx| Ok(vec![ctx.value]))?;
+
+    let ConsumerConfiguration {
+      topic,
+      retry_strategy,
+      offset,
+    } = consumer_configuration;
+
+    let stream_consumer = self.setup_consumer(&self.group_id, &topic, None);
+
+    napi::tokio::spawn(async move {
+      loop {
+        loop {
+          match stream_consumer.recv().await {
+            Err(e) => warn!("Kafka error: {}", e),
+            Ok(message) => {
+              match message.payload_view::<[u8]>() {
+                None => {}
+                Some(Ok(payload)) => {
+                  tsfn.call(Ok(payload.into()), ThreadsafeFunctionCallMode::NonBlocking);
+                }
+                Some(Err(e)) => {
+                  warn!("Error while deserializing message payload: {:?}", e);
+                }
+              };
+            }
+          };
+        }
+      }
+    });
+
+    Ok(())
   }
 
   fn setup_consumer(
@@ -120,7 +161,7 @@ impl KafkaConsumer {
     let ConsumerModel {
       group_id,
       topic,
-      
+
       offset,
       ..
     } = consumer_model;

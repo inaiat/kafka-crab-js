@@ -1,3 +1,4 @@
+use log::{debug, info};
 use rdkafka::{
   admin::{
     AdminClient, AdminOptions, ConfigResource, NewTopic, ResourceSpecifier, TopicReplication,
@@ -10,7 +11,6 @@ use rdkafka::{
 };
 
 use std::{collections::HashMap, str::FromStr, time::Duration};
-use tracing::info;
 
 const DEFAULT_NUM_PARTITIONS: i32 = 3;
 const DEFAULT_REPLICATION: i32 = 3;
@@ -65,7 +65,7 @@ impl<'a> KafkaAdmin<'a> {
   pub async fn create_topic(&self, topic_name: &str) -> anyhow::Result<()> {
     let broker_properties = self.fetch_config_resource().await?.clone();
 
-    tracing::debug!("Broker properties {:?}", broker_properties);
+    debug!("Broker properties {:?}", broker_properties);
 
     self
       .admin_client
@@ -106,7 +106,7 @@ fn extract_config_resource(
         }
       }
       Err(e) => {
-        tracing::debug!("Error on fetching config entry {:?}", e)
+        debug!("Error on fetching config entry {:?}", e)
       }
     }
   }

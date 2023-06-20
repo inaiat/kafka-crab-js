@@ -47,3 +47,33 @@ impl fmt::Display for AutoOffsetReset {
     write!(f, "{}", format!("{:?}", self).to_lowercase())
   }
 }
+
+#[napi(object)]
+#[derive(Clone, Debug)]
+pub struct ConsumerConfiguration {
+  pub topic: String,
+  pub retry_strategy: Option<RetryStrategy>,
+  pub offset: Option<OffsetModel>,
+}
+
+#[napi(object)]
+#[derive(Debug)]
+pub enum PartitionPosition {
+  Beginning,
+  End,
+  Stored,
+}
+#[napi(object)]
+#[derive(Clone, Debug)]
+pub struct OffsetModel {
+  pub offset: Option<i64>,
+  pub position: Option<PartitionPosition>,
+}
+
+#[napi(object)]
+#[derive(Clone, Debug)]
+pub struct RetryStrategy {
+  pub retries: i32,
+  pub next_topic_on_fail: String,
+  pub pause_consumer_duration: Option<i64>,
+}
