@@ -13,7 +13,7 @@ napi-derive = "2.12.2"
 log = "0.4"
 anyhow = { version= "1.0", features = ["backtrace"]}
 
-rdkafka = { version = "0.31", features = ["libz-static", "cmake-build", "tokio", "ssl-vendored"] }
+rdkafka = { version = "0.32", features = ["libz-static", "cmake-build", "tokio", "ssl-vendored"] }
 tokio = { version = "1", features = ["full"] }
 env_logger = "0.10.0"
 
