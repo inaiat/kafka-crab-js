@@ -35,6 +35,7 @@ export interface ConsumerConfiguration {
   topic: string
   retryStrategy?: RetryStrategy
   offset?: OffsetModel
+  createTopic?: boolean
 }
 export const enum PartitionPosition {
   Beginning = 0,

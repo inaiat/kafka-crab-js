@@ -15,7 +15,8 @@
   "license": "MIT",
   "devDependencies": {
     "@napi-rs/cli": "^2.16.1",
-    "ava": "^5.1.1"
+    "ava": "^5.1.1",
+    "nanoid": "^4.0.2"
   },
   "ava": {
     "timeout": "3m"

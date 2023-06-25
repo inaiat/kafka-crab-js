@@ -1,6 +1,5 @@
 use std::fmt;
 
-use log::info;
 use napi::bindgen_prelude::*;
 use rdkafka::{
   client::ClientContext,
@@ -9,6 +8,7 @@ use rdkafka::{
   error::KafkaResult,
   topic_partition_list::TopicPartitionList,
 };
+use tracing::info;
 
 use super::{kafka_consumer::KafkaConsumer, kafka_producer::KafkaProducer};
 
@@ -66,11 +66,16 @@ pub struct KafkaClient {
   #[napi(readonly)]
   pub kafka_configuration: KafkaConfiguration,
 }
+
 #[napi]
 impl KafkaClient {
   #[napi(constructor)]
   pub fn new(brokers: String, client_id: String) -> Self {
-    env_logger::init();
+    match tracing_subscriber::fmt::try_init() {
+      Ok(_) => {}
+      Err(e) => println!("Failed to initialize tracing: {:?}", e),
+    }
+
     KafkaClient::with_kafka_configuration(KafkaConfiguration {
       brokers,
       client_id,

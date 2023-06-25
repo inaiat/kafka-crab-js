@@ -1,4 +1,3 @@
-use log::{debug, info};
 use rdkafka::{
   admin::{
     AdminClient, AdminOptions, ConfigResource, NewTopic, ResourceSpecifier, TopicReplication,
@@ -9,6 +8,7 @@ use rdkafka::{
   error::KafkaError,
   types::RDKafkaErrorCode,
 };
+use tracing::{debug, info};
 
 use std::{collections::HashMap, str::FromStr, time::Duration};
 

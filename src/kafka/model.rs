@@ -54,6 +54,7 @@ pub struct ConsumerConfiguration {
   pub topic: String,
   pub retry_strategy: Option<RetryStrategy>,
   pub offset: Option<OffsetModel>,
+  pub create_topic: Option<bool>,
 }
 
 #[napi(object)]

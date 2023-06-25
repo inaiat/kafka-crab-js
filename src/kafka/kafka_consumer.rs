@@ -12,8 +12,8 @@ use rdkafka::{
   Message, Offset,
 };
 
-use log::{info, warn};
 use std::{time::Duration, vec};
+use tracing::{info, warn};
 
 use super::{
   kafka_admin::KafkaAdmin,
@@ -55,8 +55,8 @@ impl KafkaConsumer {
   pub fn new(
     kafka_client: KafkaClient,
     group_id: String,
-    _enable_auto_commit: Option<bool>,
-    _auto_offset_reset: Option<AutoOffsetReset>,
+    enable_auto_commit: Option<bool>,
+    auto_offset_reset: Option<AutoOffsetReset>,
   ) -> Self {
     KafkaConsumer {
       kafka_client,
@@ -81,28 +81,37 @@ impl KafkaConsumer {
       topic,
       retry_strategy,
       offset,
+      create_topic,
     } = consumer_configuration;
 
     let stream_consumer = self.setup_consumer(&self.group_id, &topic, None);
 
+    // &self.kafka_client
+
+    // let admin = KafkaAdmin::new(self.kafka_client.get_client_config());
+
     napi::tokio::spawn(async move {
+      // if create_topic.unwrap_or(true) {
+      //   match admin.create_topic(&topic).await {
+      //     Ok(_) => {}
+      //     Err(_) => {}
+      //   }
+      // };
       loop {
-        loop {
-          match stream_consumer.recv().await {
-            Err(e) => warn!("Kafka error: {}", e),
-            Ok(message) => {
-              match message.payload_view::<[u8]>() {
-                None => {}
-                Some(Ok(payload)) => {
-                  tsfn.call(Ok(payload.into()), ThreadsafeFunctionCallMode::NonBlocking);
-                }
-                Some(Err(e)) => {
-                  warn!("Error while deserializing message payload: {:?}", e);
-                }
-              };
-            }
-          };
-        }
+        match stream_consumer.recv().await {
+          Err(e) => warn!("Kafka error: {}", e),
+          Ok(message) => {
+            match message.payload_view::<[u8]>() {
+              None => {}
+              Some(Ok(payload)) => {
+                tsfn.call(Ok(payload.into()), ThreadsafeFunctionCallMode::NonBlocking);
+              }
+              Some(Err(e)) => {
+                warn!("Error while deserializing message payload: {:?}", e);
+              }
+            };
+          }
+        };
       }
     });
 
