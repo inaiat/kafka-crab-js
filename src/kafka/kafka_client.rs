@@ -10,7 +10,9 @@ use rdkafka::{
 };
 use tracing::info;
 
-use super::{kafka_consumer::KafkaConsumer, kafka_producer::KafkaProducer};
+use super::{
+  kafka_consumer::KafkaConsumer, kafka_producer::KafkaProducer, model::ConsumerConfiguration,
+};
 
 struct CustomContext;
 
@@ -123,7 +125,7 @@ impl KafkaClient {
   }
 
   #[napi]
-  pub fn create_consumer(&self, group_id: String) -> KafkaConsumer {
-    KafkaConsumer::new(self.clone(), group_id, None, None)
+  pub fn create_consumer(&self, consumer_configuration: ConsumerConfiguration) -> KafkaConsumer {
+    KafkaConsumer::new(self.clone(), consumer_configuration)
   }
 }

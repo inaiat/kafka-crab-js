@@ -1,24 +1,25 @@
 use napi::{
-  bindgen_prelude::Buffer,
+  bindgen_prelude::{Buffer, Promise},
   threadsafe_function::{ThreadsafeFunction, ThreadsafeFunctionCallMode},
   JsFunction, Result,
 };
 use rdkafka::{
   client::ClientContext,
   config::RDKafkaLogLevel,
-  consumer::{stream_consumer::StreamConsumer, Consumer, ConsumerContext, Rebalance},
+  consumer::{stream_consumer::StreamConsumer, CommitMode, Consumer, ConsumerContext, Rebalance},
   error::KafkaResult,
   topic_partition_list::TopicPartitionList,
   Message, Offset,
 };
+use tokio::sync::broadcast::error;
 
 use std::{time::Duration, vec};
-use tracing::{info, warn};
+use tracing::{debug, error, info, warn};
 
 use super::{
   kafka_admin::KafkaAdmin,
   kafka_client::KafkaClient,
-  model::{AutoOffsetReset, ConsumerConfiguration, ConsumerModel},
+  model::{AutoOffsetReset, ConsumerConfiguration, ConsumerModel, KafkaCommitMode},
 };
 
 type LoggingConsumer = StreamConsumer<CustomContext>;
@@ -45,69 +46,61 @@ impl ConsumerContext for CustomContext {
 #[napi]
 pub struct KafkaConsumer {
   kafka_client: KafkaClient,
-  pub group_id: String,
-  pub enable_auto_commit: Option<bool>,
-  pub auto_offset_reset: Option<AutoOffsetReset>,
+  consumer_configuration: ConsumerConfiguration,
 }
 
 #[napi]
 impl KafkaConsumer {
-  pub fn new(
-    kafka_client: KafkaClient,
-    group_id: String,
-    enable_auto_commit: Option<bool>,
-    auto_offset_reset: Option<AutoOffsetReset>,
-  ) -> Self {
+  pub fn new(kafka_client: KafkaClient, consumer_configuration: ConsumerConfiguration) -> Self {
     KafkaConsumer {
       kafka_client,
-      group_id,
-      auto_offset_reset: None,
-      enable_auto_commit: None,
+      consumer_configuration,
     }
   }
 
-  #[napi(
-    ts_args_type = "consumerConfiguration: ConsumerConfiguration, callback: (err: Error | null, result: Buffer) => void"
-  )]
-  pub fn start_consumer(
-    &self,
-    consumer_configuration: ConsumerConfiguration,
-    callback: JsFunction,
-  ) -> Result<()> {
-    let tsfn: ThreadsafeFunction<Buffer> =
-      callback.create_threadsafe_function(0, |ctx| Ok(vec![ctx.value]))?;
-
+  #[napi(ts_args_type = "callback: (err: Error | null, result: Buffer) => void")]
+  pub async fn start_consumer(&self, func: ThreadsafeFunction<Buffer>) -> Result<()> {
     let ConsumerConfiguration {
       topic,
       retry_strategy,
       offset,
       create_topic,
-    } = consumer_configuration;
+      commit_mode,
+      group_id,
+    } = self.consumer_configuration.clone();
 
-    let stream_consumer = self.setup_consumer(&self.group_id, &topic, None);
+    let admin = KafkaAdmin::new(self.kafka_client.get_client_config());
+    match admin.create_topic(&topic).await {
+      Ok(_) => info!("Topic created"),
+      Err(_) => warn!("Topic already exists"),
+    }
 
-    // &self.kafka_client
+    let commit_mode = match commit_mode.unwrap_or(KafkaCommitMode::Async) {
+      KafkaCommitMode::Sync => CommitMode::Sync,
+      KafkaCommitMode::Async => CommitMode::Async,
+    };
 
-    // let admin = KafkaAdmin::new(self.kafka_client.get_client_config());
+    let stream_consumer = self.setup_consumer(&group_id, &topic, None);
 
-    napi::tokio::spawn(async move {
-      // if create_topic.unwrap_or(true) {
-      //   match admin.create_topic(&topic).await {
-      //     Ok(_) => {}
-      //     Err(_) => {}
-      //   }
-      // };
+    tokio::spawn(async move {
       loop {
         match stream_consumer.recv().await {
-          Err(e) => warn!("Kafka error: {}", e),
+          Err(e) => error!("Error while receiving from stream consumer: {:?}", e),
           Ok(message) => {
             match message.payload_view::<[u8]>() {
               None => {}
-              Some(Ok(payload)) => {
-                tsfn.call(Ok(payload.into()), ThreadsafeFunctionCallMode::NonBlocking);
-              }
+              Some(Ok(payload)) => match func.call_async::<Promise<()>>(Ok(payload.into())).await {
+                Ok(js_result) => match js_result.await {
+                  Ok(_) => match stream_consumer.commit_message(&message, commit_mode) {
+                    Ok(_) => debug!("Message committed"),
+                    Err(e) => error!("Error on commit: {:?}", e),
+                  },
+                  Err(e) => error!("Error on promise: {:?}", e),
+                },
+                Err(js_error) => error!("Error on js call: {:?}", js_error),
+              },
               Some(Err(e)) => {
-                warn!("Error while deserializing message payload: {:?}", e);
+                error!("Error while deserializing message payload: {:?}", e);
               }
             };
           }

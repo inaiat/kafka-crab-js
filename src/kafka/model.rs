@@ -3,7 +3,7 @@ use napi::bindgen_prelude::*;
 use std::{collections::HashMap, fmt};
 
 use napi::bindgen_prelude::Buffer;
-use rdkafka::Offset;
+use rdkafka::{consumer::CommitMode, Offset};
 
 #[derive(Clone, Debug)]
 pub struct ConsumerModel {
@@ -48,13 +48,22 @@ impl fmt::Display for AutoOffsetReset {
   }
 }
 
+#[napi(string_enum)]
+#[derive(Debug)]
+pub enum KafkaCommitMode {
+  Sync,
+  Async,
+}
+
 #[napi(object)]
 #[derive(Clone, Debug)]
 pub struct ConsumerConfiguration {
   pub topic: String,
+  pub group_id: String,
   pub retry_strategy: Option<RetryStrategy>,
   pub offset: Option<OffsetModel>,
   pub create_topic: Option<bool>,
+  pub commit_mode: Option<KafkaCommitMode>,
 }
 
 #[napi(object)]
