@@ -32,6 +32,7 @@ export const enum AutoOffsetReset {
   Error = 'Error'
 }
 export const enum KafkaCommitMode {
+  AutoCommit = 'AutoCommit',
   Sync = 'Sync',
   Async = 'Async'
 }

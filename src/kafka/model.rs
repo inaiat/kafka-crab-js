@@ -3,17 +3,6 @@ use napi::bindgen_prelude::*;
 use std::{collections::HashMap, fmt};
 
 use napi::bindgen_prelude::Buffer;
-use rdkafka::{consumer::CommitMode, Offset};
-
-#[derive(Clone, Debug)]
-pub struct ConsumerModel {
-  pub group_id: String,
-  pub topic: String,
-  pub retries: i32,
-  pub next_topic_on_fail: String,
-  pub pause_consumer_duration: Option<u64>,
-  pub offset: Option<Offset>,
-}
 
 #[napi(object)]
 #[derive(Clone)]
@@ -51,6 +40,7 @@ impl fmt::Display for AutoOffsetReset {
 #[napi(string_enum)]
 #[derive(Debug)]
 pub enum KafkaCommitMode {
+  AutoCommit,
   Sync,
   Async,
 }
@@ -86,4 +76,10 @@ pub struct RetryStrategy {
   pub retries: i32,
   pub next_topic_on_fail: String,
   pub pause_consumer_duration: Option<i64>,
+}
+
+pub enum ConsumerResult {
+  Ok,
+  Error,
+  Retry,
 }

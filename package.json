@@ -16,7 +16,8 @@
   "devDependencies": {
     "@napi-rs/cli": "^2.16.1",
     "ava": "^5.1.1",
-    "nanoid": "^4.0.2"
+    "nanoid": "^4.0.2",
+    "piscina": "^4.0.0"
   },
   "ava": {
     "timeout": "3m"
