@@ -78,8 +78,9 @@ pub struct RetryStrategy {
   pub pause_consumer_duration: Option<i64>,
 }
 
+#[napi(string_enum)]
+#[derive(Debug)]
 pub enum ConsumerResult {
   Ok,
-  Error,
   Retry,
 }

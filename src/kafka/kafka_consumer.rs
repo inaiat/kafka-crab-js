@@ -19,7 +19,7 @@ use tracing::{debug, error, info};
 use super::{
   kafka_admin::KafkaAdmin,
   kafka_client::KafkaClient,
-  model::{ConsumerConfiguration, KafkaCommitMode, OffsetModel, PartitionPosition},
+  model::{ConsumerConfiguration, ConsumerResult, KafkaCommitMode, OffsetModel, PartitionPosition},
 };
 
 type LoggingConsumer = StreamConsumer<CustomContext>;
@@ -58,7 +58,7 @@ impl KafkaConsumer {
     }
   }
 
-  #[napi(ts_args_type = "callback: (err: Error | null, result: Buffer) => void")]
+  #[napi(ts_args_type = "callback: (err: Error | null, result: Buffer) => Promise<ConsumerResult>")]
   pub async fn start_consumer(&self, func: ThreadsafeFunction<Buffer>) -> Result<()> {
     let ConsumerConfiguration { commit_mode, .. } = self.consumer_configuration.clone();
 
@@ -106,11 +106,9 @@ impl KafkaConsumer {
       .create_with_context(context)
       .expect("Consumer creation failed");
 
-    if let Some(create_topic) = create_topic {
-      if create_topic {
-        let admin = KafkaAdmin::new(self.kafka_client.get_client_config());
-        admin.create_topic(&topic).await?;
-      }
+    if create_topic.unwrap_or(true) {
+      let admin = KafkaAdmin::new(self.kafka_client.get_client_config());
+      admin.create_topic(&topic).await?;
     }
 
     if let Some(offset) = convert_to_rdkafka_offset(offset) {
@@ -165,9 +163,13 @@ async fn process_message(
 ) {
   match message.payload_view::<[u8]>() {
     None => {}
-    Some(Ok(payload)) => match func.call_async::<Promise<()>>(Ok(payload.into())).await {
+    Some(Ok(payload)) => match func
+      .call_async::<Promise<ConsumerResult>>(Ok(payload.into()))
+      .await
+    {
       Ok(js_result) => match js_result.await {
-        Ok(_) => {
+        Ok(value) => {
+          debug!("Message processed: {:?}", value);
           if let Some(commit_mode) = commit_mode {
             match stream_consumer.commit_message(&message, commit_mode) {
               Ok(_) => debug!("Message committed"),

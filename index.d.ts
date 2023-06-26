@@ -58,6 +58,10 @@ export interface RetryStrategy {
   nextTopicOnFail: string
   pauseConsumerDuration?: number
 }
+export const enum ConsumerResult {
+  Ok = 'Ok',
+  Retry = 'Retry'
+}
 export class KafkaConfiguration {
   brokers: string
   clientId: string
@@ -71,7 +75,7 @@ export class KafkaClient {
   createConsumer(consumerConfiguration: ConsumerConfiguration): KafkaConsumer
 }
 export class KafkaConsumer {
-  startConsumer(callback: (err: Error | null, result: Buffer) => void): Promise<void>
+  startConsumer(callback: (err: Error | null, result: Buffer) => Promise<ConsumerResult>): Promise<void>
 }
 export class KafkaProducer {
   send(topic: string, message: MessageModel): Promise<OwnedDelivery>
