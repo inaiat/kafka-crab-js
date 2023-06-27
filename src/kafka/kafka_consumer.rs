@@ -146,9 +146,9 @@ fn convert_to_rdkafka_offset(offset_model: Option<OffsetModel>) -> Option<Offset
       Some(PartitionPosition::Beginning) => Offset::Beginning,
       Some(PartitionPosition::End) => Offset::End,
       Some(PartitionPosition::Stored) => Offset::Stored,
-      None => match model.offset.is_some() {
-        true => Offset::Offset(model.offset.unwrap()),
-        false => Offset::Stored, // Default to stored
+      None => match model.offset {
+        Some(value) => Offset::Offset(value),
+        None => Offset::Stored, // Default to stored
       },
     }),
     None => None,
