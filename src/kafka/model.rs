@@ -38,7 +38,7 @@ impl fmt::Display for AutoOffsetReset {
 }
 
 #[napi(string_enum)]
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum KafkaCommitMode {
   AutoCommit,
   Sync,
@@ -54,6 +54,14 @@ pub struct ConsumerConfiguration {
   pub offset: Option<OffsetModel>,
   pub create_topic: Option<bool>,
   pub commit_mode: Option<KafkaCommitMode>,
+  pub enable_auto_commit: Option<bool>,
+  pub configuration: Option<HashMap<String, String>>,
+}
+#[napi(object)]
+#[derive(Clone, Debug)]
+pub struct ProducerConfiguration {
+  pub topic: String,
+  pub configuration: Option<HashMap<String, String>>,
 }
 
 #[napi(object)]

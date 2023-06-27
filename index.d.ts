@@ -43,6 +43,12 @@ export interface ConsumerConfiguration {
   offset?: OffsetModel
   createTopic?: boolean
   commitMode?: KafkaCommitMode
+  enableAutoCommit?: boolean
+  configuration?: Record<string, string>
+}
+export interface ProducerConfiguration {
+  topic: string
+  configuration?: Record<string, string>
 }
 export const enum PartitionPosition {
   Beginning = 0,
@@ -66,17 +72,17 @@ export class KafkaConfiguration {
   brokers: string
   clientId: string
   securityProtocol?: SecurityProtocol
-  allowAutoCreateTopic?: boolean
+  configuration?: Record<string, string>
 }
 export class KafkaClient {
   readonly kafkaConfiguration: KafkaConfiguration
-  constructor(brokers: string, clientId: string)
-  createProducer(): KafkaProducer
+  constructor(brokers: string, clientId: string, securityProtocol?: SecurityProtocol | undefined | null, configuration?: Record<string, string> | undefined | null)
+  createProducer(producerConfiguration: ProducerConfiguration): KafkaProducer
   createConsumer(consumerConfiguration: ConsumerConfiguration): KafkaConsumer
 }
 export class KafkaConsumer {
   startConsumer(callback: (err: Error | null, result: Buffer) => Promise<ConsumerResult>): Promise<void>
 }
 export class KafkaProducer {
-  send(topic: string, message: MessageModel): Promise<OwnedDelivery>
+  send(message: MessageModel): Promise<OwnedDelivery>
 }

@@ -1,4 +1,4 @@
-use std::fmt;
+use std::{collections::HashMap, fmt};
 
 use napi::bindgen_prelude::*;
 use rdkafka::{
@@ -11,7 +11,9 @@ use rdkafka::{
 use tracing::info;
 
 use super::{
-  kafka_consumer::KafkaConsumer, kafka_producer::KafkaProducer, model::ConsumerConfiguration,
+  kafka_consumer::KafkaConsumer,
+  kafka_producer::KafkaProducer,
+  model::{ConsumerConfiguration, ProducerConfiguration},
 };
 
 struct CustomContext;
@@ -58,7 +60,7 @@ pub struct KafkaConfiguration {
   pub brokers: String,
   pub client_id: String,
   pub security_protocol: Option<SecurityProtocol>,
-  pub allow_auto_create_topic: Option<bool>,
+  pub configuration: Option<HashMap<String, String>>,
 }
 
 #[derive(Clone, Debug)]
@@ -72,7 +74,12 @@ pub struct KafkaClient {
 #[napi]
 impl KafkaClient {
   #[napi(constructor)]
-  pub fn new(brokers: String, client_id: String) -> Self {
+  pub fn new(
+    brokers: String,
+    client_id: String,
+    security_protocol: Option<SecurityProtocol>,
+    configuration: Option<HashMap<String, String>>,
+  ) -> Self {
     match tracing_subscriber::fmt::try_init() {
       Ok(_) => {}
       Err(e) => println!("Failed to initialize tracing: {:?}", e),
@@ -81,8 +88,8 @@ impl KafkaClient {
     KafkaClient::with_kafka_configuration(KafkaConfiguration {
       brokers,
       client_id,
-      security_protocol: None,
-      allow_auto_create_topic: None,
+      security_protocol,
+      configuration,
     })
   }
 
@@ -95,7 +102,7 @@ impl KafkaClient {
       brokers,
       security_protocol,
       client_id,
-      allow_auto_create_topic,
+      configuration,
     } = kafka_configuration.clone();
 
     let mut rdkafka_client_config = ClientConfig::new();
@@ -106,11 +113,10 @@ impl KafkaClient {
     if let Some(security_protocol) = security_protocol {
       rdkafka_client_config.set("security.protocol", security_protocol.to_string());
     }
-    if let Some(allow_auto_create_topic) = allow_auto_create_topic {
-      rdkafka_client_config.set(
-        "allow.auto.create.topics",
-        allow_auto_create_topic.to_string(),
-      );
+    if let Some(config) = configuration {
+      for (key, value) in config {
+        rdkafka_client_config.set(key, value);
+      }
     }
 
     KafkaClient {
@@ -120,8 +126,8 @@ impl KafkaClient {
   }
 
   #[napi]
-  pub fn create_producer(&self) -> KafkaProducer {
-    KafkaProducer::new(self.rdkafka_client_config.clone())
+  pub fn create_producer(&self, producer_configuration: ProducerConfiguration) -> KafkaProducer {
+    KafkaProducer::new(self.rdkafka_client_config.clone(), producer_configuration)
   }
 
   #[napi]

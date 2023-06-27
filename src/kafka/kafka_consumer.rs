@@ -10,7 +10,7 @@ use rdkafka::{
   error::KafkaResult,
   message::BorrowedMessage,
   topic_partition_list::TopicPartitionList,
-  Message, Offset,
+  ClientConfig, Message, Offset,
 };
 
 use std::{time::Duration, vec};
@@ -21,6 +21,8 @@ use super::{
   kafka_client::KafkaClient,
   model::{ConsumerConfiguration, ConsumerResult, KafkaCommitMode, OffsetModel, PartitionPosition},
 };
+
+const RETRY_COUNTER_NAME: &str = "kafka-crab-js-retry-counter";
 
 type LoggingConsumer = StreamConsumer<CustomContext>;
 
@@ -93,15 +95,24 @@ impl KafkaConsumer {
       offset,
       create_topic,
       group_id,
+      configuration,
+      enable_auto_commit,
       ..
     } = self.consumer_configuration.clone();
 
-    let consumer: LoggingConsumer = self
-      .kafka_client
-      .get_client_config()
+    let mut consumer_config: ClientConfig = self.kafka_client.get_client_config().clone();
+
+    if let Some(config) = configuration {
+      consumer_config.extend(config);
+    }
+
+    let consumer: LoggingConsumer = consumer_config
       .clone()
       .set("group.id", group_id.clone())
-      .set("enable.auto.commit", "false")
+      .set(
+        "enable.auto.commit",
+        enable_auto_commit.unwrap_or(true).to_string(),
+      )
       .set_log_level(RDKafkaLogLevel::Debug)
       .create_with_context(context)
       .expect("Consumer creation failed");
@@ -141,18 +152,15 @@ impl KafkaConsumer {
 }
 
 fn convert_to_rdkafka_offset(offset_model: Option<OffsetModel>) -> Option<Offset> {
-  match offset_model {
-    Some(model) => Some(match model.position {
-      Some(PartitionPosition::Beginning) => Offset::Beginning,
-      Some(PartitionPosition::End) => Offset::End,
-      Some(PartitionPosition::Stored) => Offset::Stored,
-      None => match model.offset {
-        Some(value) => Offset::Offset(value),
-        None => Offset::Stored, // Default to stored
-      },
-    }),
-    None => None,
-  }
+  offset_model.map(|model| match model.position {
+    Some(PartitionPosition::Beginning) => Offset::Beginning,
+    Some(PartitionPosition::End) => Offset::End,
+    Some(PartitionPosition::Stored) => Offset::Stored,
+    None => match model.offset {
+      Some(value) => Offset::Offset(value),
+      None => Offset::Stored, // Default to stored
+    },
+  })
 }
 
 async fn process_message(
@@ -171,7 +179,7 @@ async fn process_message(
         Ok(value) => {
           debug!("Message processed: {:?}", value);
           if let Some(commit_mode) = commit_mode {
-            match stream_consumer.commit_message(&message, commit_mode) {
+            match stream_consumer.commit_message(message, commit_mode) {
               Ok(_) => debug!("Message committed"),
               Err(e) => error!("Error on commit: {:?}", e),
             }
@@ -186,3 +194,40 @@ async fn process_message(
     }
   }
 }
+
+// async fn send_to_retry_strategy(
+//   producer: &KafkaProducer,
+//   message: &BorrowedMessage<'_>,
+//   retries: i32,
+//   next_topic_on_fail: &str,
+//   payload: &str,
+// ) -> Result<(), anyhow::Error> {
+//   let retry_counter = {
+//     let headers_map = convert_kakfa_headers_to_hashmap(message.headers());
+//     let mut counter = headers_map.get_value(RETRY_COUNTER_NAME).unwrap_or(1);
+//     if retries > 0 {
+//       counter += 1;
+//     }
+//     counter
+//   };
+//   let next_topic = if retries > 0 && retry_counter <= retries.try_into().unwrap() {
+//     message.topic()
+//   } else {
+//     next_topic_on_fail
+//   };
+//   let new_headers = message
+//     .headers()
+//     .unwrap_or(OwnedHeaders::new().as_borrowed())
+//     .detach()
+//     .insert(Header {
+//       key: RETRY_COUNTER_NAME,
+//       value: Some(retry_counter.to_string().as_str()),
+//     });
+//   let key = message.key().unwrap_or(&[]);
+//   let record = FutureRecord::to(next_topic)
+//     .headers(new_headers)
+//     .key(key)
+//     .payload(payload);
+//   // producer.send(topic, message);
+//   anyhow::Ok(())
+// }
