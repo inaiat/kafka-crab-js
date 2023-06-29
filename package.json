@@ -1,14 +1,16 @@
 {
   "name": "kafka-crab-js",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "main": "index.js",
   "types": "index.d.ts",
   "napi": {
     "name": "kafka-crab-js",
     "triples": {
+      "defaults": false,
       "additional": [
         "aarch64-apple-darwin",
-        "x86_64-unknown-linux-musl"
+        "x86_64-apple-darwin",
+        "x86_64-unknown-linux-gnu"
       ]
     }
   },
