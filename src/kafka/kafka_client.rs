@@ -1,6 +1,6 @@
 use std::{collections::HashMap, fmt};
 
-use napi::bindgen_prelude::*;
+use napi::{bindgen_prelude::*, Result};
 use rdkafka::{
   client::ClientContext,
   config::{ClientConfig, RDKafkaLogLevel},
@@ -8,12 +8,12 @@ use rdkafka::{
   error::KafkaResult,
   topic_partition_list::TopicPartitionList,
 };
+
 use tracing::info;
 
 use super::{
-  kafka_consumer::KafkaConsumer,
-  kafka_producer::KafkaProducer,
-  model::{ConsumerConfiguration, ProducerConfiguration},
+  kafka_consumer::{ConsumerConfiguration, KafkaConsumer},
+  kafka_producer::{KafkaProducer, ProducerConfiguration},
 };
 
 struct CustomContext;
@@ -126,12 +126,21 @@ impl KafkaClient {
   }
 
   #[napi]
-  pub fn create_producer(&self, producer_configuration: ProducerConfiguration) -> KafkaProducer {
-    KafkaProducer::new(self.rdkafka_client_config.clone(), producer_configuration)
+  pub fn create_producer(
+    &self,
+    producer_configuration: ProducerConfiguration,
+  ) -> Result<KafkaProducer> {
+    match KafkaProducer::new(self.rdkafka_client_config.clone(), producer_configuration) {
+      Ok(producer) => Ok(producer),
+      Err(e) => Err(Error::new(Status::GenericFailure, e.to_string())),
+    }
   }
 
   #[napi]
-  pub fn create_consumer(&self, consumer_configuration: ConsumerConfiguration) -> KafkaConsumer {
+  pub fn create_consumer(
+    &self,
+    consumer_configuration: ConsumerConfiguration,
+  ) -> Result<KafkaConsumer> {
     KafkaConsumer::new(self.clone(), consumer_configuration)
   }
 }

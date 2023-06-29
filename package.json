@@ -16,13 +16,17 @@
   "devDependencies": {
     "@napi-rs/cli": "^2.16.1",
     "ava": "^5.1.1",
-    "nanoid": "^4.0.2"
+    "nanoid": "^4.0.2",
+    "xo": "^0.54.2"
   },
   "ava": {
     "timeout": "3m"
   },
   "engines": {
     "node": ">= 10"
+  },
+  "xo": {
+    "space": true
   },
   "scripts": {
     "artifacts": "napi artifacts",

@@ -7,6 +7,7 @@ use napi::bindgen_prelude::Buffer;
 #[napi(object)]
 #[derive(Clone)]
 pub struct MessageModel {
+  pub topic: String,
   pub key: Buffer,
   pub value: Buffer,
   pub headers: Option<HashMap<String, Buffer>>,
@@ -46,22 +47,9 @@ pub enum KafkaCommitMode {
 }
 
 #[napi(object)]
-#[derive(Clone, Debug)]
-pub struct ConsumerConfiguration {
-  pub topic: String,
-  pub group_id: String,
-  pub retry_strategy: Option<RetryStrategy>,
-  pub offset: Option<OffsetModel>,
-  pub create_topic: Option<bool>,
-  pub commit_mode: Option<KafkaCommitMode>,
-  pub enable_auto_commit: Option<bool>,
-  pub configuration: Option<HashMap<String, String>>,
-}
-#[napi(object)]
-#[derive(Clone, Debug)]
-pub struct ProducerConfiguration {
-  pub topic: String,
-  pub configuration: Option<HashMap<String, String>>,
+pub struct OwnedDelivery {
+  pub partition: i32,
+  pub offset: i64,
 }
 
 #[napi(object)]
@@ -82,7 +70,8 @@ pub struct OffsetModel {
 #[derive(Clone, Debug)]
 pub struct RetryStrategy {
   pub retries: i32,
-  pub next_topic_on_fail: String,
+  pub retry_topic: Option<String>,
+  pub dql_topic: Option<String>,
   pub pause_consumer_duration: Option<i64>,
 }
 

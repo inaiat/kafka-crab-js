@@ -65,7 +65,7 @@ impl<'a> KafkaAdmin<'a> {
   pub async fn create_topic(&self, topic_name: &str) -> anyhow::Result<()> {
     let broker_properties = self.fetch_config_resource().await?.clone();
 
-    debug!("Broker properties {:?}", broker_properties);
+    // If you want print all properties => dbg!(broker_properties.clone());
 
     self
       .admin_client

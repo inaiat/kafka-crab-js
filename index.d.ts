@@ -9,11 +9,22 @@ export const enum SecurityProtocol {
   SaslPlaintext = 'SaslPlaintext',
   SaslSsl = 'SaslSsl'
 }
-export interface OwnedDelivery {
-  partition: number
-  offset: number
+export interface ConsumerConfiguration {
+  topic: string
+  groupId: string
+  retryStrategy?: RetryStrategy
+  offset?: OffsetModel
+  createTopic?: boolean
+  commitMode?: KafkaCommitMode
+  enableAutoCommit?: boolean
+  configuration?: Record<string, string>
+}
+export interface ProducerConfiguration {
+  queueTimeout?: number
+  configuration?: Record<string, string>
 }
 export interface MessageModel {
+  topic: string
   key: Buffer
   value: Buffer
   headers?: Record<string, Buffer>
@@ -36,19 +47,9 @@ export const enum KafkaCommitMode {
   Sync = 'Sync',
   Async = 'Async'
 }
-export interface ConsumerConfiguration {
-  topic: string
-  groupId: string
-  retryStrategy?: RetryStrategy
-  offset?: OffsetModel
-  createTopic?: boolean
-  commitMode?: KafkaCommitMode
-  enableAutoCommit?: boolean
-  configuration?: Record<string, string>
-}
-export interface ProducerConfiguration {
-  topic: string
-  configuration?: Record<string, string>
+export interface OwnedDelivery {
+  partition: number
+  offset: number
 }
 export const enum PartitionPosition {
   Beginning = 0,
@@ -61,7 +62,8 @@ export interface OffsetModel {
 }
 export interface RetryStrategy {
   retries: number
-  nextTopicOnFail: string
+  retryTopic?: string
+  dqlTopic?: string
   pauseConsumerDuration?: number
 }
 export const enum ConsumerResult {
