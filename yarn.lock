@@ -626,7 +626,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"ava@npm:^5.1.1":
+"ava@npm:^5.3.1":
   version: 5.3.1
   resolution: "ava@npm:5.3.1"
   dependencies:
@@ -3024,7 +3024,7 @@ __metadata:
   resolution: "kafka-crab-js@workspace:."
   dependencies:
     "@napi-rs/cli": ^2.16.1
-    ava: ^5.1.1
+    ava: ^5.3.1
     nanoid: ^4.0.2
     xo: ^0.54.2
   languageName: unknown
