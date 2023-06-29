@@ -8,4 +8,6 @@ Kafka-Crab-JS is a powerful Node.js library that allows developers to interact w
 
 **Installation**
 
+To use Kafka-Crab-JS in your Node.js project, follow the steps below:
+
 todo!
