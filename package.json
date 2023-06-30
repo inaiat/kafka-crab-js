@@ -1,6 +1,6 @@
 {
   "name": "kafka-crab-js",
-  "version": "0.0.3",
+  "version": "0.0.4",
   "main": "index.js",
   "types": "index.d.ts",
   "napi": {
@@ -10,11 +10,21 @@
       "additional": [
         "aarch64-apple-darwin",
         "x86_64-apple-darwin",
-        "x86_64-unknown-linux-gnu"
+        "x86_64-unknown-linux-gnu",
+        "aarch64-unknown-linux-gnu"
       ]
     }
   },
   "license": "MIT",
+  "keywords": [
+    "kafka",
+    "napi-rs",
+    "librdkafka",
+    "typescript",
+    "rust"
+  ],
+  "author": "inaiat@gmail.com",
+  "homepage": "https://github.com/inaiat/kafka-crab-js.git",
   "devDependencies": {
     "@napi-rs/cli": "^2.16.1",
     "ava": "^5.3.1",
