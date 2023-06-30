@@ -92,7 +92,9 @@ impl KafkaConsumer {
     })
   }
 
-  #[napi(ts_args_type = "callback: (err: Error | null, result: Buffer) => Promise<ConsumerResult>")]
+  #[napi(
+    ts_args_type = "callback: (err: Error | null, result: Buffer) => Promise<ConsumerResult | undefined>"
+  )]
   pub async fn start_consumer(&self, func: ThreadsafeFunction<Buffer>) -> Result<()> {
     let ConsumerConfiguration {
       commit_mode,
@@ -304,22 +306,22 @@ async fn process_message(
   match message.payload_view::<[u8]>() {
     None => Ok(None),
     Some(Ok(payload)) => match func
-      .call_async::<Promise<ConsumerResult>>(Ok(payload.into()))
+      .call_async::<Promise<Option<ConsumerResult>>>(Ok(payload.into()))
       .await
     {
       Ok(js_result) => match js_result.await {
         Ok(value) => match value {
-          ConsumerResult::Ok => {
+          None | Some(ConsumerResult::Ok) => {
             if let Some(commit_mode) = commit_mode {
               match stream_consumer.commit_message(message, *commit_mode) {
-                Ok(_) => Ok(Some(value)),
+                Ok(_) => Ok(Some(ConsumerResult::Ok)),
                 Err(e) => Err(anyhow::Error::new(e)),
               }
             } else {
-              Ok(Some(value))
+              Ok(Some(ConsumerResult::Ok))
             }
           }
-          ConsumerResult::Retry => Ok(Some(value)),
+          Some(ConsumerResult::Retry) => Ok(Some(ConsumerResult::Retry)),
         },
         Err(e) => Err(anyhow::Error::new(e)),
       },

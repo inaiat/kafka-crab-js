@@ -55,12 +55,13 @@ impl fmt::Display for SecurityProtocol {
 }
 
 #[derive(Clone, Debug)]
-#[napi]
+#[napi(object)]
 pub struct KafkaConfiguration {
   pub brokers: String,
   pub client_id: String,
   pub security_protocol: Option<SecurityProtocol>,
   pub configuration: Option<HashMap<String, String>>,
+  pub enable_ansi_logger: Option<bool>,
 }
 
 #[derive(Clone, Debug)]
@@ -74,23 +75,18 @@ pub struct KafkaClient {
 #[napi]
 impl KafkaClient {
   #[napi(constructor)]
-  pub fn new(
-    brokers: String,
-    client_id: String,
-    security_protocol: Option<SecurityProtocol>,
-    configuration: Option<HashMap<String, String>>,
-  ) -> Self {
-    match tracing_subscriber::fmt::try_init() {
+  pub fn new(kafka_configuration: KafkaConfiguration) -> Self {
+    match tracing_subscriber::fmt()
+      .with_ansi(kafka_configuration.enable_ansi_logger.unwrap_or(false))
+      .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
+      .try_init()
+    {
       Ok(_) => {}
-      Err(e) => println!("Failed to initialize tracing: {:?}", e),
-    }
-
-    KafkaClient::with_kafka_configuration(KafkaConfiguration {
-      brokers,
-      client_id,
-      security_protocol,
-      configuration,
-    })
+      Err(e) => {
+        eprintln!("Failed to initialize tracing: {:?}", e);
+      }
+    };
+    KafkaClient::with_kafka_configuration(kafka_configuration)
   }
 
   pub fn get_client_config(&self) -> &ClientConfig {
@@ -103,11 +99,12 @@ impl KafkaClient {
       security_protocol,
       client_id,
       configuration,
+      ..
     } = kafka_configuration.clone();
 
     let mut rdkafka_client_config = ClientConfig::new();
 
-    rdkafka_client_config.set_log_level(RDKafkaLogLevel::Info);
+    rdkafka_client_config.set_log_level(RDKafkaLogLevel::Debug);
     rdkafka_client_config.set("bootstrap.servers", brokers);
     rdkafka_client_config.set("client.id", client_id);
     if let Some(security_protocol) = security_protocol {

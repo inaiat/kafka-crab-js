@@ -9,6 +9,13 @@ export const enum SecurityProtocol {
   SaslPlaintext = 'SaslPlaintext',
   SaslSsl = 'SaslSsl'
 }
+export interface KafkaConfiguration {
+  brokers: string
+  clientId: string
+  securityProtocol?: SecurityProtocol
+  configuration?: Record<string, string>
+  enableAnsiLogger?: boolean
+}
 export interface ConsumerConfiguration {
   topic: string
   groupId: string
@@ -70,20 +77,14 @@ export const enum ConsumerResult {
   Ok = 'Ok',
   Retry = 'Retry'
 }
-export class KafkaConfiguration {
-  brokers: string
-  clientId: string
-  securityProtocol?: SecurityProtocol
-  configuration?: Record<string, string>
-}
 export class KafkaClient {
   readonly kafkaConfiguration: KafkaConfiguration
-  constructor(brokers: string, clientId: string, securityProtocol?: SecurityProtocol | undefined | null, configuration?: Record<string, string> | undefined | null)
+  constructor(kafkaConfiguration: KafkaConfiguration)
   createProducer(producerConfiguration: ProducerConfiguration): KafkaProducer
   createConsumer(consumerConfiguration: ConsumerConfiguration): KafkaConsumer
 }
 export class KafkaConsumer {
-  startConsumer(callback: (err: Error | null, result: Buffer) => Promise<ConsumerResult>): Promise<void>
+  startConsumer(callback: (err: Error | null, result: Buffer) => Promise<ConsumerResult | undefined>): Promise<void>
 }
 export class KafkaProducer {
   send(message: MessageModel): Promise<OwnedDelivery>

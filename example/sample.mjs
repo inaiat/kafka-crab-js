@@ -3,14 +3,17 @@ import timersPromises from 'node:timers/promises';
 import {Buffer} from 'node:buffer';
 import {ConsumerResult, KafkaClient, KafkaCommitMode, PartitionPosition} from '../index.js';
 
-const kafkaClient = new KafkaClient('localhost:29092', 'my-id');
+const kafkaClient = new KafkaClient({ 
+  brokers: 'localhost:29092', 
+  clientId: 'my-id', 
+  enableAnsiLogger: false});
 const topic = 'my-js-topic';
 
 let counter = 0;
 
 async function process(message) {
   await timersPromises.setTimeout(1);
-  return 'message received: ' + message;
+  return 'message received: ' + JSON.stringify(message);
 }
 
 const consumer = kafkaClient.createConsumer({
@@ -27,7 +30,7 @@ console.time('consumer');
 
 consumer.startConsumer(async (error, value) => {
   if (error) {
-    console.error('Consumer error', error);
+    console.error('Js Consumer error', error);
     return;
   }
 
@@ -36,19 +39,20 @@ consumer.startConsumer(async (error, value) => {
   counter++;
   if (counter >= 0) {
     console.timeEnd('consumer');
-    console.log('Counter:', counter, 'Content:', JSON.stringify(content));
+    console.log('Js Counter:', counter, 'Content:', JSON.stringify(content));
     console.time('consumer');
   }
 
   if (message._id === '3') {
-    console.error('Error on process message, let\'s retry', message);
+    console.error('Js Error on process message, let\'s retry', JSON.stringify(content));
     return ConsumerResult.Retry;
   }
+
 
   return ConsumerResult.Ok;
 });
 
-const producer = kafkaClient.createProducer({topic, configuration: {'message.timeout.ms': '2'}});
+const producer = kafkaClient.createProducer({topic, configuration: {'message.timeout.ms': '5000'}});
 console.log('Sending message');
 
 for (let i = 0; i < 5; i++) {
@@ -61,9 +65,9 @@ for (let i = 0; i < 5; i++) {
         headers: {key: Buffer.from('value1')},
       },
     );
-    console.log(result);
+    console.log("Js message sent. Offset: ", result);
     await timersPromises.setTimeout(1200);
   } catch (error) {
-    console.error('Error on send', error);
+    console.error('Js Error on send', error);
   }
 }
