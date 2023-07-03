@@ -1,15 +1,15 @@
-use napi::{
-  bindgen_prelude::{Buffer, Promise},
-  threadsafe_function::ThreadsafeFunction,
-  Result,
-};
+use napi::{bindgen_prelude::*, threadsafe_function::ThreadsafeFunction, Error, Result, Status};
+
 use rdkafka::{
   client::ClientContext,
   config::RDKafkaLogLevel,
-  consumer::{stream_consumer::StreamConsumer, CommitMode, Consumer, ConsumerContext, Rebalance},
+  consumer::{
+    stream_consumer::StreamConsumer, CommitMode as RdKfafkaCommitMode, Consumer, ConsumerContext,
+    Rebalance,
+  },
   error::KafkaResult,
   message::{BorrowedMessage, Header, OwnedHeaders},
-  producer::FutureRecord,
+  producer::{FutureProducer, FutureRecord},
   topic_partition_list::TopicPartitionList,
   ClientConfig, Message,
 };
@@ -21,14 +21,10 @@ use crate::kafka::kafka_util::{
   convert_to_rdkafka_offset, kakfa_headers_to_hashmap, ExtractValueOnKafkaHashMap,
 };
 
-use super::{
-  kafka_admin::KafkaAdmin,
-  kafka_client::KafkaClient,
-  kafka_producer::{KafkaProducer, ProducerConfiguration},
-  model::{ConsumerResult, KafkaCommitMode, OffsetModel, RetryStrategy},
-};
+use super::{kafka_admin::KafkaAdmin, kafka_client::KafkaClient, model::OffsetModel};
 
 const RETRY_COUNTER_NAME: &str = "kafka-crab-js-retry-counter";
+const DEFAULT_QUEUE_TIMEOUT: u64 = 5000;
 
 type LoggingConsumer = StreamConsumer<CustomContext>;
 
@@ -50,6 +46,30 @@ impl ConsumerContext for CustomContext {
   }
 }
 
+#[napi(string_enum)]
+#[derive(Debug, PartialEq)]
+pub enum CommitMode {
+  AutoCommit,
+  Sync,
+  Async,
+}
+
+#[napi(object)]
+#[derive(Clone, Debug)]
+pub struct RetryStrategy {
+  pub retries: i32,
+  pub retry_topic: Option<String>,
+  pub dql_topic: Option<String>,
+  pub pause_consumer_duration: Option<i64>,
+}
+
+#[napi(string_enum)]
+#[derive(Debug)]
+pub enum ConsumerResult {
+  Ok,
+  Retry,
+}
+
 #[napi(object)]
 #[derive(Clone, Debug)]
 pub struct ConsumerConfiguration {
@@ -58,17 +78,39 @@ pub struct ConsumerConfiguration {
   pub retry_strategy: Option<RetryStrategy>,
   pub offset: Option<OffsetModel>,
   pub create_topic: Option<bool>,
-  pub commit_mode: Option<KafkaCommitMode>,
+  pub commit_mode: Option<CommitMode>,
   pub enable_auto_commit: Option<bool>,
   pub configuration: Option<HashMap<String, String>>,
 }
 
 #[derive(Clone)]
 #[napi]
+pub struct ProducerHelper {
+  future_producer: FutureProducer,
+  queue_timeout: Duration,
+}
+
+#[derive(Clone)]
+#[napi]
 pub struct KafkaConsumer {
-  kafka_client: KafkaClient,
+  client_config: ClientConfig,
   consumer_configuration: ConsumerConfiguration,
-  producer: KafkaProducer,
+  producer: ProducerHelper,
+}
+
+fn setup_future_producer(
+  client_config: &ClientConfig,
+  queue_timeout_in_millis: Option<u64>,
+) -> anyhow::Result<ProducerHelper> {
+  let queue_timeout =
+    Duration::from_millis(queue_timeout_in_millis.unwrap_or(DEFAULT_QUEUE_TIMEOUT));
+
+  let future_producer = client_config.create::<FutureProducer>()?;
+
+  Ok(ProducerHelper {
+    future_producer,
+    queue_timeout,
+  })
 }
 
 #[napi]
@@ -77,18 +119,12 @@ impl KafkaConsumer {
     kafka_client: KafkaClient,
     consumer_configuration: ConsumerConfiguration,
   ) -> Result<Self> {
-    let producer = KafkaProducer::new(
-      kafka_client.get_client_config().clone(),
-      ProducerConfiguration {
-        configuration: None,
-        queue_timeout: None,
-      },
-    )?;
-
+    let client_config: &ClientConfig = kafka_client.get_client_config();
     Ok(KafkaConsumer {
-      kafka_client,
+      client_config: client_config.clone(),
       consumer_configuration,
-      producer,
+      producer: setup_future_producer(client_config, None)
+        .map_err(|e| Error::new(Status::GenericFailure, e.to_string()))?,
     })
   }
 
@@ -104,9 +140,9 @@ impl KafkaConsumer {
     } = self.consumer_configuration.clone();
 
     let commit_mode = match commit_mode {
-      None | Some(KafkaCommitMode::AutoCommit) => None, //Default AutoCommit
-      Some(KafkaCommitMode::Sync) => Some(CommitMode::Sync),
-      Some(KafkaCommitMode::Async) => Some(CommitMode::Async),
+      None | Some(CommitMode::AutoCommit) => None, //Default AutoCommit
+      Some(CommitMode::Sync) => Some(RdKfafkaCommitMode::Sync),
+      Some(CommitMode::Async) => Some(RdKfafkaCommitMode::Async),
     };
 
     let producer = self.producer.clone();
@@ -175,7 +211,7 @@ impl KafkaConsumer {
       ..
     } = self.consumer_configuration.clone();
 
-    let mut consumer_config: ClientConfig = self.kafka_client.get_client_config().clone();
+    let mut consumer_config: ClientConfig = self.client_config.clone();
 
     if let Some(config) = configuration {
       consumer_config.extend(config);
@@ -193,7 +229,7 @@ impl KafkaConsumer {
       .expect("Consumer creation failed");
 
     if create_topic.unwrap_or(true) {
-      let admin = KafkaAdmin::new(self.kafka_client.get_client_config());
+      let admin = KafkaAdmin::new(&self.client_config);
       admin.create_topic(&topic).await?;
     }
 
@@ -229,10 +265,10 @@ impl KafkaConsumer {
 async fn start_consumer_loop(
   stream_consumer: StreamConsumer<CustomContext>,
   func: ThreadsafeFunction<Buffer>,
-  commit_mode: Option<CommitMode>,
+  commit_mode: Option<RdKfafkaCommitMode>,
   retries: i32,
   next_topic_on_fail: &str,
-  producer: KafkaProducer,
+  producer: ProducerHelper,
 ) {
   loop {
     match stream_consumer.recv().await {
@@ -267,7 +303,7 @@ async fn start_consumer_loop(
 async fn handle_message_result(
   retries: i32,
   next_topic_on_fail: &str,
-  producer: &KafkaProducer,
+  producer: &ProducerHelper,
   message: &BorrowedMessage<'_>,
   message_result: anyhow::Result<Option<ConsumerResult>>,
 ) -> anyhow::Result<()> {
@@ -298,7 +334,7 @@ async fn handle_message_result(
 }
 
 async fn process_message(
-  commit_mode: &Option<CommitMode>,
+  commit_mode: &Option<RdKfafkaCommitMode>,
   stream_consumer: &StreamConsumer<CustomContext>,
   func: &ThreadsafeFunction<Buffer>,
   message: &BorrowedMessage<'_>,
@@ -334,7 +370,7 @@ async fn process_message(
 }
 
 async fn send_to_retry_strategy(
-  producer: &KafkaProducer,
+  producer: &ProducerHelper,
   message: &BorrowedMessage<'_>,
   retries: i32,
   next_topic_on_fail: &str,
@@ -376,7 +412,10 @@ async fn send_to_retry_strategy(
     .headers(new_headers)
     .payload(message.payload().unwrap_or(&[]));
 
-  let _result = producer.raw_send(record).await;
+  let _result = producer
+    .future_producer
+    .send(record, producer.queue_timeout)
+    .await;
   info!("Message sent to topic: {:?}", next_topic);
   Ok(())
 }

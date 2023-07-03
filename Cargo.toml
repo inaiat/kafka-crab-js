@@ -8,15 +8,16 @@ crate-type = ["cdylib"]
 
 [dependencies]
 # Default enable napi4 feature, see https://nodejs.org/api/n-api.html#node-api-version-matrix
-napi = { version = "2.13", default-features = false, features = [
-    "napi4",
+napi = { version = "2", default-features = false, features = [
+    "napi8",
     "tokio_rt",
+    "serde-json",
 ] }
-napi-derive = "2.13"
+napi-derive = "2"
 
 anyhow = { version = "1.0", features = ["backtrace"] }
 
-rdkafka = { version = "0.32", features = [
+rdkafka = { version = "0.33", features = [
     "libz-static",
     "cmake-build",
     "tokio",

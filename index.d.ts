@@ -19,24 +19,18 @@ export interface KafkaConfiguration {
 export interface ConsumerConfiguration {
   topic: string
   groupId: string
-  retryStrategy?: RetryStrategy
   offset?: OffsetModel
   createTopic?: boolean
-  commitMode?: KafkaCommitMode
+  commitMode?: CommitMode
   enableAutoCommit?: boolean
   configuration?: Record<string, string>
 }
 export interface ProducerConfiguration {
   queueTimeout?: number
+  thrownOnError?: boolean
   configuration?: Record<string, string>
 }
-export interface MessageModel {
-  topic: string
-  key: Buffer
-  value: Buffer
-  headers?: Record<string, Buffer>
-}
-export interface ProduceRecord {
+export interface ProducerRecord {
   topic: string
   messages: Array<MessageModel>
 }
@@ -49,12 +43,14 @@ export const enum AutoOffsetReset {
   End = 'End',
   Error = 'Error'
 }
-export const enum KafkaCommitMode {
+export const enum CommitMode {
   AutoCommit = 'AutoCommit',
   Sync = 'Sync',
   Async = 'Async'
 }
-export interface OwnedDelivery {
+export interface Payload {
+  message: Buffer
+  topic: string
   partition: number
   offset: number
 }
@@ -67,15 +63,20 @@ export interface OffsetModel {
   offset?: number
   position?: PartitionPosition
 }
-export interface RetryStrategy {
-  retries: number
-  retryTopic?: string
-  dqlTopic?: string
-  pauseConsumerDuration?: number
+export interface KafkaCrabError {
+  code: number
+  message: string
 }
-export const enum ConsumerResult {
-  Ok = 'Ok',
-  Retry = 'Retry'
+export interface RecordMetadata {
+  topic: string
+  partition: number
+  offset: number
+  error?: KafkaCrabError
+}
+export interface MessageModel {
+  value: Buffer
+  key?: Buffer
+  headers?: Record<string, Buffer>
 }
 export class KafkaClient {
   readonly kafkaConfiguration: KafkaConfiguration
@@ -84,8 +85,8 @@ export class KafkaClient {
   createConsumer(consumerConfiguration: ConsumerConfiguration): KafkaConsumer
 }
 export class KafkaConsumer {
-  startConsumer(callback: (err: Error | null, result: Buffer) => Promise<ConsumerResult | undefined>): Promise<void>
+  startConsumer(callback: (err: Error | null, result: Payload) => Promise<undefined>): Promise<void>
 }
 export class KafkaProducer {
-  send(message: MessageModel): Promise<OwnedDelivery>
+  send(producerRecord: ProducerRecord): Promise<Array<RecordMetadata>>
 }

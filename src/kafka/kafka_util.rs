@@ -2,11 +2,32 @@ use std::collections::HashMap;
 
 use napi::bindgen_prelude::Buffer;
 use rdkafka::{
+  consumer::{ConsumerContext, Rebalance},
+  error::KafkaResult,
   message::{BorrowedHeaders, Header, Headers, OwnedHeaders},
-  Offset,
+  ClientContext, Offset, TopicPartitionList,
 };
+use tracing::info;
 
 use super::model::{OffsetModel, PartitionPosition};
+
+pub struct CustomContext;
+
+impl ClientContext for CustomContext {}
+
+impl ConsumerContext for CustomContext {
+  fn pre_rebalance(&self, rebalance: &Rebalance) {
+    info!("Pre rebalance {:?}", rebalance);
+  }
+
+  fn post_rebalance(&self, rebalance: &Rebalance) {
+    info!("Post rebalance {:?}", rebalance);
+  }
+
+  fn commit_callback(&self, result: KafkaResult<()>, _offsets: &TopicPartitionList) {
+    info!("Committing offsets: {:?}. Offset: {:?}", result, _offsets);
+  }
+}
 
 pub fn convert_to_rdkafka_offset(offset_model: Option<OffsetModel>) -> Option<Offset> {
   offset_model.map(|model| match model.position {

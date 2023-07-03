@@ -1,12 +1,12 @@
 /* eslint-disable no-await-in-loop */
 import timersPromises from 'node:timers/promises';
 import {Buffer} from 'node:buffer';
-import {ConsumerResult, KafkaClient, KafkaCommitMode, PartitionPosition} from '../index.js';
+import {KafkaClient, CommitMode, PartitionPosition} from '../index.js';
 
-const kafkaClient = new KafkaClient({ 
-  brokers: 'localhost:29092', 
-  clientId: 'my-id', 
-  enableAnsiLogger: false});
+const kafkaClient = new KafkaClient({
+  brokers: 'localhost:29092',
+  clientId: 'my-id',
+  enableAnsiLogger: true});
 const topic = 'my-js-topic';
 
 let counter = 0;
@@ -19,54 +19,48 @@ async function process(message) {
 const consumer = kafkaClient.createConsumer({
   topic,
   groupId: 'my-js-group',
-  commitMode: KafkaCommitMode.Sync,
+  CommitMode: CommitMode.Async,
   offset: {position: PartitionPosition.Stored},
-  retryStrategy: {
-    retries: 3,
-  },
 });
 
 console.time('consumer');
 
-consumer.startConsumer(async (error, value) => {
+consumer.startConsumer(async (error, {message}) => {
   if (error) {
     console.error('Js Consumer error', error);
     return;
   }
 
-  const message = JSON.parse(value.toString());
-  const content = await process(message);
+  const value = JSON.parse(message.toString());
+  const content = await process(value);
+
+  if (message._id === '3') {
+    throw new Error('Error on message 3');
+  }
+
   counter++;
   if (counter >= 0) {
     console.timeEnd('consumer');
     console.log('Js Counter:', counter, 'Content:', JSON.stringify(content));
     console.time('consumer');
   }
-
-  if (message._id === '3') {
-    console.error('Js Error on process message, let\'s retry', JSON.stringify(content));
-    return ConsumerResult.Retry;
-  }
-
-
-  return ConsumerResult.Ok;
 });
 
 const producer = kafkaClient.createProducer({topic, configuration: {'message.timeout.ms': '5000'}});
 console.log('Sending message');
 
-for (let i = 0; i < 5; i++) {
+await timersPromises.setTimeout(5000);
+
+for (let i = 0; i < 20; i++) {
   try {
     const result = await producer.send(
       {
         topic,
-        key: Buffer.from('abc'),
-        value: Buffer.from(`{"_id":"${i}","name":"Elizeu Drummond Sample js","phone":"555"}`),
-        headers: {key: Buffer.from('value1')},
+        messages: [{key: Buffer.from('value1'), value: Buffer.from(`{"_id":"${i}","name":"Elizeu Drummond Sample js","phone":"555"}`)}],
       },
     );
-    console.log("Js message sent. Offset: ", result);
-    await timersPromises.setTimeout(1200);
+    console.log('Js message sent. Offset:', result);
+    await timersPromises.setTimeout(1500);
   } catch (error) {
     console.error('Js Error on send', error);
   }

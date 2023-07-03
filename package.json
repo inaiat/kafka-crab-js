@@ -27,6 +27,8 @@
   "devDependencies": {
     "@napi-rs/cli": "^2.16.1",
     "ava": "^5.3.1",
+    "benny": "^3.7.1",
+    "kafkajs": "^2.2.4",
     "nanoid": "^4.0.2",
     "xo": "^0.54.2"
   },
