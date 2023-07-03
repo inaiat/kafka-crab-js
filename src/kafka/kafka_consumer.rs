@@ -15,13 +15,18 @@ use rdkafka::{
 };
 
 use std::{collections::HashMap, time::Duration, vec};
-use tracing::{debug, error, info};
+use tracing::{debug, error, info, warn};
 
 use crate::kafka::kafka_util::{
   convert_to_rdkafka_offset, kakfa_headers_to_hashmap, ExtractValueOnKafkaHashMap,
 };
 
-use super::{kafka_admin::KafkaAdmin, kafka_client::KafkaClient, model::OffsetModel};
+use super::{
+  kafka_admin::KafkaAdmin,
+  kafka_client::KafkaClient,
+  kafka_util::kakfa_headers_to_hashmap_buffer,
+  model::{OffsetModel, Payload},
+};
 
 const RETRY_COUNTER_NAME: &str = "kafka-crab-js-retry-counter";
 const DEFAULT_QUEUE_TIMEOUT: u64 = 5000;
@@ -129,9 +134,9 @@ impl KafkaConsumer {
   }
 
   #[napi(
-    ts_args_type = "callback: (err: Error | null, result: Buffer) => Promise<ConsumerResult | undefined>"
+    ts_args_type = "callback: (err: Error | null, result: Payload) => Promise<ConsumerResult | undefined>"
   )]
-  pub async fn start_consumer(&self, func: ThreadsafeFunction<Buffer>) -> Result<()> {
+  pub async fn start_consumer(&self, func: ThreadsafeFunction<Payload>) -> Result<()> {
     let ConsumerConfiguration {
       commit_mode,
       retry_strategy,
@@ -148,30 +153,9 @@ impl KafkaConsumer {
     let producer = self.producer.clone();
 
     if let Some(strategy) = retry_strategy.clone() {
-      let retry_topic = strategy
-        .retry_topic
-        .unwrap_or(format!("{}-retry", topic.clone()));
-      let stream_consumer_retry: StreamConsumer<CustomContext> = self
-        .setup_consumer(retry_topic.clone())
-        .await
-        .expect("Consumer creation failed");
-      debug!(
-        "Stream consumer configured for retry topic: {}",
-        retry_topic
-      );
-      let (retry_topic, retry_func, retry_producer) =
-        (topic.clone(), func.clone(), producer.clone());
-      tokio::spawn(async move {
-        start_consumer_loop(
-          stream_consumer_retry,
-          retry_func,
-          commit_mode,
-          strategy.retries,
-          &strategy.dql_topic.unwrap_or(format!("{}-dql", retry_topic)),
-          retry_producer,
-        )
-        .await
-      });
+      self
+        .setup_retry_consumer(topic.clone(), strategy, &func, &producer, commit_mode)
+        .await;
     };
 
     let stream_consumer: StreamConsumer<CustomContext> = self
@@ -197,6 +181,39 @@ impl KafkaConsumer {
     });
 
     Ok(())
+  }
+
+  async fn setup_retry_consumer(
+    &self,
+    topic: String,
+    strategy: RetryStrategy,
+    func: &ThreadsafeFunction<Payload>,
+    producer: &ProducerHelper,
+    commit_mode: Option<RdKfafkaCommitMode>,
+  ) {
+    let retry_topic = strategy
+      .retry_topic
+      .unwrap_or(format!("{}-retry", topic.clone()));
+    let stream_consumer_retry: StreamConsumer<CustomContext> = self
+      .setup_consumer(retry_topic.clone())
+      .await
+      .expect("Consumer creation failed");
+    debug!(
+      "Stream consumer configured for retry topic: {}",
+      retry_topic
+    );
+    let (retry_topic, retry_func, retry_producer) = (topic.clone(), func.clone(), producer.clone());
+    tokio::spawn(async move {
+      start_consumer_loop(
+        stream_consumer_retry,
+        retry_func,
+        commit_mode,
+        strategy.retries,
+        &strategy.dql_topic.unwrap_or(format!("{}-dql", retry_topic)),
+        retry_producer,
+      )
+      .await
+    });
   }
 
   async fn setup_consumer(&self, topic: String) -> anyhow::Result<StreamConsumer<CustomContext>> {
@@ -264,7 +281,7 @@ impl KafkaConsumer {
 
 async fn start_consumer_loop(
   stream_consumer: StreamConsumer<CustomContext>,
-  func: ThreadsafeFunction<Buffer>,
+  func: ThreadsafeFunction<Payload>,
   commit_mode: Option<RdKfafkaCommitMode>,
   retries: i32,
   next_topic_on_fail: &str,
@@ -291,8 +308,8 @@ async fn start_consumer_loop(
               message.offset()
             );
           }
-          Err(_) => {
-            error!("Message processing failed")
+          Err(err) => {
+            error!("Message processing failed. Error: {:?}", err);
           }
         }
       }
@@ -317,56 +334,73 @@ async fn handle_message_result(
               debug!("Message sent to retry strategy");
               Ok(())
             }
-            Err(e) => {
-              error!("Error while sending message to retry strategy: {:?}", e);
-              Err(e)
-            }
+            Err(e) => Err(anyhow::Error::msg(format!(
+              "Error while sending message to retry strategy: {:?}",
+              e
+            ))),
           }
         }
       },
       None => Ok(()),
     },
-    Err(err) => {
-      error!("Error while processing message: {:?}", err);
-      Err(anyhow::Error::msg("Producer not found"))
-    }
+    Err(err) => Err(err),
   }
 }
 
 async fn process_message(
   commit_mode: &Option<RdKfafkaCommitMode>,
   stream_consumer: &StreamConsumer<CustomContext>,
-  func: &ThreadsafeFunction<Buffer>,
+  func: &ThreadsafeFunction<Payload>,
   message: &BorrowedMessage<'_>,
 ) -> anyhow::Result<Option<ConsumerResult>> {
   match message.payload_view::<[u8]>() {
     None => Ok(None),
-    Some(Ok(payload)) => match func
-      .call_async::<Promise<Option<ConsumerResult>>>(Ok(payload.into()))
-      .await
-    {
-      Ok(js_result) => match js_result.await {
-        Ok(value) => match value {
-          None | Some(ConsumerResult::Ok) => {
-            if let Some(commit_mode) = commit_mode {
-              match stream_consumer.commit_message(message, *commit_mode) {
-                Ok(_) => Ok(Some(ConsumerResult::Ok)),
-                Err(e) => Err(anyhow::Error::new(e)),
+    Some(Ok(payload)) => {
+      let payload_js = create_payload(message, payload);
+      match func
+        .call_async::<Promise<Option<ConsumerResult>>>(Ok(payload_js))
+        .await
+      {
+        Ok(js_result) => match js_result.await {
+          Ok(value) => match value {
+            None | Some(ConsumerResult::Ok) => {
+              if let Some(commit_mode) = commit_mode {
+                match stream_consumer.commit_message(message, *commit_mode) {
+                  Ok(_) => Ok(Some(ConsumerResult::Ok)),
+                  Err(e) => Err(anyhow::Error::new(e)),
+                }
+              } else {
+                Ok(Some(ConsumerResult::Ok))
               }
-            } else {
-              Ok(Some(ConsumerResult::Ok))
             }
-          }
-          Some(ConsumerResult::Retry) => Ok(Some(ConsumerResult::Retry)),
+            Some(ConsumerResult::Retry) => Ok(Some(ConsumerResult::Retry)),
+          },
+          Err(_) => Ok(Some(ConsumerResult::Ok)),
         },
-        Err(e) => Err(anyhow::Error::new(e)),
-      },
-      Err(js_error) => Err(anyhow::Error::new(js_error)),
-    },
+        Err(err) => {
+          warn!("Error while calling function: {:?}", err.to_string());
+          Ok(Some(ConsumerResult::Retry))
+        }
+      }
+    }
     Some(_) => Err(anyhow::Error::msg(
       "Error while deserializing message payload",
     )),
   }
+}
+
+fn create_payload(message: &BorrowedMessage<'_>, payload: &[u8]) -> Payload {
+  let key: Option<Buffer> = message.key().map(|bytes| bytes.into());
+  let headers = Some(kakfa_headers_to_hashmap_buffer(message.headers()));
+  let payload_js = Payload::new(
+    payload.into(),
+    key,
+    headers,
+    message.topic().to_owned(),
+    message.partition(),
+    message.offset(),
+  );
+  payload_js
 }
 
 async fn send_to_retry_strategy(
@@ -415,7 +449,8 @@ async fn send_to_retry_strategy(
   let _result = producer
     .future_producer
     .send(record, producer.queue_timeout)
-    .await;
+    .await
+    .map_err(|e| anyhow::Error::new(e.0))?;
   info!("Message sent to topic: {:?}", next_topic);
   Ok(())
 }

@@ -16,9 +16,25 @@ export interface KafkaConfiguration {
   configuration?: Record<string, string>
   enableAnsiLogger?: boolean
 }
+export const enum CommitMode {
+  AutoCommit = 'AutoCommit',
+  Sync = 'Sync',
+  Async = 'Async'
+}
+export interface RetryStrategy {
+  retries: number
+  retryTopic?: string
+  dqlTopic?: string
+  pauseConsumerDuration?: number
+}
+export const enum ConsumerResult {
+  Ok = 'Ok',
+  Retry = 'Retry'
+}
 export interface ConsumerConfiguration {
   topic: string
   groupId: string
+  retryStrategy?: RetryStrategy
   offset?: OffsetModel
   createTopic?: boolean
   commitMode?: CommitMode
@@ -43,13 +59,10 @@ export const enum AutoOffsetReset {
   End = 'End',
   Error = 'Error'
 }
-export const enum CommitMode {
-  AutoCommit = 'AutoCommit',
-  Sync = 'Sync',
-  Async = 'Async'
-}
 export interface Payload {
-  message: Buffer
+  value: Buffer
+  key?: Buffer
+  headers?: Record<string, Buffer>
   topic: string
   partition: number
   offset: number
@@ -84,8 +97,9 @@ export class KafkaClient {
   createProducer(producerConfiguration: ProducerConfiguration): KafkaProducer
   createConsumer(consumerConfiguration: ConsumerConfiguration): KafkaConsumer
 }
+export class ProducerHelper { }
 export class KafkaConsumer {
-  startConsumer(callback: (err: Error | null, result: Payload) => Promise<undefined>): Promise<void>
+  startConsumer(callback: (err: Error | null, result: Payload) => Promise<ConsumerResult | undefined>): Promise<void>
 }
 export class KafkaProducer {
   send(producerRecord: ProducerRecord): Promise<Array<RecordMetadata>>

@@ -62,6 +62,19 @@ pub fn kakfa_headers_to_hashmap(headers: Option<&BorrowedHeaders>) -> HashMap<&s
   }
 }
 
+pub fn kakfa_headers_to_hashmap_buffer(
+  headers: Option<&BorrowedHeaders>,
+) -> HashMap<String, Buffer> {
+  match headers {
+    Some(value) => value
+      .iter()
+      .filter(|it| it.value.is_some())
+      .map(|it| (it.key.to_owned(), it.value.unwrap().into()))
+      .collect::<HashMap<String, Buffer>>(),
+    _ => HashMap::new(),
+  }
+}
+
 pub trait ExtractValueOnKafkaHashMap<T> {
   fn get_value(&self, key: &str) -> Option<T>;
 }

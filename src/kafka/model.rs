@@ -22,18 +22,11 @@ impl fmt::Display for AutoOffsetReset {
   }
 }
 
-#[napi(string_enum)]
-#[derive(Debug, PartialEq)]
-pub enum CommitMode {
-  AutoCommit,
-  Sync,
-  Async,
-}
-
+#[derive(Clone)]
 #[napi(object)]
 pub struct Payload {
   pub value: Buffer,
-  pub key: Buffer,
+  pub key: Option<Buffer>,
   pub headers: Option<HashMap<String, Buffer>>,
   pub topic: String,
   pub partition: i32,
@@ -43,7 +36,7 @@ pub struct Payload {
 impl Payload {
   pub fn new(
     value: Buffer,
-    key: Buffer,
+    key: Option<Buffer>,
     headers: Option<HashMap<String, Buffer>>,
     topic: String,
     partition: i32,
