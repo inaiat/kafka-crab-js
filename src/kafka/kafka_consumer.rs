@@ -32,7 +32,7 @@ const RETRY_COUNTER_NAME: &str = "kafka-crab-js-retry-counter";
 const DEFAULT_QUEUE_TIMEOUT: u64 = 5000;
 const DEFAULT_PAUSE_DURATION: i64 = 1000;
 const DEFAULT_RETRY_TOPIC_SUFFIX: &str = "-retry";
-const DEFAULT_DQL_TOPIC_SUFFIX: &str = "-dql";
+const DEFAULT_DLQ_TOPIC_SUFFIX: &str = "-dlq";
 
 type LoggingConsumer = StreamConsumer<CustomContext>;
 
@@ -176,10 +176,10 @@ impl KafkaConsumer {
         } else {
           strategy
             .dql_topic
-            .unwrap_or(format!("{}{}", &self.topic, DEFAULT_DQL_TOPIC_SUFFIX))
+            .unwrap_or(format!("{}{}", &self.topic, DEFAULT_DLQ_TOPIC_SUFFIX))
         }
       }
-      None => format!("{}{}", &self.topic, DEFAULT_DQL_TOPIC_SUFFIX),
+      None => format!("{}{}", &self.topic, DEFAULT_DLQ_TOPIC_SUFFIX),
     };
     let consumer_thread = ConsumerThread {
       stream_consumer: self
@@ -214,7 +214,7 @@ impl KafkaConsumer {
     let next_topic_on_fail = strategy
       .clone()
       .dql_topic
-      .unwrap_or(format!("{}{}", self.topic, DEFAULT_DQL_TOPIC_SUFFIX));
+      .unwrap_or(format!("{}{}", self.topic, DEFAULT_DLQ_TOPIC_SUFFIX));
     let pause_consumer_duration = Some(Duration::from_millis(
       strategy
         .pause_consumer_duration

@@ -14,12 +14,12 @@ const topic = 'my-js-topic';
 const consumer = kafkaClient.createConsumer({
   topic,
   groupId: 'my-js-group',
-  // CommitMode: CommitMode.Async,
+  CommitMode: CommitMode.AutoCommit,
   offset: {position: PartitionPosition.Stored},
-  configuration: {'enable.auto.commit': 'false', 'auto.offset.reset': 'earliest'},
-  retryStrategy: {
-    retries: 3,
-  },
+  configuration: {'auto.offset.reset': 'earliest'},
+  // RetryStrategy: {
+  //   retries: 3,
+  // },
 });
 const producer = kafkaClient.createProducer({topic, configuration: {'message.timeout.ms': '5000'}});
 
