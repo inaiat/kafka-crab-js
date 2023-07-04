@@ -1,6 +1,6 @@
 # Kafka Crab Js
 
-**Blazingly Fast Kafka Client for NodeJs**
+🚧 Project in Alpha Stage: API Subject to Breaking Changes 🚧
 
 Kafka-Crab-JS is a powerful Node.js library that allows developers to interact with Apache Kafka using Rust programming language, seamlessly integrated with Node.js applications. This documentation provides an overview of the Kafka-Crab-JS library, including installation instructions, usage guidelines, and examples.
 
@@ -37,11 +37,11 @@ const kafkaClient = new KafkaClient({
 The producer component allows you to send messages to Kafka topics.
 
 ```javascript
+const producer = kafkaClient.createProducer({topic: 'my-topic'});
+
 const result = await producer.send({
     topic: 'my-js-topic',
-    key: Buffer.from('abc'),
-    value: Buffer.from(`{"name":"Elizeu Drummond","phone":"55219123456"}`),
-    headers: {key: Buffer.from('value1')},
+    messages: [{value: Buffer.from(`{"name":"Elizeu Drummond","phone":"55219123456"}`)}],
 });
 console.log('Message sent with offset:', result);
 ```
@@ -55,8 +55,8 @@ Create a consumer instance by specifying the Kafka broker(s), group ID, and othe
 
 ```javascript
 const consumer = kafkaClient.createConsumer({
-  topic: 'my-js-topic',
-  groupId: 'my-js-group',
+  topic: 'my-topic',
+  groupId: 'my-group',
   retryStrategy: {
     retries: 3,
   },
@@ -66,9 +66,10 @@ const consumer = kafkaClient.createConsumer({
 You can consume messages using the run startConsumer:
 
 ```javascript
-consumer.startConsumer(async (error, value) => {
+consumer.startConsumer(async (error, {value, partition, offset}) => {
   const message = JSON.parse(value.toString());
-  const content = await process_my_message(message);
+  console.log('Message received! Partition:', partition, 'Offset:', offset, 'Message =>', message.toString());
+
   return ConsumerResult.Ok;
 });
 ```
