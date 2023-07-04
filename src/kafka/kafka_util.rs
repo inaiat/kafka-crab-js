@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use napi::bindgen_prelude::Buffer;
+use napi::{bindgen_prelude::Buffer, Status};
 use rdkafka::{
   consumer::{ConsumerContext, Rebalance},
   error::KafkaResult,
@@ -10,6 +10,19 @@ use rdkafka::{
 use tracing::info;
 
 use super::model::{OffsetModel, PartitionPosition};
+
+pub trait AnyhowToNapiError {
+  fn convert_to_napi(&self) -> napi::Error;
+}
+
+impl AnyhowToNapiError for anyhow::Error {
+  fn convert_to_napi(&self) -> napi::Error {
+    napi::Error::new(
+      Status::GenericFailure,
+      format!("Error: {}", self),
+    )
+  }
+}
 
 pub struct CustomContext;
 

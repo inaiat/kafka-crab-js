@@ -39,7 +39,10 @@
     "node": ">= 10"
   },
   "xo": {
-    "space": true
+    "space": true,
+    "rules": {
+      "new-cap": "off"
+    }
   },
   "scripts": {
     "artifacts": "napi artifacts",

@@ -6,55 +6,25 @@ import {KafkaClient, CommitMode, PartitionPosition, ConsumerResult} from '../ind
 
 const kafkaClient = new KafkaClient({
   brokers: 'localhost:29092',
-  clientId: 'my-id',
+  clientId: 'my-ids',
+  groupId: 'my-js-group',
   enableAnsiLogger: true});
 const topic = 'my-js-topic';
-
-const counter = 0;
 
 const consumer = kafkaClient.createConsumer({
   topic,
   groupId: 'my-js-group',
-  CommitMode: CommitMode.Sync,
+  // CommitMode: CommitMode.Async,
   offset: {position: PartitionPosition.Stored},
-  configuration: {'enable.auto.commit': 'false'},
+  configuration: {'enable.auto.commit': 'false', 'auto.offset.reset': 'earliest'},
+  retryStrategy: {
+    retries: 3,
+  },
 });
-
-console.time('consumer');
-
-consumer.startConsumer(async (error, {value, partition, offset}) => {
-  if (error) {
-    console.error('Js Consumer error', error);
-    return;
-  }
-
-  const message = JSON.parse(value.toString());
-
-  console.log('Message received! Partition:', partition, 'Offset:', offset, 'Message =>', message);
-
-  // Const content = await process(value);
-
-  // if (message._id !== '100') {
-  //   throw new Error('Error on message 3');
-  // }
-
-  // Counter++;
-  // if (counter >= 0) {
-  //   console.timeEnd('consumer');
-  //   console.log('Js Counter:', counter, 'Content:', JSON.stringify(content));
-  //   console.time('consumer');
-  // }
-
-  return 'xxxok';
-});
-
 const producer = kafkaClient.createProducer({topic, configuration: {'message.timeout.ms': '5000'}});
-console.log('Sending message');
-
-await timersPromises.setTimeout(5000);
 
 async function produce() {
-  for (let i = 0; i < 2; i++) {
+  for (let i = 0; i < 10; i++) {
     try {
       const result = await producer.send(
         {
@@ -69,4 +39,40 @@ async function produce() {
   }
 }
 
+async function startConsumer() {
+  consumer.startConsumer(async (error, {value, partition, offset}) => {
+    if (error) {
+      console.error('Js Consumer error', error);
+      return;
+    }
+
+    const message = JSON.parse(value.toString());
+
+    console.log('Message received! Partition:', partition, 'Offset:', offset, 'Message =>', message);
+
+    // Const content = await process(value);
+
+    if (message._id === '5') {
+      return ConsumerResult.Retry;
+    }
+
+    // Counter++;
+    // if (counter >= 0) {
+    //   console.timeEnd('consumer');
+    //   console.log('Js Counter:', counter, 'Content:', JSON.stringify(content));
+    //   console.time('consumer');
+    // }
+
+    return ConsumerResult.Ok;
+  });
+}
+
 await produce();
+
+// Await timersPromises.setTimeout(500);
+
+console.time('consumer');
+
+await startConsumer();
+// Await timersPromises.setTimeout(5000);
+
