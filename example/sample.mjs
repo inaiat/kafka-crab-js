@@ -2,6 +2,7 @@
 
 import timersPromises from 'node:timers/promises';
 import {Buffer} from 'node:buffer';
+import {nanoid} from 'nanoid';
 import {KafkaClient, CommitMode, PartitionPosition, ConsumerResult} from '../index.js';
 
 const kafkaClient = new KafkaClient({
@@ -9,7 +10,7 @@ const kafkaClient = new KafkaClient({
   clientId: 'my-ids',
   groupId: 'my-js-group',
   enableAnsiLogger: true});
-const topic = 'my-js-topic';
+const topic = `topic-${nanoid()}`;
 
 const consumer = kafkaClient.createConsumer({
   topic,
@@ -17,9 +18,10 @@ const consumer = kafkaClient.createConsumer({
   CommitMode: CommitMode.AutoCommit,
   offset: {position: PartitionPosition.Stored},
   configuration: {'auto.offset.reset': 'earliest'},
-  // RetryStrategy: {
-  //   retries: 3,
-  // },
+  retryStrategy: {
+    retries: 5,
+    pauseConsumerDuration: 5000,
+  },
 });
 const producer = kafkaClient.createProducer({topic, configuration: {'message.timeout.ms': '5000'}});
 
@@ -50,29 +52,16 @@ async function startConsumer() {
 
     console.log('Message received! Partition:', partition, 'Offset:', offset, 'Message =>', message);
 
-    // Const content = await process(value);
-
     if (message._id === '5') {
       return ConsumerResult.Retry;
     }
-
-    // Counter++;
-    // if (counter >= 0) {
-    //   console.timeEnd('consumer');
-    //   console.log('Js Counter:', counter, 'Content:', JSON.stringify(content));
-    //   console.time('consumer');
-    // }
 
     return ConsumerResult.Ok;
   });
 }
 
-await produce();
-
-// Await timersPromises.setTimeout(500);
-
 console.time('consumer');
 
 await startConsumer();
-// Await timersPromises.setTimeout(5000);
 
+await produce();

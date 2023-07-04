@@ -169,7 +169,7 @@ impl KafkaConsumer {
   ) -> Result<()> {
     let next_topic_on_fail = match retry_strategy {
       Some(strategy) => {
-        if (strategy.retries) > 0 {
+        let next_topic = if (strategy.retries) > 0 {
           strategy
             .retry_topic
             .unwrap_or(format!("{}{}", &self.topic, DEFAULT_RETRY_TOPIC_SUFFIX))
@@ -177,9 +177,10 @@ impl KafkaConsumer {
           strategy
             .dql_topic
             .unwrap_or(format!("{}{}", &self.topic, DEFAULT_DLQ_TOPIC_SUFFIX))
-        }
+        };
+        Some(next_topic)
       }
-      None => format!("{}{}", &self.topic, DEFAULT_DLQ_TOPIC_SUFFIX),
+      None => None,
     };
     let consumer_thread = ConsumerThread {
       stream_consumer: self
@@ -211,10 +212,12 @@ impl KafkaConsumer {
       .retry_topic
       .unwrap_or(format!("{}{}", self.topic, DEFAULT_RETRY_TOPIC_SUFFIX));
 
-    let next_topic_on_fail = strategy
-      .clone()
-      .dql_topic
-      .unwrap_or(format!("{}{}", self.topic, DEFAULT_DLQ_TOPIC_SUFFIX));
+    let next_topic_on_fail = Some(
+      strategy
+        .clone()
+        .dql_topic
+        .unwrap_or(format!("{}{}", self.topic, DEFAULT_DLQ_TOPIC_SUFFIX)),
+    );
     let pause_consumer_duration = Some(Duration::from_millis(
       strategy
         .pause_consumer_duration
@@ -317,7 +320,7 @@ pub struct ConsumerThread {
   func: ThreadsafeFunction<Payload>,
   commit_mode: Option<RdKfafkaCommitMode>,
   retries: i32,
-  next_topic_on_fail: String,
+  next_topic_on_fail: Option<String>,
   producer: ProducerHelper,
   pause_consumer_duration: Option<Duration>,
 }
@@ -431,41 +434,42 @@ impl ConsumerThread {
     };
 
     let next_topic = if self.retries > 0 && retry_counter <= self.retries.try_into().unwrap() {
-      debug!(
-        "Send message to same topic. Retry counter: {}",
-        retry_counter
-      );
-      message.topic()
+      Some(message.topic().to_string())
     } else {
-      debug!(
-        "Send message to next topic: {}. Retry counter {}",
-        self.next_topic_on_fail, retry_counter
-      );
-      &self.next_topic_on_fail
+      self.next_topic_on_fail.clone()
     };
-    let new_headers = message
-      .headers()
-      .unwrap_or(OwnedHeaders::new().as_borrowed())
-      .detach()
-      .insert(Header {
-        key: RETRY_COUNTER_NAME,
-        value: Some(retry_counter.to_string().as_str()),
-      });
-    let key = message.key().unwrap_or(&[]);
 
-    let record = FutureRecord::to(next_topic)
-      .key(key)
-      .headers(new_headers)
-      .payload(message.payload().unwrap_or(&[]));
+    match next_topic {
+      Some(next_topic) => {
+        info!("Message sent to next topic: {}", next_topic);
+        let new_headers = message
+          .headers()
+          .unwrap_or(OwnedHeaders::new().as_borrowed())
+          .detach()
+          .insert(Header {
+            key: RETRY_COUNTER_NAME,
+            value: Some(retry_counter.to_string().as_str()),
+          });
+        let key = message.key().unwrap_or(&[]);
 
-    let _result = self
-      .producer
-      .future_producer
-      .send(record, self.producer.queue_timeout)
-      .await
-      .map_err(|e| anyhow::Error::new(e.0))?;
-    info!("Message sent to topic: {:?}", next_topic);
-    Ok(())
+        let record = FutureRecord::to(&next_topic)
+          .key(key)
+          .headers(new_headers)
+          .payload(message.payload().unwrap_or(&[]));
+
+        let _result = self
+          .producer
+          .future_producer
+          .send(record, self.producer.queue_timeout)
+          .await
+          .map_err(|e| anyhow::Error::new(e.0))?;
+        Ok(())
+      }
+      None => {
+        debug!("There is no next topic. Commit message");
+        Ok(())
+      }
+    }
   }
 }
 
