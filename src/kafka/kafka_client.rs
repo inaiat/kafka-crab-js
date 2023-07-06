@@ -10,6 +10,7 @@ use rdkafka::{
 };
 
 use tracing::info;
+use tracing_subscriber::EnvFilter;
 
 use super::{
   kafka_consumer::{ConsumerConfiguration, KafkaConsumer},
@@ -78,7 +79,7 @@ impl KafkaClient {
   pub fn new(kafka_configuration: KafkaConfiguration) -> Self {
     match tracing_subscriber::fmt()
       .with_ansi(kafka_configuration.enable_ansi_logger.unwrap_or(false))
-      .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
+      .with_env_filter(EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info")))
       .try_init()
     {
       Ok(_) => {}
