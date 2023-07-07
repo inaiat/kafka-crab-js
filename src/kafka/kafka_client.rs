@@ -1,4 +1,4 @@
-use std::{collections::HashMap, fmt};
+use std::{collections::HashMap, fmt, str::FromStr};
 
 use napi::{bindgen_prelude::*, Result};
 use rdkafka::{
@@ -9,8 +9,7 @@ use rdkafka::{
   topic_partition_list::TopicPartitionList,
 };
 
-use tracing::info;
-use tracing_subscriber::EnvFilter;
+use tracing::{info, Level};
 
 use super::{
   kafka_consumer::{ConsumerConfiguration, KafkaConsumer},
@@ -62,7 +61,7 @@ pub struct KafkaConfiguration {
   pub client_id: String,
   pub security_protocol: Option<SecurityProtocol>,
   pub configuration: Option<HashMap<String, String>>,
-  pub enable_ansi_logger: Option<bool>,
+  pub log_level: Option<String>,
 }
 
 #[derive(Clone, Debug)]
@@ -77,9 +76,13 @@ pub struct KafkaClient {
 impl KafkaClient {
   #[napi(constructor)]
   pub fn new(kafka_configuration: KafkaConfiguration) -> Self {
+    let log_level = kafka_configuration.clone().log_level;
     match tracing_subscriber::fmt()
-      .with_ansi(kafka_configuration.enable_ansi_logger.unwrap_or(false))
-      .with_env_filter(EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info")))
+      .with_max_level(
+        Level::from_str(log_level.unwrap_or("error".to_owned()).as_str()).unwrap_or(Level::ERROR),
+      )
+      .json()
+      .with_ansi(false)
       .try_init()
     {
       Ok(_) => {}

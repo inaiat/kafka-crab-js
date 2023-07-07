@@ -7,8 +7,8 @@ import {KafkaClient, CommitMode, PartitionPosition, ConsumerResult} from '../ind
 
 const kafkaClient = new KafkaClient({
   brokers: 'localhost:29092',
-  clientId: 'my-ids',
-  groupId: 'my-js-group',
+  clientId: 'my-js-group',
+  logLevel: 'info',
   enableAnsiLogger: true});
 const topic = `topic-${nanoid()}`;
 

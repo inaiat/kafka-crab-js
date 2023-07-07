@@ -25,7 +25,7 @@ use super::{
   kafka_admin::KafkaAdmin,
   kafka_client::KafkaClient,
   kafka_util::{kakfa_headers_to_hashmap_buffer, AnyhowToNapiError},
-  model::{OffsetModel, Payload},
+  model::{OffsetModel, PartitionPosition, Payload},
 };
 
 const RETRY_COUNTER_NAME: &str = "kafka-crab-js-retry-counter";
@@ -69,6 +69,8 @@ pub struct RetryStrategy {
   pub retry_topic: Option<String>,
   pub dql_topic: Option<String>,
   pub pause_consumer_duration: Option<i64>,
+  pub offset: Option<OffsetModel>,
+  pub configuration: Option<HashMap<String, String>>,
 }
 
 #[napi(string_enum)]
@@ -184,7 +186,11 @@ impl KafkaConsumer {
     };
     let consumer_thread = ConsumerThread {
       stream_consumer: self
-        .create_stream_consumer(&self.topic)
+        .create_stream_consumer(
+          &self.topic,
+          self.consumer_configuration.offset.clone(),
+          self.consumer_configuration.configuration.clone(),
+        )
         .await
         .map_err(|e| e.convert_to_napi())?,
       func: func.clone(),
@@ -223,9 +229,17 @@ impl KafkaConsumer {
         .pause_consumer_duration
         .unwrap_or(DEFAULT_PAUSE_DURATION) as u64,
     ));
+    let offset_model = strategy.offset.clone().unwrap_or(OffsetModel {
+      position: Some(PartitionPosition::Stored),
+      offset: None,
+    });
     let consumer_thread = ConsumerThread {
       stream_consumer: self
-        .create_stream_consumer(&retry_topic)
+        .create_stream_consumer(
+          &retry_topic,
+          Some(offset_model),
+          strategy.configuration.clone(),
+        )
         .await
         .map_err(|e| e.convert_to_napi())?,
       func: func.clone(),
@@ -246,14 +260,14 @@ impl KafkaConsumer {
   async fn create_stream_consumer(
     &self,
     topic: &str,
+    offset: Option<OffsetModel>,
+    configuration: Option<HashMap<String, String>>,
   ) -> anyhow::Result<StreamConsumer<CustomContext>> {
     let context = CustomContext;
 
     let ConsumerConfiguration {
-      offset,
       create_topic,
       group_id,
-      configuration,
       enable_auto_commit,
       ..
     } = self.consumer_configuration.clone();
@@ -339,7 +353,8 @@ impl ConsumerThread {
           match self.handle_message_result(&message, message_result).await {
             Ok(_) => {
               debug!(
-                "Message consumed successfully. Partition: {}, Offset: {}",
+                "Message consumed successfully. Topic: {}, Partition: {}, Offset: {}",
+                message.topic(),
                 message.partition(),
                 message.offset()
               );

@@ -14,7 +14,7 @@ export interface KafkaConfiguration {
   clientId: string
   securityProtocol?: SecurityProtocol
   configuration?: Record<string, string>
-  enableAnsiLogger?: boolean
+  logLevel?: string
 }
 export const enum CommitMode {
   AutoCommit = 'AutoCommit',
@@ -26,6 +26,8 @@ export interface RetryStrategy {
   retryTopic?: string
   dqlTopic?: string
   pauseConsumerDuration?: number
+  offset?: OffsetModel
+  configuration?: Record<string, string>
 }
 export const enum ConsumerResult {
   Ok = 'Ok',
