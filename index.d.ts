@@ -101,7 +101,7 @@ export class KafkaClient {
 }
 export class ProducerHelper { }
 export class KafkaConsumer {
-  startConsumer(callback: (err: Error | null, result: Payload) => Promise<ConsumerResult | undefined>): Promise<void>
+  startConsumer(callback: (error: Error | undefined, result: Payload) => Promise<ConsumerResult | undefined>): Promise<void>
 }
 export class KafkaProducer {
   send(producerRecord: ProducerRecord): Promise<Array<RecordMetadata>>

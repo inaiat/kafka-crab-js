@@ -150,7 +150,7 @@ impl KafkaConsumer {
   }
 
   #[napi(
-    ts_args_type = "callback: (err: Error | null, result: Payload) => Promise<ConsumerResult | undefined>"
+    ts_args_type = "callback: (error: Error | undefined, result: Payload) => Promise<ConsumerResult | undefined>"
   )]
   pub async fn start_consumer(&self, func: ThreadsafeFunction<Payload>) -> Result<()> {
     let ConsumerConfiguration { retry_strategy, .. } = self.consumer_configuration.clone();

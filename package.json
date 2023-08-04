@@ -1,6 +1,6 @@
 {
   "name": "kafka-crab-js",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "main": "index.js",
   "types": "index.d.ts",
   "napi": {
@@ -41,7 +41,8 @@
   "xo": {
     "space": true,
     "rules": {
-      "new-cap": "off"
+      "new-cap": "off",
+      "object-curly-spacing": "off"
     }
   },
   "scripts": {

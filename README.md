@@ -1,7 +1,5 @@
 # Kafka Crab Js
 
-🚧 Project in Alpha Stage: API Subject to Breaking Changes 🚧
-
 Kafka-Crab-JS is a powerful Node.js library that allows developers to interact with Apache Kafka using Rust programming language, seamlessly integrated with Node.js applications. This documentation provides an overview of the Kafka-Crab-JS library, including installation instructions, usage guidelines, and examples.
 
 The plugin can be found on [npm](https://www.npmjs.com/package/kafka-crab-js) and the source code is available on [GitHub](https://github.com/inaiat/kafka-crab-js).
