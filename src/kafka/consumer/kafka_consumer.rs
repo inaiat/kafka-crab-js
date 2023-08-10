@@ -1,13 +1,9 @@
+use anyhow::Ok;
 use napi::{bindgen_prelude::*, threadsafe_function::ThreadsafeFunction, Result};
 
 use rdkafka::{
-  client::ClientContext,
   config::RDKafkaLogLevel,
-  consumer::{
-    stream_consumer::StreamConsumer, CommitMode as RdKfafkaCommitMode, Consumer, ConsumerContext,
-    Rebalance,
-  },
-  error::KafkaResult,
+  consumer::{stream_consumer::StreamConsumer, CommitMode as RdKfafkaCommitMode, Consumer},
   message::{BorrowedMessage, Header, OwnedHeaders},
   producer::{FutureProducer, FutureRecord},
   topic_partition_list::TopicPartitionList,
@@ -17,75 +13,24 @@ use rdkafka::{
 use std::{collections::HashMap, time::Duration, vec};
 use tracing::{debug, error, info, warn};
 
-use crate::kafka::kafka_util::{
-  convert_to_rdkafka_offset, kakfa_headers_to_hashmap, ExtractValueOnKafkaHashMap,
-};
-
-use super::{
+use crate::kafka::{
   kafka_admin::KafkaAdmin,
   kafka_client::KafkaClient,
-  kafka_util::{kakfa_headers_to_hashmap_buffer, AnyhowToNapiError},
+  kafka_util::kakfa_headers_to_hashmap_buffer,
+  kafka_util::{
+    convert_to_rdkafka_offset, kakfa_headers_to_hashmap, AnyhowToNapiError,
+    ExtractValueOnKafkaHashMap,
+  },
   model::{OffsetModel, PartitionPosition, Payload},
 };
 
-const RETRY_COUNTER_NAME: &str = "kafka-crab-js-retry-counter";
-const DEFAULT_QUEUE_TIMEOUT: u64 = 5000;
-const DEFAULT_PAUSE_DURATION: i64 = 1000;
-const DEFAULT_RETRY_TOPIC_SUFFIX: &str = "-retry";
-const DEFAULT_DLQ_TOPIC_SUFFIX: &str = "-dlq";
+use super::consumer_model::{
+  CommitMode, ConsumerConfiguration, ConsumerResult, CustomContext, KafkaConsumer, ProducerHelper,
+  DEFAULT_DLQ_TOPIC_SUFFIX, DEFAULT_PAUSE_DURATION, DEFAULT_QUEUE_TIMEOUT,
+  DEFAULT_RETRY_TOPIC_SUFFIX, RETRY_COUNTER_NAME,
+};
 
 type LoggingConsumer = StreamConsumer<CustomContext>;
-
-pub struct CustomContext;
-
-impl ClientContext for CustomContext {}
-
-impl ConsumerContext for CustomContext {
-  fn pre_rebalance(&self, rebalance: &Rebalance) {
-    info!("Pre rebalance {:?}", rebalance);
-  }
-
-  fn post_rebalance(&self, rebalance: &Rebalance) {
-    info!("Post rebalance {:?}", rebalance);
-  }
-
-  fn commit_callback(&self, result: KafkaResult<()>, _offsets: &TopicPartitionList) {
-    info!("Committing offsets: {:?}. Offset: {:?}", result, _offsets);
-  }
-}
-
-#[napi(string_enum)]
-#[derive(Debug, PartialEq)]
-pub enum CommitMode {
-  AutoCommit,
-  Sync,
-  Async,
-}
-
-#[napi(object)]
-#[derive(Clone, Debug)]
-pub struct RetryStrategy {
-  pub retries: i32,
-  pub retry_topic: Option<String>,
-  pub dql_topic: Option<String>,
-  pub pause_consumer_duration: Option<i64>,
-  pub offset: Option<OffsetModel>,
-  pub configuration: Option<HashMap<String, String>>,
-}
-
-#[napi(string_enum)]
-#[derive(Debug)]
-pub enum ConsumerResult {
-  Ok,
-  Retry,
-}
-
-#[derive(Clone)]
-#[napi]
-pub struct ProducerHelper {
-  future_producer: FutureProducer,
-  queue_timeout: Duration,
-}
 
 fn setup_future_producer(
   client_config: &ClientConfig,
@@ -100,28 +45,6 @@ fn setup_future_producer(
     future_producer,
     queue_timeout,
   })
-}
-#[napi(object)]
-#[derive(Clone, Debug)]
-pub struct ConsumerConfiguration {
-  pub topic: String,
-  pub group_id: String,
-  pub retry_strategy: Option<RetryStrategy>,
-  pub offset: Option<OffsetModel>,
-  pub create_topic: Option<bool>,
-  pub commit_mode: Option<CommitMode>,
-  pub enable_auto_commit: Option<bool>,
-  pub configuration: Option<HashMap<String, String>>,
-}
-
-#[derive(Clone)]
-#[napi]
-pub struct KafkaConsumer {
-  client_config: ClientConfig,
-  consumer_configuration: ConsumerConfiguration,
-  producer: ProducerHelper,
-  commit_mode: Option<RdKfafkaCommitMode>,
-  topic: String,
 }
 
 #[napi]
@@ -147,7 +70,37 @@ impl KafkaConsumer {
       commit_mode,
       topic,
     })
+
   }
+
+  pub fn create_base_consumer(&self) -> Result<LoggingConsumer> {
+    let ConsumerConfiguration {
+      create_topic,
+      group_id,
+      enable_auto_commit,
+      ..
+    } = self.consumer_configuration.clone();
+
+    let mut consumer_config: ClientConfig = self.client_config.clone();
+
+    if let Some(config) = self.consumer_configuration.configuration {
+      consumer_config.extend(config);
+    }
+
+    let consumer: LoggingConsumer = consumer_config
+      .clone()
+      .set("group.id", group_id.clone())
+      .set(
+        "enable.auto.commit",
+        enable_auto_commit.unwrap_or(true).to_string(),
+      )
+      .set_log_level(RDKafkaLogLevel::Debug)
+      .create_with_context(context)
+      .expect("Consumer creation failed");
+
+    Ok(consumer)
+  }
+}
 
   #[napi(
     ts_args_type = "callback: (error: Error | undefined, result: Payload) => Promise<ConsumerResult | undefined>"

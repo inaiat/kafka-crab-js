@@ -12,7 +12,7 @@ use rdkafka::{
 use tracing::{info, Level};
 
 use super::{
-  kafka_consumer::{ConsumerConfiguration, KafkaConsumer},
+  consumer::kafka_consumer::{ConsumerConfiguration, KafkaConsumer},
   kafka_producer::{KafkaProducer, ProducerConfiguration},
 };
 
