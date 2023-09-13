@@ -1,6 +1,6 @@
 {
   "name": "kafka-crab-js",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "main": "index.js",
   "types": "index.d.ts",
   "napi": {
@@ -25,7 +25,7 @@
   "author": "inaiat@gmail.com",
   "homepage": "https://github.com/inaiat/kafka-crab-js.git",
   "devDependencies": {
-    "@napi-rs/cli": "^2.16.1",
+    "@napi-rs/cli": "^2.16.3",
     "ava": "^5.3.1",
     "benny": "^3.7.1",
     "kafkajs": "^2.2.4",

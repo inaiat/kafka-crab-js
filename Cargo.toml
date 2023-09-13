@@ -17,10 +17,11 @@ napi-derive = "2"
 
 anyhow = { version = "1.0", features = ["backtrace"] }
 
-rdkafka = { version = "0.33", features = [
+rdkafka = { version = "0.34", features = [
     "libz-static",
     "cmake-build",
     "tokio",
+    "ssl",
     "ssl-vendored",
 ] }
 tokio = { version = "1", features = ["full"] }
