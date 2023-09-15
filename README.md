@@ -72,5 +72,4 @@ consumer.startConsumer(async (error, {value, partition, offset}) => {
 });
 ```
 ## Examples
-
 You can find examples of using Kafka Crab JS in the [GitHub repository](https://github.com/inaiat/kafka-crab-js).
