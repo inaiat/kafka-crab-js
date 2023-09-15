@@ -9,7 +9,7 @@ use rdkafka::{
 };
 
 use std::{collections::HashMap, time::Duration, vec};
-use tracing::{debug, info};
+use tracing::{debug, error, info, warn};
 
 use crate::kafka::{
   kafka_admin::KafkaAdmin,
@@ -265,29 +265,46 @@ impl KafkaConsumer {
         enable_auto_commit.unwrap_or(true).to_string(),
       )
       .set_log_level(RDKafkaLogLevel::Debug)
-      .create_with_context(context)
-      .expect("Consumer creation failed");
+      .create_with_context(context)?;
 
     if create_topic.unwrap_or(true) {
+      info!("Creating topic: {:?}", topic);
       let admin = KafkaAdmin::new(&self.client_config);
-      admin.create_topic(topic).await?;
+      let result = admin.create_topic(topic).await;
+      if let Err(e) = result {
+        warn!("Fail to create topic {:?}", e);
+        return Err(anyhow::Error::msg(format!("Fail to create topic: {:?}", e)));
+      }
+      info!("Topic created: {:?}", topic)
     }
 
     if let Some(offset) = convert_to_rdkafka_offset(offset) {
       debug!("Setting offset to: {:?}", offset);
-      let metadata = consumer
-        .fetch_metadata(Some(topic), Duration::from_millis(1500))
-        .expect("Fail to retrive metadata from consumer");
+      let metadata = consumer.fetch_metadata(Some(topic), Duration::from_millis(1500))?;
 
       metadata.topics().iter().for_each(|meta_topic| {
         let mut tpl = TopicPartitionList::new();
         meta_topic.partitions().iter().for_each(|meta_partition| {
           tpl.add_partition(topic, meta_partition.id());
         });
-        tpl.set_all_offsets(offset).expect("Fail to set offset");
-        consumer
-          .assign(&tpl)
-          .expect("Assign topic partition list failed");
+        //TODO: Handle error
+        match tpl.set_all_offsets(offset) {
+          Ok(_) => {
+            debug!("Offset set to: {:?}", offset);
+          }
+          Err(e) => {
+            error!("Fail to set offset: {:?}", e)
+          }
+        };
+        //TODO: Handle error
+        match consumer.assign(&tpl) {
+          Ok(_) => {
+            debug!("Assigning topic: {:?}", topic);
+          }
+          Err(e) => {
+            error!("Fail to assign topic: {:?}", e);
+          }
+        }
       });
     }
 

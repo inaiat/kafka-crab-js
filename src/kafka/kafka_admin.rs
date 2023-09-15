@@ -33,14 +33,9 @@ impl<'a> KafkaAdmin<'a> {
   }
 
   async fn fetch_config_resource(&self) -> Result<HashMap<String, String>, KafkaError> {
-    let consumer: BaseConsumer = self
-      .client_config
-      .create()
-      .expect("Consumer creation failed");
+    let consumer: BaseConsumer = self.client_config.create()?;
 
-    let metadata = consumer
-      .fetch_metadata(None, Duration::from_secs(5))
-      .expect("Failed to fetch metadata");
+    let metadata = consumer.fetch_metadata(None, Duration::from_secs(5))?;
 
     for broker in metadata.brokers() {
       info!(
@@ -63,9 +58,9 @@ impl<'a> KafkaAdmin<'a> {
   }
 
   pub async fn create_topic(&self, topic_name: &str) -> anyhow::Result<()> {
+    debug!("Fetching broker properties");
     let broker_properties = self.fetch_config_resource().await?.clone();
-
-    // If you want print all properties => dbg!(broker_properties.clone());
+    debug!("Broker properties: {:?}", broker_properties);
 
     self
       .admin_client
