@@ -1,4 +1,4 @@
-use napi::{bindgen_prelude::*, threadsafe_function::ThreadsafeFunction, Result};
+use napi::{threadsafe_function::ThreadsafeFunction, Result};
 
 use rdkafka::{
   config::RDKafkaLogLevel,

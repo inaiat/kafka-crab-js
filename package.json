@@ -25,12 +25,12 @@
   "author": "inaiat@gmail.com",
   "homepage": "https://github.com/inaiat/kafka-crab-js.git",
   "devDependencies": {
-    "@napi-rs/cli": "^2.16.3",
-    "ava": "^5.3.1",
+    "@napi-rs/cli": "^2.18.0",
+    "ava": "^6.1.2",
     "benny": "^3.7.1",
     "kafkajs": "^2.2.4",
-    "nanoid": "^4.0.2",
-    "xo": "^0.54.2"
+    "nanoid": "^5.0.6",
+    "xo": "^0.58.0"
   },
   "ava": {
     "timeout": "3m"
