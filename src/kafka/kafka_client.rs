@@ -62,6 +62,7 @@ pub struct KafkaConfiguration {
   pub security_protocol: Option<SecurityProtocol>,
   pub configuration: Option<HashMap<String, String>>,
   pub log_level: Option<String>,
+  pub broker_address_family: Option<String>,
 }
 
 #[derive(Clone, Debug)]
@@ -103,6 +104,7 @@ impl KafkaClient {
       security_protocol,
       client_id,
       configuration,
+      broker_address_family,
       ..
     } = kafka_configuration.clone();
 
@@ -111,6 +113,10 @@ impl KafkaClient {
     rdkafka_client_config.set_log_level(RDKafkaLogLevel::Debug);
     rdkafka_client_config.set("bootstrap.servers", brokers);
     rdkafka_client_config.set("client.id", client_id);
+    rdkafka_client_config.set(
+      "broker.address.family",
+      broker_address_family.unwrap_or("v4".to_string()),
+    );
     if let Some(security_protocol) = security_protocol {
       rdkafka_client_config.set("security.protocol", security_protocol.to_string());
     }

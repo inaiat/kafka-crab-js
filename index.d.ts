@@ -42,6 +42,7 @@ export interface KafkaConfiguration {
   securityProtocol?: SecurityProtocol
   configuration?: Record<string, string>
   logLevel?: string
+  brokerAddressFamily?: string
 }
 export interface ProducerConfiguration {
   queueTimeout?: number
