@@ -6,6 +6,7 @@
   "napi": {
     "name": "kafka-crab-js",
     "triples": {
+      "defaults": false,
       "additional": [
         "aarch64-apple-darwin",
         "x86_64-apple-darwin",
@@ -32,7 +33,7 @@
     "timeout": "3m"
   },
   "engines": {
-    "node": ">= 10"
+    "node": ">= 18"
   },
   "xo": {
     "space": true,
