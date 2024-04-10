@@ -24,6 +24,10 @@
   ],
   "author": "inaiat@gmail.com",
   "homepage": "https://github.com/inaiat/kafka-crab-js.git",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/inaiat/kafka-crab-js.git"
+  },
   "devDependencies": {
     "@napi-rs/cli": "^2.18.0",
     "ava": "^6.1.2",
