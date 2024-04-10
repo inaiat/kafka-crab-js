@@ -2,6 +2,7 @@ name: CI
 env:
   DEBUG: napi:*
   APP_NAME: kafka-crab-js
+  CXXFLAGS: "-stdlib=libc++ -L/usr/lib/llvm-18/lib -static"
   MACOSX_DEPLOYMENT_TARGET: '10.13'
 permissions:
   contents: write
