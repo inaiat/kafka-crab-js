@@ -1,5 +1,3 @@
-use napi::bindgen_prelude::*;
-
 use std::{collections::HashMap, fmt};
 
 use napi::bindgen_prelude::Buffer;
@@ -53,7 +51,7 @@ impl Payload {
   }
 }
 
-#[napi(object)]
+#[napi(string_enum)]
 #[derive(Debug)]
 pub enum PartitionPosition {
   Beginning,

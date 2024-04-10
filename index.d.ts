@@ -42,6 +42,7 @@ export interface KafkaConfiguration {
   securityProtocol?: SecurityProtocol
   configuration?: Record<string, string>
   logLevel?: string
+  brokerAddressFamily?: string
 }
 export interface ProducerConfiguration {
   queueTimeout?: number
@@ -70,9 +71,9 @@ export interface Payload {
   offset: number
 }
 export const enum PartitionPosition {
-  Beginning = 0,
-  End = 1,
-  Stored = 2
+  Beginning = 'Beginning',
+  End = 'End',
+  Stored = 'Stored'
 }
 export interface OffsetModel {
   offset?: number
