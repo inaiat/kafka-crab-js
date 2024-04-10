@@ -1,14 +1,17 @@
 /* eslint-disable no-await-in-loop */
 
-import timersPromises from 'node:timers/promises';
+// import timersPromises from 'node:timers/promises';
 import { Buffer } from 'node:buffer';
 import { nanoid } from 'nanoid';
-import { KafkaClient, CommitMode, PartitionPosition, ConsumerResult } from '../index.js';
+import {
+  KafkaClient, CommitMode, PartitionPosition, ConsumerResult,
+} from '../index.js';
 
 const kafkaClient = new KafkaClient({
   brokers: 'localhost:29092',
   clientId: 'my-js-group',
   logLevel: 'info',
+  brokerAddressFamily: 'v4',
 });
 const topic = `topic-${nanoid()}`;
 
