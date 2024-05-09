@@ -56,7 +56,7 @@ jobs:
           check-latest: true
           cache: pnpm
       - name: Install corepack
-        run: npm install -g corepack && corepack enable
+        run: npm install -g pnpm
       - name: Install
         uses: dtolnay/rust-toolchain@stable
         if: ${{ !matrix.settings.docker }}
@@ -135,7 +135,7 @@ jobs:
           check-latest: true
           cache: pnpm
       - name: Install corepack
-        run: npm install -g corepack && corepack enable
+        run: npm install -g pnpm
       - name: Install dependencies
         run: pnpm install
       - name: Download artifacts
@@ -168,7 +168,7 @@ jobs:
           check-latest: true
           cache: pnpm
       - name: Install corepack
-        run: npm install -g corepack && corepack enable
+        run: npm install -g pnpm
       - name: Install dependencies
         run: pnpm install
       - name: Download artifacts
@@ -195,7 +195,7 @@ jobs:
           node-version: 20
           cache: pnpm
       - name: Install corepack
-        run: npm install -g corepack && corepack enable
+        run: npm install -g pnpm
       - name: Install dependencies
         run: pnpm install
       - name: Download all artifacts
