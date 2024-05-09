@@ -54,12 +54,11 @@ jobs:
         with:
           node-version: 20
           check-latest: true
-          cache: pnpm
       - uses: pnpm/action-setup@v4
         name: Install pnpm
         with:
           version: 9
-          run_install: false
+          run_install: true
       - name: Install
         uses: dtolnay/rust-toolchain@stable
         if: ${{ !matrix.settings.docker }}
@@ -141,9 +140,7 @@ jobs:
         name: Install pnpm
         with:
           version: 9
-          run_install: false
-      - name: Install dependencies
-        run: pnpm install
+          run_install: true
       - name: Download artifacts
         uses: actions/download-artifact@v3
         with:
@@ -177,9 +174,7 @@ jobs:
         name: Install pnpm
         with:
           version: 9
-          run_install: false
-      - name: Install dependencies
-        run: pnpm install
+          run_install: true
       - name: Download artifacts
         uses: actions/download-artifact@v3
         with:
@@ -202,14 +197,11 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: pnpm
       - uses: pnpm/action-setup@v4
         name: Install pnpm
         with:
           version: 9
-          run_install: false
-      - name: Install dependencies
-        run: pnpm install
+          run_install: true
       - name: Download all artifacts
         uses: actions/download-artifact@v3
         with:
