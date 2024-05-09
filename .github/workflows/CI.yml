@@ -134,6 +134,8 @@ jobs:
           node-version: ${{ matrix.node }}
           check-latest: true
           cache: pnpm
+      - name: Install corepack
+        run: npm install -g corepack && corepack enable
       - name: Install dependencies
         run: pnpm install
       - name: Download artifacts
@@ -165,6 +167,8 @@ jobs:
           node-version: ${{ matrix.node }}
           check-latest: true
           cache: pnpm
+      - name: Install corepack
+        run: npm install -g corepack && corepack enable
       - name: Install dependencies
         run: pnpm install
       - name: Download artifacts
@@ -190,6 +194,8 @@ jobs:
         with:
           node-version: 20
           cache: pnpm
+      - name: Install corepack
+        run: npm install -g corepack && corepack enable
       - name: Install dependencies
         run: pnpm install
       - name: Download all artifacts
