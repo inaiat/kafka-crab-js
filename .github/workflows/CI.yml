@@ -57,7 +57,6 @@ jobs:
       - uses: pnpm/action-setup@v4
         name: Install pnpm
         with:
-          version: 9
           run_install: true
       - name: Install
         uses: dtolnay/rust-toolchain@stable
@@ -139,7 +138,6 @@ jobs:
       - uses: pnpm/action-setup@v4
         name: Install pnpm
         with:
-          version: 9
           run_install: true
       - name: Download artifacts
         uses: actions/download-artifact@v3
@@ -173,7 +171,6 @@ jobs:
       - uses: pnpm/action-setup@v4
         name: Install pnpm
         with:
-          version: 9
           run_install: true
       - name: Download artifacts
         uses: actions/download-artifact@v3
@@ -200,7 +197,6 @@ jobs:
       - uses: pnpm/action-setup@v4
         name: Install pnpm
         with:
-          version: 9
           run_install: true
       - name: Download all artifacts
         uses: actions/download-artifact@v3
