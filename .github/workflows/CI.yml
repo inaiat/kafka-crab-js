@@ -54,7 +54,6 @@ jobs:
         with:
           node-version: 20
           check-latest: true
-          cache: 'pnpm'
       - uses: pnpm/action-setup@v4
         name: Install pnpm
         with:
@@ -87,8 +86,10 @@ jobs:
         if: matrix.settings.target == 'i686-pc-windows-msvc'
         run: pnpm config set supportedArchitectures.cpu "ia32"
         shell: bash
-      - name: Install dependencies
-        run: pnpm install
+      - uses: pnpm/action-setup@v4
+        name: Install pnpm
+        with:
+          run_install: true
       - name: Setup node x86
         uses: actions/setup-node@v3
         if: matrix.settings.target == 'i686-pc-windows-msvc'
@@ -135,7 +136,6 @@ jobs:
         with:
           node-version: ${{ matrix.node }}
           check-latest: true
-          cache: 'pnpm'
       - uses: pnpm/action-setup@v4
         name: Install pnpm
         with:
@@ -168,7 +168,6 @@ jobs:
         with:
           node-version: ${{ matrix.node }}
           check-latest: true
-          cache: 'pnpm'
       - uses: pnpm/action-setup@v4
         name: Install pnpm
         with:
