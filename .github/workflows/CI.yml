@@ -54,6 +54,7 @@ jobs:
         with:
           node-version: 20
           check-latest: true
+          cache: 'pnpm'
       - uses: pnpm/action-setup@v4
         name: Install pnpm
         with:
@@ -86,17 +87,15 @@ jobs:
         if: matrix.settings.target == 'i686-pc-windows-msvc'
         run: pnpm config set supportedArchitectures.cpu "ia32"
         shell: bash
-      - uses: pnpm/action-setup@v4
-        name: Install pnpm
-        with:
-          run_install: true
+      - name: Install dependencies
+        run: pnpm install
       - name: Setup node x86
         uses: actions/setup-node@v3
         if: matrix.settings.target == 'i686-pc-windows-msvc'
         with:
           node-version: 20
           check-latest: true
-          # cache: 'pnpm'
+          cache: 'pnpm'
           architecture: x86
       - name: Build in docker
         uses: addnab/docker-run-action@v3
@@ -136,6 +135,7 @@ jobs:
         with:
           node-version: ${{ matrix.node }}
           check-latest: true
+          cache: 'pnpm'
       - uses: pnpm/action-setup@v4
         name: Install pnpm
         with:
@@ -168,6 +168,7 @@ jobs:
         with:
           node-version: ${{ matrix.node }}
           check-latest: true
+          cache: 'pnpm'
       - uses: pnpm/action-setup@v4
         name: Install pnpm
         with:
@@ -194,7 +195,7 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 20
-          # cache: 'pnpm'
+          cache: 'pnpm'
       - uses: pnpm/action-setup@v4
         name: Install pnpm
         with:
