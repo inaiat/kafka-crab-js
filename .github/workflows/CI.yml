@@ -10,7 +10,6 @@ permissions:
   push:
     branches:
       - main
-      - chore/pnpm
     tags-ignore:
       - '**'
     paths-ignore:
@@ -54,7 +53,6 @@ jobs:
         with:
           node-version: 20
           check-latest: true
-          cache: 'pnpm'
       - uses: pnpm/action-setup@v4
         name: Install pnpm
         with:
@@ -95,7 +93,6 @@ jobs:
         with:
           node-version: 20
           check-latest: true
-          cache: 'pnpm'
           architecture: x86
       - name: Build in docker
         uses: addnab/docker-run-action@v3
@@ -135,7 +132,6 @@ jobs:
         with:
           node-version: ${{ matrix.node }}
           check-latest: true
-          cache: 'pnpm'
       - uses: pnpm/action-setup@v4
         name: Install pnpm
         with:
@@ -168,7 +164,6 @@ jobs:
         with:
           node-version: ${{ matrix.node }}
           check-latest: true
-          cache: 'pnpm'
       - uses: pnpm/action-setup@v4
         name: Install pnpm
         with:
@@ -195,7 +190,6 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: 'pnpm'
       - uses: pnpm/action-setup@v4
         name: Install pnpm
         with:
