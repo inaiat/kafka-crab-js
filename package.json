@@ -55,5 +55,5 @@
     "universal": "napi universal",
     "version": "napi version"
   },
-  "packageManager": "pnpm@9.1.0"
+  "packageManager": "pnpm@9.0.6"
 }
