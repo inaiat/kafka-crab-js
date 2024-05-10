@@ -177,7 +177,8 @@ jobs:
         run: ls -R .
         shell: bash
       - name: Test bindings
-        run: docker run --rm -v $(pwd):/build -w /build node:${{ matrix.node }}-slim pnpm test
+        run: pnpm test
+        # run: docker run --rm -v $(pwd):/build -w /build node:${{ matrix.node }}-slim pnpm test
   publish:
     name: Publish
     runs-on: ubuntu-latest
