@@ -1,26 +1,19 @@
 use napi::{threadsafe_function::ThreadsafeFunction, Result};
 
 use rdkafka::{
-  config::RDKafkaLogLevel,
-  consumer::{stream_consumer::StreamConsumer, CommitMode as RdKfafkaCommitMode, Consumer},
+  consumer::CommitMode as RdKfafkaCommitMode,
   producer::FutureProducer,
-  topic_partition_list::TopicPartitionList,
   ClientConfig,
 };
 
-use std::{collections::HashMap, time::Duration, vec};
-use tracing::{debug, error, info, warn};
+use std::time::Duration;
 
 use crate::kafka::{
-  kafka_admin::KafkaAdmin,
-  kafka_client::KafkaClient,
-  kafka_util::{convert_to_rdkafka_offset, AnyhowToNapiError},
-  model::{OffsetModel, PartitionPosition, Payload},
+  kafka_client::KafkaClient, kafka_util::AnyhowToNapiError, model::{OffsetModel, PartitionPosition, Payload}
 };
 
 use super::{
-  consumer_context::{CustomContext, LoggingConsumer},
-  consumer_thread::ConsumerThread,
+  consumer_helper::create_stream_consumer, consumer_model::{CommitMode, ConsumerConfiguration, RetryStrategy}, consumer_thread::ConsumerThread
 };
 
 pub const RETRY_COUNTER_NAME: &str = "kafka-crab-js-retry-counter";
@@ -28,25 +21,6 @@ pub const DEFAULT_QUEUE_TIMEOUT: u64 = 5000;
 pub const DEFAULT_PAUSE_DURATION: i64 = 1000;
 pub const DEFAULT_RETRY_TOPIC_SUFFIX: &str = "-retry";
 pub const DEFAULT_DLQ_TOPIC_SUFFIX: &str = "-dlq";
-
-#[napi(string_enum)]
-#[derive(Debug, PartialEq)]
-pub enum CommitMode {
-  AutoCommit,
-  Sync,
-  Async,
-}
-
-#[napi(object)]
-#[derive(Clone, Debug)]
-pub struct RetryStrategy {
-  pub retries: i32,
-  pub retry_topic: Option<String>,
-  pub dql_topic: Option<String>,
-  pub pause_consumer_duration: Option<i64>,
-  pub offset: Option<OffsetModel>,
-  pub configuration: Option<HashMap<String, String>>,
-}
 
 #[napi(string_enum)]
 #[derive(Debug)]
@@ -74,18 +48,6 @@ fn setup_future_producer(
     future_producer,
     queue_timeout,
   })
-}
-#[napi(object)]
-#[derive(Clone, Debug)]
-pub struct ConsumerConfiguration {
-  pub topic: String,
-  pub group_id: String,
-  pub retry_strategy: Option<RetryStrategy>,
-  pub offset: Option<OffsetModel>,
-  pub create_topic: Option<bool>,
-  pub commit_mode: Option<CommitMode>,
-  pub enable_auto_commit: Option<bool>,
-  pub configuration: Option<HashMap<String, String>>,
 }
 
 #[derive(Clone)]
@@ -123,11 +85,6 @@ impl KafkaConsumer {
     })
   }
 
-  // #[napi(ts_args_type = "callback: (error: Error) => Promise<ConsumerResult | undefined>")]
-  // pub async fn create_consumer(&self) -> Result<()> {
-  //   Ok(())
-  // }
-
   #[napi(
     ts_args_type = "callback: (error: Error | undefined, result: Payload) => Promise<ConsumerResult | undefined>"
   )]
@@ -164,10 +121,12 @@ impl KafkaConsumer {
       None => None,
     };
     let consumer_thread = ConsumerThread {
-      stream_consumer: self
-        .create_stream_consumer(
+      stream_consumer:
+        create_stream_consumer(
+          &self.client_config,
+          &self.consumer_configuration,
           &self.topic,
-          self.consumer_configuration.offset.clone(),
+          &self.consumer_configuration.offset.clone(),
           self.consumer_configuration.configuration.clone(),
         )
         .await
@@ -213,10 +172,12 @@ impl KafkaConsumer {
       offset: None,
     });
     let consumer_thread = ConsumerThread {
-      stream_consumer: self
-        .create_stream_consumer(
+      stream_consumer: 
+        create_stream_consumer(
+          &self.client_config,
+          &self.consumer_configuration,
           &retry_topic,
-          Some(offset_model),
+          &Some(offset_model),
           strategy.configuration.clone(),
         )
         .await
@@ -236,91 +197,4 @@ impl KafkaConsumer {
     Ok(())
   }
 
-  async fn create_stream_consumer(
-    &self,
-    topic: &str,
-    offset: Option<OffsetModel>,
-    configuration: Option<HashMap<String, String>>,
-  ) -> anyhow::Result<StreamConsumer<CustomContext>> {
-    let context = CustomContext;
-
-    let ConsumerConfiguration {
-      create_topic,
-      group_id,
-      enable_auto_commit,
-      ..
-    } = self.consumer_configuration.clone();
-
-    let mut consumer_config: ClientConfig = self.client_config.clone();
-
-    if let Some(config) = configuration {
-      consumer_config.extend(config);
-    }
-
-    let consumer: LoggingConsumer = consumer_config
-      .clone()
-      .set("group.id", group_id.clone())
-      .set(
-        "enable.auto.commit",
-        enable_auto_commit.unwrap_or(true).to_string(),
-      )
-      .set_log_level(RDKafkaLogLevel::Debug)
-      .create_with_context(context)?;
-
-    if create_topic.unwrap_or(true) {
-      info!("Creating topic: {:?}", topic);
-      let admin = KafkaAdmin::new(&self.client_config);
-      let result = admin.create_topic(topic).await;
-      if let Err(e) = result {
-        warn!("Fail to create topic {:?}", e);
-        return Err(anyhow::Error::msg(format!("Fail to create topic: {:?}", e)));
-      }
-      info!("Topic created: {:?}", topic)
-    }
-
-    if let Some(offset) = convert_to_rdkafka_offset(offset) {
-      debug!("Setting offset to: {:?}", offset);
-      let metadata = consumer.fetch_metadata(Some(topic), Duration::from_millis(1500))?;
-
-      metadata.topics().iter().for_each(|meta_topic| {
-        let mut tpl = TopicPartitionList::new();
-        meta_topic.partitions().iter().for_each(|meta_partition| {
-          tpl.add_partition(topic, meta_partition.id());
-        });
-        //TODO: Handle error
-        match tpl.set_all_offsets(offset) {
-          Ok(_) => {
-            debug!("Offset set to: {:?}", offset);
-          }
-          Err(e) => {
-            error!("Fail to set offset: {:?}", e)
-          }
-        };
-        //TODO: Handle error
-        match consumer.assign(&tpl) {
-          Ok(_) => {
-            debug!("Assigning topic: {:?}", topic);
-          }
-          Err(e) => {
-            error!("Fail to assign topic: {:?}", e);
-          }
-        }
-      });
-    }
-
-    consumer
-      .subscribe(vec![&*topic.to_string()].as_slice())
-      .map_err(|e| {
-        anyhow::Error::msg(format!(
-          "Can't subscribe to specified topics. Error: {:?}",
-          e
-        ))
-      })?;
-
-    info!(
-      "Consumer created. Group id: {:?}, Topic: {:?}",
-      group_id, topic
-    );
-    Ok(consumer)
-  }
 }

@@ -1,15 +1,9 @@
 use std::collections::HashMap;
 
 use napi::{bindgen_prelude::Buffer, Status};
-use rdkafka::{
-  consumer::{ConsumerContext, Rebalance},
-  error::KafkaResult,
-  message::{BorrowedHeaders, Header, Headers, OwnedHeaders},
-  ClientContext, Offset, TopicPartitionList,
-};
-use tracing::info;
+use rdkafka::{message::{BorrowedHeaders, BorrowedMessage, Header, Headers, OwnedHeaders}, Message, Offset};
 
-use super::model::{OffsetModel, PartitionPosition};
+use super::model::{OffsetModel, PartitionPosition, Payload};
 
 pub trait AnyhowToNapiError {
   fn convert_to_napi(&self) -> napi::Error;
@@ -21,24 +15,6 @@ impl AnyhowToNapiError for anyhow::Error {
       Status::GenericFailure,
       format!("Error: {}", self),
     )
-  }
-}
-
-pub struct CustomContext;
-
-impl ClientContext for CustomContext {}
-
-impl ConsumerContext for CustomContext {
-  fn pre_rebalance(&self, rebalance: &Rebalance) {
-    info!("Pre rebalance {:?}", rebalance);
-  }
-
-  fn post_rebalance(&self, rebalance: &Rebalance) {
-    info!("Post rebalance {:?}", rebalance);
-  }
-
-  fn commit_callback(&self, result: KafkaResult<()>, _offsets: &TopicPartitionList) {
-    info!("Committing offsets: {:?}. Offset: {:?}", result, _offsets);
   }
 }
 
@@ -108,6 +84,20 @@ impl ExtractValueOnKafkaHashMap<usize> for HashMap<&str, &[u8]> {
       None => None,
     }
   }
+}
+
+pub fn create_payload(message: &BorrowedMessage<'_>, payload: &[u8]) -> Payload {
+  let key: Option<Buffer> = message.key().map(|bytes| bytes.into());
+  let headers = Some(kakfa_headers_to_hashmap_buffer(message.headers()));
+  let payload_js = Payload::new(
+    payload.into(),
+    key,
+    headers,
+    message.topic().to_owned(),
+    message.partition(),
+    message.offset(),
+  );
+  payload_js
 }
 
 #[cfg(test)]

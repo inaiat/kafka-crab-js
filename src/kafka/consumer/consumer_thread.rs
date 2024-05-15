@@ -18,9 +18,8 @@ use crate::kafka::{
   model::Payload,
 };
 
-use super::kafka_consumer::{ConsumerResult, ProducerHelper};
+use super::{consumer_model::CustomContext, kafka_consumer::{ConsumerResult, ProducerHelper}};
 
-use super::consumer_context::CustomContext;
 
 pub struct ConsumerThread {
   pub stream_consumer: StreamConsumer<CustomContext>,
