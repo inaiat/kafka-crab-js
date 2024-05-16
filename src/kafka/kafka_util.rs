@@ -2,14 +2,14 @@ use std::collections::HashMap;
 
 use napi::{bindgen_prelude::Buffer, Status};
 use rdkafka::{
-  consumer::{ConsumerContext, Rebalance},
-  error::KafkaResult,
-  message::{BorrowedHeaders, Header, Headers, OwnedHeaders},
-  ClientContext, Offset, TopicPartitionList,
+  message::{BorrowedHeaders, BorrowedMessage, Header, Headers, OwnedHeaders},
+  Message as RdMessage, Offset,
 };
-use tracing::info;
 
-use super::model::{OffsetModel, PartitionPosition};
+use super::{
+  model::{OffsetModel, PartitionPosition},
+  producer::model::{Message, Payload},
+};
 
 pub trait AnyhowToNapiError {
   fn convert_to_napi(&self) -> napi::Error;
@@ -17,41 +17,20 @@ pub trait AnyhowToNapiError {
 
 impl AnyhowToNapiError for anyhow::Error {
   fn convert_to_napi(&self) -> napi::Error {
-    napi::Error::new(
-      Status::GenericFailure,
-      format!("Error: {}", self),
-    )
+    napi::Error::new(Status::GenericFailure, format!("Error: {}", self))
   }
 }
 
-pub struct CustomContext;
-
-impl ClientContext for CustomContext {}
-
-impl ConsumerContext for CustomContext {
-  fn pre_rebalance(&self, rebalance: &Rebalance) {
-    info!("Pre rebalance {:?}", rebalance);
-  }
-
-  fn post_rebalance(&self, rebalance: &Rebalance) {
-    info!("Post rebalance {:?}", rebalance);
-  }
-
-  fn commit_callback(&self, result: KafkaResult<()>, _offsets: &TopicPartitionList) {
-    info!("Committing offsets: {:?}. Offset: {:?}", result, _offsets);
-  }
-}
-
-pub fn convert_to_rdkafka_offset(offset_model: Option<OffsetModel>) -> Option<Offset> {
-  offset_model.map(|model| match model.position {
+pub fn convert_to_rdkafka_offset(offset_model: &OffsetModel) -> Offset {
+  match offset_model.position {
     Some(PartitionPosition::Beginning) => Offset::Beginning,
     Some(PartitionPosition::End) => Offset::End,
     Some(PartitionPosition::Stored) => Offset::Stored,
-    None => match model.offset {
+    None => match offset_model.offset {
       Some(value) => Offset::Offset(value),
       None => Offset::Stored, // Default to stored
     },
-  })
+  }
 }
 
 pub fn hashmap_to_kafka_headers(map: &HashMap<String, Buffer>) -> OwnedHeaders {
@@ -108,6 +87,34 @@ impl ExtractValueOnKafkaHashMap<usize> for HashMap<&str, &[u8]> {
       None => None,
     }
   }
+}
+
+pub fn create_payload(message: &BorrowedMessage<'_>, payload: &[u8]) -> Payload {
+  let key: Option<Buffer> = message.key().map(|bytes| bytes.into());
+  let headers = Some(kakfa_headers_to_hashmap_buffer(message.headers()));
+  let payload_js = Payload::new(
+    payload.into(),
+    key,
+    headers,
+    message.topic().to_owned(),
+    message.partition(),
+    message.offset(),
+  );
+  payload_js
+}
+
+pub fn create_message(message: &BorrowedMessage<'_>, payload: &[u8]) -> Message {
+  let key: Option<Buffer> = message.key().map(|bytes| bytes.into());
+  let headers = Some(kakfa_headers_to_hashmap_buffer(message.headers()));
+  let payload_js = Message::new(
+    payload.into(),
+    key,
+    headers,
+    message.topic().to_owned(),
+    message.partition(),
+    message.offset(),
+  );
+  payload_js
 }
 
 #[cfg(test)]

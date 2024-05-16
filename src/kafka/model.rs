@@ -1,6 +1,4 @@
-use std::{collections::HashMap, fmt};
-
-use napi::bindgen_prelude::Buffer;
+use std::fmt;
 
 #[derive(Debug)]
 #[napi(string_enum)]
@@ -20,37 +18,6 @@ impl fmt::Display for AutoOffsetReset {
   }
 }
 
-#[derive(Clone)]
-#[napi(object)]
-pub struct Payload {
-  pub value: Buffer,
-  pub key: Option<Buffer>,
-  pub headers: Option<HashMap<String, Buffer>>,
-  pub topic: String,
-  pub partition: i32,
-  pub offset: i64,
-}
-
-impl Payload {
-  pub fn new(
-    value: Buffer,
-    key: Option<Buffer>,
-    headers: Option<HashMap<String, Buffer>>,
-    topic: String,
-    partition: i32,
-    offset: i64,
-  ) -> Self {
-    Self {
-      value,
-      key,
-      headers,
-      topic,
-      partition,
-      offset,
-    }
-  }
-}
-
 #[napi(string_enum)]
 #[derive(Debug)]
 pub enum PartitionPosition {
@@ -66,25 +33,16 @@ pub struct OffsetModel {
 }
 
 #[napi(object)]
-#[derive(Clone)]
-pub struct KafkaCrabError {
-  pub code: i32,
-  pub message: String,
-}
-
-#[napi(object)]
-#[derive(Clone)]
-pub struct RecordMetadata {
-  pub topic: String,
+#[derive(Clone, Debug)]
+pub struct PartitionOffset {
   pub partition: i32,
-  pub offset: i64,
-  pub error: Option<KafkaCrabError>,
+  pub offset: OffsetModel,
 }
 
 #[napi(object)]
-#[derive(Clone)]
-pub struct MessageModel {
-  pub value: Buffer,
-  pub key: Option<Buffer>,
-  pub headers: Option<HashMap<String, Buffer>>,
+#[derive(Clone, Debug)]
+pub struct TopicPartitionConfig {
+  pub topic: String,
+  pub all_offsets: Option<OffsetModel>,
+  pub partition_offset: Option<Vec<PartitionOffset>>,
 }

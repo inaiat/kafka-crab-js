@@ -16,10 +16,11 @@ use rdkafka::{
   ClientConfig, ClientContext, Message, Statistics,
 };
 
-use super::{
-  kafka_util::hashmap_to_kafka_headers,
-  model::{KafkaCrabError, MessageModel, RecordMetadata},
-};
+use napi::bindgen_prelude::Buffer;
+
+use crate::kafka::kafka_util::hashmap_to_kafka_headers;
+
+use super::model::KafkaCrabError;
 
 const DEFAULT_QUEUE_TIMEOUT: i64 = 5000;
 
@@ -82,6 +83,23 @@ where
 }
 
 #[napi(object)]
+#[derive(Clone)]
+pub struct RecordMetadata {
+  pub topic: String,
+  pub partition: i32,
+  pub offset: i64,
+  pub error: Option<KafkaCrabError>,
+}
+
+#[napi(object)]
+#[derive(Clone)]
+pub struct MessageProducer {
+  pub value: Buffer,
+  pub key: Option<Buffer>,
+  pub headers: Option<HashMap<String, Buffer>>,
+}
+
+#[napi(object)]
 #[derive(Clone, Debug)]
 pub struct ProducerConfiguration {
   pub queue_timeout: Option<i64>,
@@ -93,7 +111,7 @@ pub struct ProducerConfiguration {
 #[derive(Clone)]
 pub struct ProducerRecord {
   pub topic: String,
-  pub messages: Vec<MessageModel>,
+  pub messages: Vec<MessageProducer>,
 }
 
 #[napi]
@@ -135,7 +153,7 @@ impl KafkaProducer {
     let producer = threaded_producer_with_context(context.clone(), self.client_config.clone());
 
     for message in producer_record.messages {
-      let MessageModel { value, headers, .. } = message;
+      let MessageProducer { value, headers, .. } = message;
       let headers = match headers {
         Some(v) => hashmap_to_kafka_headers(&v),
         None => OwnedHeaders::new(),

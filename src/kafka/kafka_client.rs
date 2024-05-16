@@ -12,8 +12,12 @@ use rdkafka::{
 use tracing::{info, Level};
 
 use super::{
-  consumer::kafka_consumer::{ConsumerConfiguration, KafkaConsumer},
-  kafka_producer::{KafkaProducer, ProducerConfiguration},
+  consumer::{
+    kafka_consumer::{KafkaConsumer, KafkaConsumerConfiguration},
+    kafka_stream_consumer::KafkaStreamConsumer,
+    model::ConsumerConfiguration,
+  },
+  producer::kafka_producer::{KafkaProducer, ProducerConfiguration},
 };
 
 struct CustomContext;
@@ -146,8 +150,21 @@ impl KafkaClient {
   #[napi]
   pub fn create_consumer(
     &self,
-    consumer_configuration: ConsumerConfiguration,
+    consumer_configuration: KafkaConsumerConfiguration,
   ) -> Result<KafkaConsumer> {
     KafkaConsumer::new(self.clone(), consumer_configuration)
+  }
+
+  #[napi]
+  pub fn create_stream_consumer(
+    &self,
+    consumer_configuration: ConsumerConfiguration,
+  ) -> Result<KafkaStreamConsumer> {
+    KafkaStreamConsumer::new(self.clone(), &consumer_configuration).map_err(|e| {
+      Error::new(
+        Status::GenericFailure,
+        format!("Failed to create stream consumer: {:?}", e),
+      )
+    })
   }
 }
