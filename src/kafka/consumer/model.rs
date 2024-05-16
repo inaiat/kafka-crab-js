@@ -11,6 +11,8 @@ use crate::kafka::model::OffsetModel;
 
 pub type LoggingConsumer = StreamConsumer<CustomContext>;
 
+pub const DEFAULT_FECTH_METADATA_TIMEOUT: i64 = 2000;
+
 pub struct CustomContext;
 
 impl ClientContext for CustomContext {}
@@ -54,4 +56,5 @@ pub struct ConsumerConfiguration {
   pub create_topic: Option<bool>,
   pub enable_auto_commit: Option<bool>,
   pub configuration: Option<HashMap<String, String>>,
+  pub fecth_metadata_timeout: Option<i64>,
 }

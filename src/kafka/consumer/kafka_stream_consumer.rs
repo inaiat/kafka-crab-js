@@ -11,7 +11,7 @@ use rdkafka::{
 use tracing::{debug, error, info};
 
 use crate::kafka::{
-  consumer::consumer_helper::{assign_helper, try_create_topic},
+  consumer::consumer_helper::{assign_offset_or_use_metadata, try_create_topic},
   kafka_client::KafkaClient,
   kafka_util::{convert_to_rdkafka_offset, create_message, AnyhowToNapiError},
   model::{OffsetModel, TopicPartitionConfig},
@@ -20,7 +20,7 @@ use crate::kafka::{
 
 use super::{
   consumer_helper::{create_stream_consumer, set_offset_of_all_partitions},
-  model::{CommitMode, ConsumerConfiguration, CustomContext},
+  model::{CommitMode, ConsumerConfiguration, CustomContext, DEFAULT_FECTH_METADATA_TIMEOUT},
 };
 
 pub const DEFAULT_SEEK_TIMEOUT: i64 = 1500;
@@ -29,6 +29,7 @@ pub const DEFAULT_SEEK_TIMEOUT: i64 = 1500;
 pub struct KafkaStreamConsumer {
   client_config: ClientConfig,
   stream_consumer: StreamConsumer<CustomContext>,
+  fecth_metadata_timeout: Duration,
 }
 
 #[napi]
@@ -47,6 +48,9 @@ impl KafkaStreamConsumer {
     Ok(KafkaStreamConsumer {
       client_config: client_config.clone(),
       stream_consumer,
+      fecth_metadata_timeout: Duration::from_millis(
+        consumer_configuration.fecth_metadata_timeout.unwrap_or(DEFAULT_FECTH_METADATA_TIMEOUT) as u64,
+      ),
     })
   }
 
@@ -103,7 +107,7 @@ impl KafkaStreamConsumer {
           "Subscribing to topic: {}. Setting all partitions to offset: {:?}",
           &item.topic, &all_offsets
         );
-        set_offset_of_all_partitions(&all_offsets, &self.stream_consumer, &item.topic)
+        set_offset_of_all_partitions(&all_offsets, &self.stream_consumer, &item.topic, self.fecth_metadata_timeout)
           .map_err(|e| e.convert_to_napi())
           .unwrap();
       } else if let Some(partition_offset) = item.partition_offset.clone() {
@@ -111,11 +115,12 @@ impl KafkaStreamConsumer {
           "Subscribing to topic: {} with partition offsets: {:?}",
           &item.topic, &partition_offset
         );
-        assign_helper(
+        assign_offset_or_use_metadata(
           &item.topic,
           Some(partition_offset),
           None,
           &self.stream_consumer,
+          self.fecth_metadata_timeout
         )
         .map_err(|e| e.convert_to_napi())
         .unwrap();
@@ -148,13 +153,6 @@ impl KafkaStreamConsumer {
           format!("Error while seeking: {:?}", e),
         )
       })?;
-    Ok(())
-  }
-
-  #[napi]
-  pub fn seek_all_partitions(&self, topic: String, offset_model: OffsetModel) -> Result<()> {
-    set_offset_of_all_partitions(&offset_model, &self.stream_consumer, &topic)
-      .map_err(|e| e.convert_to_napi())?;
     Ok(())
   }
 

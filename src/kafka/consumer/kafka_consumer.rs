@@ -14,7 +14,7 @@ use crate::kafka::{
 use super::{
   consumer_helper::create_stream_consumer_and_setup_everything,
   consumer_thread::ConsumerThread,
-  model::{CommitMode, ConsumerConfiguration, RetryStrategy},
+  model::{CommitMode, ConsumerConfiguration, RetryStrategy, DEFAULT_FECTH_METADATA_TIMEOUT},
 };
 
 pub const RETRY_COUNTER_NAME: &str = "kafka-crab-js-retry-counter";
@@ -62,6 +62,7 @@ pub struct KafkaConsumerConfiguration {
   pub commit_mode: Option<CommitMode>,
   pub enable_auto_commit: Option<bool>,
   pub configuration: Option<HashMap<String, String>>,
+  pub fecth_metadata_timeout: Option<i64>,
 }
 
 #[derive(Clone)]
@@ -72,6 +73,7 @@ pub struct KafkaConsumer {
   producer: ProducerHelper,
   commit_mode: Option<RdKfafkaCommitMode>,
   topic: String,
+  fetch_metadata_timeout: Duration,
 }
 
 #[napi]
@@ -88,7 +90,7 @@ impl KafkaConsumer {
       Some(CommitMode::Async) => Some(RdKfafkaCommitMode::Async),
     };
 
-    let topic = consumer_configuration.topic.clone();
+    let KafkaConsumerConfiguration { topic, fecth_metadata_timeout, .. } = consumer_configuration.clone();
 
     Ok(KafkaConsumer {
       client_config: client_config.clone(),
@@ -96,6 +98,9 @@ impl KafkaConsumer {
       producer: setup_future_producer(client_config, None).map_err(|e| e.convert_to_napi())?,
       commit_mode,
       topic,
+      fetch_metadata_timeout: Duration::from_millis(
+        fecth_metadata_timeout.unwrap_or(DEFAULT_FECTH_METADATA_TIMEOUT) as u64,
+      ),
     })
   }
 
@@ -142,6 +147,7 @@ impl KafkaConsumer {
         &self.topic,
         &self.consumer_configuration.offset.clone(),
         self.consumer_configuration.configuration.clone(),
+        self.fetch_metadata_timeout,
       )
       .await
       .map_err(|e| e.convert_to_napi())?,
@@ -193,6 +199,7 @@ impl KafkaConsumer {
         &retry_topic,
         &Some(offset_model),
         strategy.configuration.clone(),
+        self.fetch_metadata_timeout,
       )
       .await
       .map_err(|e| e.convert_to_napi())?,
@@ -218,5 +225,6 @@ fn convert_to_consumer_configuration(config: &KafkaConsumerConfiguration) -> Con
     create_topic: config.create_topic,
     enable_auto_commit: config.enable_auto_commit,
     configuration: config.configuration.clone(),
+    fecth_metadata_timeout: Some(DEFAULT_FECTH_METADATA_TIMEOUT)
   }
 }

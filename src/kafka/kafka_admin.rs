@@ -12,16 +12,19 @@ use tracing::{debug, info, trace};
 
 use std::{collections::HashMap, str::FromStr, time::Duration};
 
+use super::consumer::model::DEFAULT_FECTH_METADATA_TIMEOUT;
+
 const DEFAULT_NUM_PARTITIONS: i32 = 3;
 const DEFAULT_REPLICATION: i32 = 3;
 
 pub struct KafkaAdmin<'a> {
   client_config: &'a ClientConfig,
   admin_client: AdminClient<DefaultClientContext>,
+  fetch_metadata_timeout: Duration,
 }
 
 impl<'a> KafkaAdmin<'a> {
-  pub fn new(client_config: &'a ClientConfig) -> Self {
+  pub fn new(client_config: &'a ClientConfig, fetch_metadata_timeout: Option<i64>) -> Self {
     let admin_client: AdminClient<DefaultClientContext> = client_config
       .create()
       .expect("admin client creation failed");
@@ -29,13 +32,14 @@ impl<'a> KafkaAdmin<'a> {
     KafkaAdmin {
       client_config,
       admin_client,
+      fetch_metadata_timeout: Duration::from_millis( fetch_metadata_timeout.unwrap_or(DEFAULT_FECTH_METADATA_TIMEOUT) as u64),
     }
   }
 
   async fn fetch_config_resource(&self) -> Result<HashMap<String, String>, KafkaError> {
     let consumer: BaseConsumer = self.client_config.create()?;
 
-    let metadata = consumer.fetch_metadata(None, Duration::from_secs(5))?;
+    let metadata = consumer.fetch_metadata(None, self.fetch_metadata_timeout)?;
 
     for broker in metadata.brokers() {
       info!(

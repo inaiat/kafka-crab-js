@@ -73,8 +73,7 @@ async function startConsumer() {
       }
       counter++;
       await sleep(50)
-      if (counter >= 4) {
-        console.log('Unsubscribing')
+      if (counter >= 3) {
         streamerConsumer.unsubscribe();
       }
     }

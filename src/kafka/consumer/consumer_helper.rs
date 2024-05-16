@@ -22,6 +22,7 @@ pub async fn create_stream_consumer_and_setup_everything(
   topic: &str,
   offset: &Option<OffsetModel>,
   configuration: Option<HashMap<String, String>>,
+  timeout: Duration,
 ) -> anyhow::Result<StreamConsumer<CustomContext>> {
   let consumer = create_stream_consumer(client_config, consumer_configuration, configuration)?;
 
@@ -30,7 +31,7 @@ pub async fn create_stream_consumer_and_setup_everything(
   }
 
   if let Some(offset_model) = offset {
-    set_offset_of_all_partitions(offset_model, &consumer, topic)?;
+    set_offset_of_all_partitions(offset_model, &consumer, topic, timeout)?;
   }
 
   try_subscribe(&consumer, topic)?;
@@ -91,7 +92,7 @@ pub fn try_subscribe(consumer: &LoggingConsumer, topic: &str) -> anyhow::Result<
 
 pub async fn try_create_topic(topic: &str, client_config: &ClientConfig) -> anyhow::Result<()> {
   info!("Creating topic: {:?}", topic);
-  let admin = KafkaAdmin::new(client_config);
+  let admin = KafkaAdmin::new(client_config, None);
   let result = admin.create_topic(topic).await;
   if let Err(e) = result {
     warn!("Fail to create topic {:?}", e);
@@ -105,10 +106,11 @@ pub fn set_offset_of_all_partitions(
   offset_model: &OffsetModel,
   consumer: &StreamConsumer<CustomContext>,
   topic: &str,
+  timeout: Duration,
 ) -> anyhow::Result<()> {
   let offset = convert_to_rdkafka_offset(offset_model);
   debug!("Setting offset to: {:?}", offset);
-  let metadata = consumer.fetch_metadata(Some(topic), Duration::from_millis(1500))?;
+  let metadata = consumer.fetch_metadata(Some(topic), timeout)?;
 
   metadata.topics().iter().for_each(|meta_topic| {
     let mut tpl = TopicPartitionList::new();
@@ -137,11 +139,12 @@ pub fn set_offset_of_all_partitions(
   Ok(())
 }
 
-pub fn assign_helper(
+pub fn assign_offset_or_use_metadata(
   topic: &str,
   partition_offset: Option<Vec<PartitionOffset>>,
   offset_model: Option<&OffsetModel>,
   consumer: &StreamConsumer<CustomContext>,
+  timeout: Duration,
 ) -> anyhow::Result<()> {
   let mut tpl = TopicPartitionList::new();
 
@@ -156,7 +159,7 @@ pub fn assign_helper(
     }
   } else if let Some(offset_model) = offset_model {
     let offset = convert_to_rdkafka_offset(offset_model);
-    let metadata = consumer.fetch_metadata(Some(topic), Duration::from_millis(1500))?;
+    let metadata = consumer.fetch_metadata(Some(topic), timeout)?;
     for meta_topic in metadata.topics() {
       for meta_partition in meta_topic.partitions() {
         info!(

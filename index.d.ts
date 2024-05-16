@@ -16,6 +16,7 @@ export interface KafkaConsumerConfiguration {
   commitMode?: CommitMode
   enableAutoCommit?: boolean
   configuration?: Record<string, string>
+  fecthMetadataTimeout?: number
 }
 export interface RetryStrategy {
   retries: number
@@ -34,6 +35,7 @@ export interface ConsumerConfiguration {
   createTopic?: boolean
   enableAutoCommit?: boolean
   configuration?: Record<string, string>
+  fecthMetadataTimeout?: number
 }
 export const enum SecurityProtocol {
   Plaintext = 'Plaintext',
@@ -122,8 +124,7 @@ export class KafkaConsumer {
 export class KafkaStreamConsumer {
   subscribe(topicConfigs: string | Array<TopicPartitionConfig>): Promise<void>
   unsubscribe(): void
-  seek(topic: string, partition: number, offsetModel: OffsetModel): void
-  seekAllPartitions(topic: string, offsetModel: OffsetModel): void
+  seek(topic: string, partition: number, offsetModel: OffsetModel, timeout?: number | undefined | null): void
   recv(): Promise<Message>
   commit(topic: string, partition: number, offset: number, commit: CommitMode): void
 }
