@@ -52,9 +52,6 @@ fn setup_future_producer(
 
 #[napi(object)]
 #[derive(Clone, Debug)]
-#[deprecated(
-  note = "this will deprecated in the future as it will be replaced by ConsumerConfiguration"
-)]
 pub struct KafkaConsumerConfiguration {
   pub topic: String,
   pub group_id: String,

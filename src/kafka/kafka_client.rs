@@ -148,7 +148,6 @@ impl KafkaClient {
   }
 
   #[napi]
-  #[deprecated(note = "Use create_stream_consumer instead")]
   pub fn create_consumer(
     &self,
     consumer_configuration: KafkaConsumerConfiguration,
