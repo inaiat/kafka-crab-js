@@ -7,7 +7,7 @@ use rdkafka::{
 };
 
 use super::{
-  model::{OffsetModel, PartitionPosition, TopicPartitionConfig},
+  model::{OffsetModel, PartitionPosition},
   producer::model::{Message, Payload},
 };
 
