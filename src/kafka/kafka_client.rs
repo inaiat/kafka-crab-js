@@ -13,11 +13,11 @@ use tracing::{info, Level};
 
 use super::{
   consumer::{
-    consumer_model::ConsumerConfiguration,
     kafka_consumer::{KafkaConsumer, KafkaConsumerConfiguration},
     kafka_stream_consumer::KafkaStreamConsumer,
+    model::ConsumerConfiguration,
   },
-  kafka_producer::{KafkaProducer, ProducerConfiguration},
+  producer::kafka_producer::{KafkaProducer, ProducerConfiguration},
 };
 
 struct CustomContext;

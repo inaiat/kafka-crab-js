@@ -3,10 +3,13 @@ use std::collections::HashMap;
 use napi::{bindgen_prelude::Buffer, Status};
 use rdkafka::{
   message::{BorrowedHeaders, BorrowedMessage, Header, Headers, OwnedHeaders},
-  Message, Offset,
+  Message as RdMessage, Offset,
 };
 
-use super::model::{OffsetModel, PartitionPosition, Payload};
+use super::{
+  model::{OffsetModel, PartitionPosition, TopicPartitionConfig},
+  producer::model::{Message, Payload},
+};
 
 pub trait AnyhowToNapiError {
   fn convert_to_napi(&self) -> napi::Error;
@@ -90,6 +93,20 @@ pub fn create_payload(message: &BorrowedMessage<'_>, payload: &[u8]) -> Payload 
   let key: Option<Buffer> = message.key().map(|bytes| bytes.into());
   let headers = Some(kakfa_headers_to_hashmap_buffer(message.headers()));
   let payload_js = Payload::new(
+    payload.into(),
+    key,
+    headers,
+    message.topic().to_owned(),
+    message.partition(),
+    message.offset(),
+  );
+  payload_js
+}
+
+pub fn create_message(message: &BorrowedMessage<'_>, payload: &[u8]) -> Message {
+  let key: Option<Buffer> = message.key().map(|bytes| bytes.into());
+  let headers = Some(kakfa_headers_to_hashmap_buffer(message.headers()));
+  let payload_js = Message::new(
     payload.into(),
     key,
     headers,

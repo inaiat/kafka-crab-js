@@ -7,13 +7,14 @@ use std::{collections::HashMap, time::Duration};
 use crate::kafka::{
   kafka_client::KafkaClient,
   kafka_util::AnyhowToNapiError,
-  model::{OffsetModel, PartitionPosition, Payload},
+  model::{OffsetModel, PartitionPosition},
+  producer::model::Payload,
 };
 
 use super::{
   consumer_helper::create_stream_consumer_and_setup_everything,
-  consumer_model::{CommitMode, ConsumerConfiguration, RetryStrategy},
   consumer_thread::ConsumerThread,
+  model::{CommitMode, ConsumerConfiguration, RetryStrategy},
 };
 
 pub const RETRY_COUNTER_NAME: &str = "kafka-crab-js-retry-counter";
@@ -213,7 +214,6 @@ impl KafkaConsumer {
 
 fn convert_to_consumer_configuration(config: &KafkaConsumerConfiguration) -> ConsumerConfiguration {
   ConsumerConfiguration {
-    topic: config.topic.clone(),
     group_id: config.group_id.clone(),
     create_topic: config.create_topic,
     enable_auto_commit: config.enable_auto_commit,

@@ -50,7 +50,6 @@ pub enum CommitMode {
 #[napi(object)]
 #[derive(Clone, Debug)]
 pub struct ConsumerConfiguration {
-  pub topic: String,
   pub group_id: String,
   pub create_topic: Option<bool>,
   pub enable_auto_commit: Option<bool>,

@@ -29,8 +29,9 @@
     "url": "https://github.com/inaiat/kafka-crab-js.git"
   },
   "devDependencies": {
+    "@faker-js/faker": "^8.4.1",
     "@napi-rs/cli": "^2.18.3",
-    "@types/node": "^20.12.11",
+    "@types/node": "^20.12.12",
     "ava": "^6.1.2",
     "nanoid": "^5.0.7",
     "typescript": "^5.4.5",

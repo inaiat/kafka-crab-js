@@ -34,7 +34,7 @@ async function produce() {
       const result = await producer.send(
         {
           topic,
-          messages: [{ value: Buffer.from(`{"_id":"${i}","name":"Elizeu Drummond Sample js","phone":"555"}`) }],
+          messages: [{ payload: Buffer.from(`{"_id":"${i}","name":"Elizeu Drummond Sample js","phone":"555"}`) }],
         },
       );
       console.log('Js message sent. Offset:', result);

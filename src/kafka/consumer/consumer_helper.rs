@@ -8,11 +8,13 @@ use rdkafka::{
 use tracing::{debug, error, info, warn};
 
 use crate::kafka::{
-  consumer::consumer_model::LoggingConsumer, kafka_admin::KafkaAdmin,
-  kafka_util::convert_to_rdkafka_offset, model::OffsetModel,
+  consumer::model::LoggingConsumer,
+  kafka_admin::KafkaAdmin,
+  kafka_util::convert_to_rdkafka_offset,
+  model::{OffsetModel, PartitionOffset},
 };
 
-use super::{consumer_model::ConsumerConfiguration, consumer_model::CustomContext};
+use super::{model::ConsumerConfiguration, model::CustomContext};
 
 pub async fn create_stream_consumer_and_setup_everything(
   client_config: &ClientConfig,
@@ -132,5 +134,43 @@ pub fn set_offset_of_all_partitions(
     }
   });
 
+  Ok(())
+}
+
+pub fn assign_helper(
+  topic: &str,
+  partition_offset: Option<Vec<PartitionOffset>>,
+  offset_model: Option<&OffsetModel>,
+  consumer: &StreamConsumer<CustomContext>,
+) -> anyhow::Result<()> {
+  let mut tpl = TopicPartitionList::new();
+
+  if let Some(value) = partition_offset {
+    for item in value {
+      let offset = convert_to_rdkafka_offset(&item.offset);
+      debug!(
+        "Adding partition: {:?} with offset: {:?} for topic: {:?}",
+        item.partition, offset, topic
+      );
+      tpl.add_partition_offset(topic, item.partition, offset)?;
+    }
+  } else if let Some(offset_model) = offset_model {
+    let offset = convert_to_rdkafka_offset(offset_model);
+    let metadata = consumer.fetch_metadata(Some(topic), Duration::from_millis(1500))?;
+    for meta_topic in metadata.topics() {
+      for meta_partition in meta_topic.partitions() {
+        info!(
+          "Adding partition: {:?} with offset: {:?} for topic: {:?}",
+          meta_partition.id(),
+          offset,
+          topic
+        );
+        tpl.add_partition_offset(topic, meta_partition.id(), offset)?;
+      }
+    }
+  } else {
+    anyhow::bail!("At least one of partition_offset or offset_model should be provided");
+  }
+  consumer.assign(&tpl)?;
   Ok(())
 }

@@ -12,15 +12,13 @@ use tracing::{debug, error, info, warn};
 
 use crate::kafka::{
   consumer::kafka_consumer::RETRY_COUNTER_NAME,
-  kafka_util::{
-    kakfa_headers_to_hashmap, kakfa_headers_to_hashmap_buffer, ExtractValueOnKafkaHashMap,
-  },
-  model::Payload,
+  kafka_util::{create_payload, kakfa_headers_to_hashmap, ExtractValueOnKafkaHashMap},
+  producer::model::Payload,
 };
 
 use super::{
-  consumer_model::CustomContext,
   kafka_consumer::{ConsumerResult, ProducerHelper},
+  model::CustomContext,
 };
 
 pub struct ConsumerThread {
@@ -180,18 +178,4 @@ impl ConsumerThread {
       }
     }
   }
-}
-
-fn create_payload(message: &BorrowedMessage<'_>, payload: &[u8]) -> Payload {
-  let key: Option<Buffer> = message.key().map(|bytes| bytes.into());
-  let headers = Some(kakfa_headers_to_hashmap_buffer(message.headers()));
-  let payload_js = Payload::new(
-    payload.into(),
-    key,
-    headers,
-    message.topic().to_owned(),
-    message.partition(),
-    message.offset(),
-  );
-  payload_js
 }
