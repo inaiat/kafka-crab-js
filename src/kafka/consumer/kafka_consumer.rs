@@ -1,19 +1,19 @@
 use napi::{threadsafe_function::ThreadsafeFunction, Result};
 
-use rdkafka::{
-  consumer::CommitMode as RdKfafkaCommitMode,
-  producer::FutureProducer,
-  ClientConfig,
-};
+use rdkafka::{consumer::CommitMode as RdKfafkaCommitMode, producer::FutureProducer, ClientConfig};
 
-use std::time::Duration;
+use std::{collections::HashMap, time::Duration};
 
 use crate::kafka::{
-  kafka_client::KafkaClient, kafka_util::AnyhowToNapiError, model::{OffsetModel, PartitionPosition, Payload}
+  kafka_client::KafkaClient,
+  kafka_util::AnyhowToNapiError,
+  model::{OffsetModel, PartitionPosition, Payload},
 };
 
 use super::{
-  consumer_helper::create_stream_consumer, consumer_model::{CommitMode, ConsumerConfiguration, RetryStrategy}, consumer_thread::ConsumerThread
+  consumer_helper::create_stream_consumer_and_setup_everything,
+  consumer_model::{CommitMode, ConsumerConfiguration, RetryStrategy},
+  consumer_thread::ConsumerThread,
 };
 
 pub const RETRY_COUNTER_NAME: &str = "kafka-crab-js-retry-counter";
@@ -50,11 +50,27 @@ fn setup_future_producer(
   })
 }
 
+#[napi(object)]
+#[derive(Clone, Debug)]
+#[deprecated(
+  note = "this will deprecated in the future as it will be replaced by ConsumerConfiguration"
+)]
+pub struct KafkaConsumerConfiguration {
+  pub topic: String,
+  pub group_id: String,
+  pub retry_strategy: Option<RetryStrategy>,
+  pub offset: Option<OffsetModel>,
+  pub create_topic: Option<bool>,
+  pub commit_mode: Option<CommitMode>,
+  pub enable_auto_commit: Option<bool>,
+  pub configuration: Option<HashMap<String, String>>,
+}
+
 #[derive(Clone)]
 #[napi]
 pub struct KafkaConsumer {
   client_config: ClientConfig,
-  consumer_configuration: ConsumerConfiguration,
+  consumer_configuration: KafkaConsumerConfiguration,
   producer: ProducerHelper,
   commit_mode: Option<RdKfafkaCommitMode>,
   topic: String,
@@ -64,12 +80,12 @@ pub struct KafkaConsumer {
 impl KafkaConsumer {
   pub fn new(
     kafka_client: KafkaClient,
-    consumer_configuration: ConsumerConfiguration,
+    consumer_configuration: KafkaConsumerConfiguration,
   ) -> Result<Self> {
     let client_config: &ClientConfig = kafka_client.get_client_config();
 
     let commit_mode = match consumer_configuration.commit_mode {
-      None | Some(CommitMode::AutoCommit) => None, //Default AutoCommit
+      None => None, //Default AutoCommit
       Some(CommitMode::Sync) => Some(RdKfafkaCommitMode::Sync),
       Some(CommitMode::Async) => Some(RdKfafkaCommitMode::Async),
     };
@@ -89,7 +105,7 @@ impl KafkaConsumer {
     ts_args_type = "callback: (error: Error | undefined, result: Payload) => Promise<ConsumerResult | undefined>"
   )]
   pub async fn start_consumer(&self, func: ThreadsafeFunction<Payload>) -> Result<()> {
-    let ConsumerConfiguration { retry_strategy, .. } = self.consumer_configuration.clone();
+    let KafkaConsumerConfiguration { retry_strategy, .. } = self.consumer_configuration.clone();
 
     if let Some(strategy) = retry_strategy.clone() {
       self.start_retry_consumer(strategy, &func).await?;
@@ -120,17 +136,17 @@ impl KafkaConsumer {
       }
       None => None,
     };
+
     let consumer_thread = ConsumerThread {
-      stream_consumer:
-        create_stream_consumer(
-          &self.client_config,
-          &self.consumer_configuration,
-          &self.topic,
-          &self.consumer_configuration.offset.clone(),
-          self.consumer_configuration.configuration.clone(),
-        )
-        .await
-        .map_err(|e| e.convert_to_napi())?,
+      stream_consumer: create_stream_consumer_and_setup_everything(
+        &self.client_config,
+        &convert_to_consumer_configuration(&self.consumer_configuration),
+        &self.topic,
+        &self.consumer_configuration.offset.clone(),
+        self.consumer_configuration.configuration.clone(),
+      )
+      .await
+      .map_err(|e| e.convert_to_napi())?,
       func: func.clone(),
       commit_mode: self.commit_mode,
       retries: 0,
@@ -171,17 +187,17 @@ impl KafkaConsumer {
       position: Some(PartitionPosition::Stored),
       offset: None,
     });
+
     let consumer_thread = ConsumerThread {
-      stream_consumer: 
-        create_stream_consumer(
-          &self.client_config,
-          &self.consumer_configuration,
-          &retry_topic,
-          &Some(offset_model),
-          strategy.configuration.clone(),
-        )
-        .await
-        .map_err(|e| e.convert_to_napi())?,
+      stream_consumer: create_stream_consumer_and_setup_everything(
+        &self.client_config,
+        &convert_to_consumer_configuration(&self.consumer_configuration),
+        &retry_topic,
+        &Some(offset_model),
+        strategy.configuration.clone(),
+      )
+      .await
+      .map_err(|e| e.convert_to_napi())?,
       func: func.clone(),
       commit_mode: self.commit_mode,
       retries: strategy.retries,
@@ -196,5 +212,14 @@ impl KafkaConsumer {
 
     Ok(())
   }
+}
 
+fn convert_to_consumer_configuration(config: &KafkaConsumerConfiguration) -> ConsumerConfiguration {
+  ConsumerConfiguration {
+    topic: config.topic.clone(),
+    group_id: config.group_id.clone(),
+    create_topic: config.create_topic,
+    enable_auto_commit: config.enable_auto_commit,
+    configuration: config.configuration.clone(),
+  }
 }

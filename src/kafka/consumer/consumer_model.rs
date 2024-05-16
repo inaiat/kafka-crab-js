@@ -1,6 +1,10 @@
 use std::collections::HashMap;
 
-use rdkafka::{consumer::{ConsumerContext, Rebalance, StreamConsumer}, error::KafkaResult, ClientContext, TopicPartitionList};
+use rdkafka::{
+  consumer::{ConsumerContext, Rebalance, StreamConsumer},
+  error::KafkaResult,
+  ClientContext, TopicPartitionList,
+};
 use tracing::info;
 
 use crate::kafka::model::OffsetModel;
@@ -39,7 +43,6 @@ pub struct RetryStrategy {
 #[napi(string_enum)]
 #[derive(Debug, PartialEq)]
 pub enum CommitMode {
-  AutoCommit,
   Sync,
   Async,
 }
@@ -49,12 +52,7 @@ pub enum CommitMode {
 pub struct ConsumerConfiguration {
   pub topic: String,
   pub group_id: String,
-  #[deprecated(note = "this will deprecated in the future")]
-  pub retry_strategy: Option<RetryStrategy>,
-  pub offset: Option<OffsetModel>,
   pub create_topic: Option<bool>,
-  pub commit_mode: Option<CommitMode>,
   pub enable_auto_commit: Option<bool>,
   pub configuration: Option<HashMap<String, String>>,
 }
-

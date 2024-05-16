@@ -1,7 +1,10 @@
 use std::collections::HashMap;
 
 use napi::{bindgen_prelude::Buffer, Status};
-use rdkafka::{message::{BorrowedHeaders, BorrowedMessage, Header, Headers, OwnedHeaders}, Message, Offset};
+use rdkafka::{
+  message::{BorrowedHeaders, BorrowedMessage, Header, Headers, OwnedHeaders},
+  Message, Offset,
+};
 
 use super::model::{OffsetModel, PartitionPosition, Payload};
 
@@ -11,23 +14,20 @@ pub trait AnyhowToNapiError {
 
 impl AnyhowToNapiError for anyhow::Error {
   fn convert_to_napi(&self) -> napi::Error {
-    napi::Error::new(
-      Status::GenericFailure,
-      format!("Error: {}", self),
-    )
+    napi::Error::new(Status::GenericFailure, format!("Error: {}", self))
   }
 }
 
-pub fn convert_to_rdkafka_offset(offset_model: Option<OffsetModel>) -> Option<Offset> {
-  offset_model.map(|model| match model.position {
+pub fn convert_to_rdkafka_offset(offset_model: &OffsetModel) -> Offset {
+  match offset_model.position {
     Some(PartitionPosition::Beginning) => Offset::Beginning,
     Some(PartitionPosition::End) => Offset::End,
     Some(PartitionPosition::Stored) => Offset::Stored,
-    None => match model.offset {
+    None => match offset_model.offset {
       Some(value) => Offset::Offset(value),
       None => Offset::Stored, // Default to stored
     },
-  })
+  }
 }
 
 pub fn hashmap_to_kafka_headers(map: &HashMap<String, Buffer>) -> OwnedHeaders {

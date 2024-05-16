@@ -8,7 +8,7 @@ use rdkafka::{
   error::KafkaError,
   types::RDKafkaErrorCode,
 };
-use tracing::{debug, info};
+use tracing::{debug, info, trace};
 
 use std::{collections::HashMap, str::FromStr, time::Duration};
 
@@ -58,9 +58,8 @@ impl<'a> KafkaAdmin<'a> {
   }
 
   pub async fn create_topic(&self, topic_name: &str) -> anyhow::Result<()> {
-    debug!("Fetching broker properties");
     let broker_properties = self.fetch_config_resource().await?.clone();
-    debug!("Broker properties: {:?}", broker_properties);
+    trace!("Broker properties: {:?}", broker_properties);
 
     self
       .admin_client
