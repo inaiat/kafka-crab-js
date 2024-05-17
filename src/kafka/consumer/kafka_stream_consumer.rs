@@ -12,7 +12,7 @@ use tracing::{debug, error, info};
 
 use crate::kafka::{
   consumer::consumer_helper::{
-    assign_offset_or_use_metadata, convert_to_rdkafka_offset, try_create_topic,
+    assign_offset_or_use_metadata, convert_to_rdkafka_offset, try_create_topic, try_subscribe,
   },
   kafka_client::KafkaClient,
   kafka_util::{create_message, AnyhowToNapiError},
@@ -84,28 +84,17 @@ impl KafkaStreamConsumer {
       .iter()
       .map(|x| x.topic.clone())
       .collect::<Vec<String>>();
-    let topics_ref = topics_name
-      .iter()
-      .map(|x| x.as_str())
-      .collect::<Vec<&str>>();
 
-    debug!("Creating topics if not exists: {:?}", &topics_ref);
-    for topic in &topics_ref {
-      try_create_topic(&topic, &self.client_config, self.fecth_metadata_timeout)
-        .await
-        .map_err(|e| e.convert_to_napi())?;
-    }
+    debug!("Creating topics if not exists: {:?}", &topics_name);
+    try_create_topic(
+      &topics_name,
+      &self.client_config,
+      self.fecth_metadata_timeout,
+    )
+    .await
+    .map_err(|e| e.convert_to_napi())?;
 
-    info!("Subscribing to topics: {:?}", topics_name);
-    self
-      .stream_consumer
-      .subscribe(&topics_ref.as_slice())
-      .map_err(|e| {
-        napi::Error::new(
-          napi::Status::GenericFailure,
-          format!("Error while subscribing to topic: {:?}", e),
-        )
-      })?;
+    try_subscribe(&self.stream_consumer, &topics_name).map_err(|e| e.convert_to_napi())?;
 
     topics.iter().for_each(|item| {
       if let Some(all_offsets) = item.all_offsets.clone() {

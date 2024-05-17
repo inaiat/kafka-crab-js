@@ -97,7 +97,7 @@ export interface RecordMetadata {
   error?: KafkaCrabError
 }
 export interface MessageProducer {
-  value: Buffer
+  payload: Buffer
   key?: Buffer
   headers?: Record<string, Buffer>
 }

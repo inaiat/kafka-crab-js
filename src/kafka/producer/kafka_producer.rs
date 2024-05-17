@@ -127,7 +127,9 @@ impl KafkaProducer {
     let producer = threaded_producer_with_context(context.clone(), self.client_config.clone());
 
     for message in producer_record.messages {
-      let MessageProducer { value, headers, .. } = message;
+      let MessageProducer {
+        payload, headers, ..
+      } = message;
       let headers = match headers {
         Some(v) => hashmap_to_kafka_headers(&v),
         None => OwnedHeaders::new(),
@@ -141,7 +143,7 @@ impl KafkaProducer {
       producer
         .send(
           BaseRecord::to(topic)
-            .payload(value.to_bytes())
+            .payload(payload.to_bytes())
             .headers(headers)
             .key(rd_key),
         )

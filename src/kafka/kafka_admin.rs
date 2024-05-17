@@ -61,31 +61,33 @@ impl<'a> KafkaAdmin<'a> {
     Ok(extract_config_resource(config_resource))
   }
 
-  pub async fn create_topic(&self, topic_name: &str) -> anyhow::Result<()> {
+  pub async fn create_topic(&self, topics: &Vec<String>) -> anyhow::Result<()> {
     let broker_properties = self.fetch_config_resource().await?.clone();
     trace!("Broker properties: {:?}", broker_properties);
 
+    let new_topics: Vec<NewTopic> = topics
+      .iter()
+      .map(|topic| NewTopic {
+        name: topic,
+        num_partitions: broker_properties
+          .get("num.partitions")
+          .get_parsed_or_default_value(DEFAULT_NUM_PARTITIONS),
+        replication: TopicReplication::Fixed(
+          broker_properties
+            .get("default.replication.factor")
+            .get_parsed_or_default_value(DEFAULT_REPLICATION),
+        ),
+        config: vec![],
+      })
+      .collect();
+
     self
       .admin_client
-      .create_topics(
-        &[NewTopic {
-          name: topic_name,
-          num_partitions: broker_properties
-            .get("num.partitions")
-            .get_parsed_or_default_value(DEFAULT_NUM_PARTITIONS),
-          replication: TopicReplication::Fixed(
-            broker_properties
-              .get("default.replication.factor")
-              .get_parsed_or_default_value(DEFAULT_REPLICATION),
-          ),
-          config: vec![],
-        }],
-        &AdminOptions::default(),
-      )
+      .create_topics(&new_topics, &AdminOptions::default())
       .await
       .map_err(anyhow::Error::new)?;
 
-    info!("Topic {} was created successfully", topic_name);
+    info!("Topic(s) {:?} was created successfully", topics);
     Ok(())
   }
 }

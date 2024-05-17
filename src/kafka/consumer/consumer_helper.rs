@@ -36,14 +36,14 @@ pub async fn create_stream_consumer_and_setup_everything(
   let consumer = create_stream_consumer(client_config, consumer_configuration, configuration)?;
 
   if consumer_configuration.create_topic.unwrap_or(true) {
-    try_create_topic(topic, client_config, timeout).await?;
+    try_create_topic(&vec![topic.to_owned()], client_config, timeout).await?;
   }
 
   if let Some(offset_model) = offset {
     set_offset_of_all_partitions(offset_model, &consumer, topic, timeout)?;
   }
 
-  try_subscribe(&consumer, topic)?;
+  try_subscribe(&consumer, &vec![topic.to_owned()])?;
 
   Ok(consumer)
 }
@@ -86,31 +86,30 @@ pub fn create_stream_consumer(
   Ok(consumer)
 }
 
-pub fn try_subscribe(consumer: &LoggingConsumer, topic: &str) -> anyhow::Result<()> {
-  consumer
-    .subscribe(vec![&*topic.to_string()].as_slice())
-    .map_err(|e| {
-      anyhow::Error::msg(format!(
-        "Can't subscribe to specified topics. Error: {:?}",
-        e
-      ))
-    })?;
-  debug!("Subscribed to topic: {:?}", topic);
+pub fn try_subscribe(consumer: &LoggingConsumer, topics: &Vec<String>) -> anyhow::Result<()> {
+  let topics_ref = topics.iter().map(|x| x.as_str()).collect::<Vec<&str>>();
+  consumer.subscribe(topics_ref.as_slice()).map_err(|e| {
+    anyhow::Error::msg(format!(
+      "Can't subscribe to specified topic(s): {:?}. Error: {:?}",
+      topics_ref, e
+    ))
+  })?;
+  debug!("Subscribed to topic(s): {:?}", topics_ref);
   Ok(())
 }
 
 pub async fn try_create_topic(
-  topic: &str,
+  topics: &Vec<String>,
   client_config: &ClientConfig,
   fetch_metadata_timeout: Duration,
 ) -> anyhow::Result<()> {
   let admin = KafkaAdmin::new(client_config, Some(fetch_metadata_timeout));
-  let result = admin.create_topic(topic).await;
+  let result = admin.create_topic(topics).await;
   if let Err(e) = result {
     warn!("Fail to create topic {:?}", e);
     return Err(anyhow::Error::msg(format!("Fail to create topic: {:?}", e)));
   }
-  info!("Topic created: {:?}", topic);
+  info!("Topic(s) created: {:?}", topics);
   Ok(())
 }
 

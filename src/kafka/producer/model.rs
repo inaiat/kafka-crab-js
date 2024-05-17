@@ -77,7 +77,7 @@ pub struct RecordMetadata {
 #[napi(object)]
 #[derive(Clone)]
 pub struct MessageProducer {
-  pub value: Buffer,
+  pub payload: Buffer,
   pub key: Option<Buffer>,
   pub headers: Option<HashMap<String, Buffer>>,
 }
