@@ -82,10 +82,14 @@ async function startConsumer() {
       counter++;
       console.log('>>> Message received:', { payload: message.payload.toString(), offset: message.offset, partition: message.partition, topic: message.topic })
       if (counter === maxMessages) {
-        kafkaStreamConsumer.unsubscribe();
         kafkaStream.destroy();
       }
       // streamerConsumer.commit(message.partition, message.offset+1, CommitMode.Sync)
+    })
+
+    kafkaStream.on('close', () => {
+      kafkaStreamConsumer.unsubscribe();
+      console.log('Stream ended')
     })
   }
 

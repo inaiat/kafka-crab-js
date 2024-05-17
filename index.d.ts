@@ -27,8 +27,8 @@ export interface RetryStrategy {
   configuration?: Record<string, string>
 }
 export const enum CommitMode {
-  Sync = 'Sync',
-  Async = 'Async'
+  Sync = 0,
+  Async = 1
 }
 export interface ConsumerConfiguration {
   groupId: string
@@ -36,29 +36,6 @@ export interface ConsumerConfiguration {
   enableAutoCommit?: boolean
   configuration?: Record<string, string>
   fecthMetadataTimeout?: number
-}
-export const enum SecurityProtocol {
-  Plaintext = 'Plaintext',
-  Ssl = 'Ssl',
-  SaslPlaintext = 'SaslPlaintext',
-  SaslSsl = 'SaslSsl'
-}
-export interface KafkaConfiguration {
-  brokers: string
-  clientId: string
-  securityProtocol?: SecurityProtocol
-  configuration?: Record<string, string>
-  logLevel?: string
-  brokerAddressFamily?: string
-}
-export const enum AutoOffsetReset {
-  Smallest = 'Smallest',
-  Earliest = 'Earliest',
-  Beginning = 'Beginning',
-  Largest = 'Largest',
-  Latest = 'Latest',
-  End = 'End',
-  Error = 'Error'
 }
 export const enum PartitionPosition {
   Beginning = 'Beginning',
@@ -78,25 +55,24 @@ export interface TopicPartitionConfig {
   allOffsets?: OffsetModel
   partitionOffset?: Array<PartitionOffset>
 }
-export interface RecordMetadata {
-  topic: string
-  partition: number
-  offset: number
-  error?: KafkaCrabError
+export const enum SecurityProtocol {
+  Plaintext = 'Plaintext',
+  Ssl = 'Ssl',
+  SaslPlaintext = 'SaslPlaintext',
+  SaslSsl = 'SaslSsl'
 }
-export interface MessageProducer {
-  value: Buffer
-  key?: Buffer
-  headers?: Record<string, Buffer>
+export interface KafkaConfiguration {
+  brokers: string
+  clientId: string
+  securityProtocol?: SecurityProtocol
+  configuration?: Record<string, string>
+  logLevel?: string
+  brokerAddressFamily?: string
 }
 export interface ProducerConfiguration {
   queueTimeout?: number
   thrownOnError?: boolean
   configuration?: Record<string, string>
-}
-export interface ProducerRecord {
-  topic: string
-  messages: Array<MessageProducer>
 }
 export interface Payload {
   value: Buffer
@@ -113,6 +89,21 @@ export interface Message {
   topic: string
   partition: number
   offset: number
+}
+export interface RecordMetadata {
+  topic: string
+  partition: number
+  offset: number
+  error?: KafkaCrabError
+}
+export interface MessageProducer {
+  value: Buffer
+  key?: Buffer
+  headers?: Record<string, Buffer>
+}
+export interface ProducerRecord {
+  topic: string
+  messages: Array<MessageProducer>
 }
 export interface KafkaCrabError {
   code: number

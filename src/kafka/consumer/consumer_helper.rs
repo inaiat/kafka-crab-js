@@ -3,18 +3,27 @@ use std::{collections::HashMap, time::Duration};
 use rdkafka::{
   config::RDKafkaLogLevel,
   consumer::{Consumer, StreamConsumer},
-  ClientConfig, TopicPartitionList,
+  ClientConfig, Offset, TopicPartitionList,
 };
 use tracing::{debug, error, info, warn};
 
-use crate::kafka::{
-  consumer::model::LoggingConsumer,
-  kafka_admin::KafkaAdmin,
-  kafka_util::convert_to_rdkafka_offset,
-  model::{OffsetModel, PartitionOffset},
+use crate::kafka::{consumer::model::LoggingConsumer, kafka_admin::KafkaAdmin};
+
+use super::model::{
+  ConsumerConfiguration, CustomContext, OffsetModel, PartitionOffset, PartitionPosition,
 };
 
-use super::{model::ConsumerConfiguration, model::CustomContext};
+pub fn convert_to_rdkafka_offset(offset_model: &OffsetModel) -> Offset {
+  match offset_model.position {
+    Some(PartitionPosition::Beginning) => Offset::Beginning,
+    Some(PartitionPosition::End) => Offset::End,
+    Some(PartitionPosition::Stored) => Offset::Stored,
+    None => match offset_model.offset {
+      Some(value) => Offset::Offset(value),
+      None => Offset::Stored, // Default to stored
+    },
+  }
+}
 
 pub async fn create_stream_consumer_and_setup_everything(
   client_config: &ClientConfig,

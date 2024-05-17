@@ -7,11 +7,9 @@ use rdkafka::{
 };
 use tracing::info;
 
-use crate::kafka::model::OffsetModel;
+pub const DEFAULT_FECTH_METADATA_TIMEOUT: i64 = 2000;
 
 pub type LoggingConsumer = StreamConsumer<CustomContext>;
-
-pub const DEFAULT_FECTH_METADATA_TIMEOUT: i64 = 2000;
 
 pub struct CustomContext;
 
@@ -42,11 +40,11 @@ pub struct RetryStrategy {
   pub configuration: Option<HashMap<String, String>>,
 }
 
-#[napi(string_enum)]
+#[napi]
 #[derive(Debug, PartialEq)]
 pub enum CommitMode {
-  Sync,
-  Async,
+  Sync = 0,
+  Async = 1,
 }
 
 #[napi(object)]
@@ -57,4 +55,33 @@ pub struct ConsumerConfiguration {
   pub enable_auto_commit: Option<bool>,
   pub configuration: Option<HashMap<String, String>>,
   pub fecth_metadata_timeout: Option<i64>,
+}
+
+#[napi(string_enum)]
+#[derive(Debug)]
+pub enum PartitionPosition {
+  Beginning,
+  End,
+  Stored,
+}
+#[napi(object)]
+#[derive(Clone, Debug)]
+pub struct OffsetModel {
+  pub offset: Option<i64>,
+  pub position: Option<PartitionPosition>,
+}
+
+#[napi(object)]
+#[derive(Clone, Debug)]
+pub struct PartitionOffset {
+  pub partition: i32,
+  pub offset: OffsetModel,
+}
+
+#[napi(object)]
+#[derive(Clone, Debug)]
+pub struct TopicPartitionConfig {
+  pub topic: String,
+  pub all_offsets: Option<OffsetModel>,
+  pub partition_offset: Option<Vec<PartitionOffset>>,
 }

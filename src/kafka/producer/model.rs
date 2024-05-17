@@ -67,6 +67,30 @@ impl Message {
 
 #[napi(object)]
 #[derive(Clone)]
+pub struct RecordMetadata {
+  pub topic: String,
+  pub partition: i32,
+  pub offset: i64,
+  pub error: Option<KafkaCrabError>,
+}
+
+#[napi(object)]
+#[derive(Clone)]
+pub struct MessageProducer {
+  pub value: Buffer,
+  pub key: Option<Buffer>,
+  pub headers: Option<HashMap<String, Buffer>>,
+}
+
+#[napi(object)]
+#[derive(Clone)]
+pub struct ProducerRecord {
+  pub topic: String,
+  pub messages: Vec<MessageProducer>,
+}
+
+#[napi(object)]
+#[derive(Clone)]
 pub struct KafkaCrabError {
   pub code: i32,
   pub message: String,

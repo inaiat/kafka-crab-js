@@ -1,15 +1,9 @@
 use std::{collections::HashMap, fmt, str::FromStr};
 
 use napi::{bindgen_prelude::*, Result};
-use rdkafka::{
-  client::ClientContext,
-  config::{ClientConfig, RDKafkaLogLevel},
-  consumer::{ConsumerContext, Rebalance},
-  error::KafkaResult,
-  topic_partition_list::TopicPartitionList,
-};
+use rdkafka::config::{ClientConfig, RDKafkaLogLevel};
 
-use tracing::{info, Level};
+use tracing::Level;
 
 use super::{
   consumer::{
@@ -19,24 +13,6 @@ use super::{
   },
   producer::kafka_producer::{KafkaProducer, ProducerConfiguration},
 };
-
-struct CustomContext;
-
-impl ClientContext for CustomContext {}
-
-impl ConsumerContext for CustomContext {
-  fn pre_rebalance(&self, rebalance: &Rebalance) {
-    info!("Pre rebalance {:?}", rebalance);
-  }
-
-  fn post_rebalance(&self, rebalance: &Rebalance) {
-    info!("Post rebalance {:?}", rebalance);
-  }
-
-  fn commit_callback(&self, result: KafkaResult<()>, _offsets: &TopicPartitionList) {
-    info!("Committing offsets: {:?}. Offset: {:?}", result, _offsets);
-  }
-}
 
 #[derive(Debug)]
 #[napi(string_enum)]

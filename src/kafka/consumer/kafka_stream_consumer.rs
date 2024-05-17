@@ -11,16 +11,20 @@ use rdkafka::{
 use tracing::{debug, error, info};
 
 use crate::kafka::{
-  consumer::consumer_helper::{assign_offset_or_use_metadata, try_create_topic},
+  consumer::consumer_helper::{
+    assign_offset_or_use_metadata, convert_to_rdkafka_offset, try_create_topic,
+  },
   kafka_client::KafkaClient,
-  kafka_util::{convert_to_rdkafka_offset, create_message, AnyhowToNapiError},
-  model::{OffsetModel, TopicPartitionConfig},
+  kafka_util::{create_message, AnyhowToNapiError},
   producer::model::Message,
 };
 
 use super::{
   consumer_helper::{create_stream_consumer, set_offset_of_all_partitions},
-  model::{CommitMode, ConsumerConfiguration, CustomContext, DEFAULT_FECTH_METADATA_TIMEOUT},
+  model::{
+    CommitMode, ConsumerConfiguration, CustomContext, OffsetModel, TopicPartitionConfig,
+    DEFAULT_FECTH_METADATA_TIMEOUT,
+  },
 };
 
 pub const DEFAULT_SEEK_TIMEOUT: i64 = 1500;

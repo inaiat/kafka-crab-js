@@ -5,16 +5,16 @@ use rdkafka::{consumer::CommitMode as RdKfafkaCommitMode, producer::FutureProduc
 use std::{collections::HashMap, time::Duration};
 
 use crate::kafka::{
-  kafka_client::KafkaClient,
-  kafka_util::AnyhowToNapiError,
-  model::{OffsetModel, PartitionPosition},
-  producer::model::Payload,
+  kafka_client::KafkaClient, kafka_util::AnyhowToNapiError, producer::model::Payload,
 };
 
 use super::{
   consumer_helper::create_stream_consumer_and_setup_everything,
   consumer_thread::ConsumerThread,
-  model::{CommitMode, ConsumerConfiguration, RetryStrategy, DEFAULT_FECTH_METADATA_TIMEOUT},
+  model::{
+    CommitMode, ConsumerConfiguration, OffsetModel, PartitionPosition, RetryStrategy,
+    DEFAULT_FECTH_METADATA_TIMEOUT,
+  },
 };
 
 pub const RETRY_COUNTER_NAME: &str = "kafka-crab-js-retry-counter";
