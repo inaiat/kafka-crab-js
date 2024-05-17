@@ -90,7 +90,11 @@ impl KafkaConsumer {
       Some(CommitMode::Async) => Some(RdKfafkaCommitMode::Async),
     };
 
-    let KafkaConsumerConfiguration { topic, fecth_metadata_timeout, .. } = consumer_configuration.clone();
+    let KafkaConsumerConfiguration {
+      topic,
+      fecth_metadata_timeout,
+      ..
+    } = consumer_configuration.clone();
 
     Ok(KafkaConsumer {
       client_config: client_config.clone(),
@@ -225,6 +229,6 @@ fn convert_to_consumer_configuration(config: &KafkaConsumerConfiguration) -> Con
     create_topic: config.create_topic,
     enable_auto_commit: config.enable_auto_commit,
     configuration: config.configuration.clone(),
-    fecth_metadata_timeout: Some(DEFAULT_FECTH_METADATA_TIMEOUT)
+    fecth_metadata_timeout: Some(DEFAULT_FECTH_METADATA_TIMEOUT),
   }
 }

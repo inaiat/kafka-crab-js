@@ -49,7 +49,9 @@ impl KafkaStreamConsumer {
       client_config: client_config.clone(),
       stream_consumer,
       fecth_metadata_timeout: Duration::from_millis(
-        consumer_configuration.fecth_metadata_timeout.unwrap_or(DEFAULT_FECTH_METADATA_TIMEOUT) as u64,
+        consumer_configuration
+          .fecth_metadata_timeout
+          .unwrap_or(DEFAULT_FECTH_METADATA_TIMEOUT) as u64,
       ),
     })
   }
@@ -107,9 +109,14 @@ impl KafkaStreamConsumer {
           "Subscribing to topic: {}. Setting all partitions to offset: {:?}",
           &item.topic, &all_offsets
         );
-        set_offset_of_all_partitions(&all_offsets, &self.stream_consumer, &item.topic, self.fecth_metadata_timeout)
-          .map_err(|e| e.convert_to_napi())
-          .unwrap();
+        set_offset_of_all_partitions(
+          &all_offsets,
+          &self.stream_consumer,
+          &item.topic,
+          self.fecth_metadata_timeout,
+        )
+        .map_err(|e| e.convert_to_napi())
+        .unwrap();
       } else if let Some(partition_offset) = item.partition_offset.clone() {
         info!(
           "Subscribing to topic: {} with partition offsets: {:?}",
@@ -120,7 +127,7 @@ impl KafkaStreamConsumer {
           Some(partition_offset),
           None,
           &self.stream_consumer,
-          self.fecth_metadata_timeout
+          self.fecth_metadata_timeout,
         )
         .map_err(|e| e.convert_to_napi())
         .unwrap();
@@ -137,7 +144,13 @@ impl KafkaStreamConsumer {
   }
 
   #[napi]
-  pub fn seek(&self, topic: String, partition: i32, offset_model: OffsetModel, timeout: Option<i64>) -> Result<()> {
+  pub fn seek(
+    &self,
+    topic: String,
+    partition: i32,
+    offset_model: OffsetModel,
+    timeout: Option<i64>,
+  ) -> Result<()> {
     let offset = convert_to_rdkafka_offset(&offset_model);
     info!(
       "Seeking to topic: {}, partition: {}, offset: {:?}",
@@ -145,7 +158,12 @@ impl KafkaStreamConsumer {
     );
     self
       .stream_consumer
-      .seek(&topic, partition, offset, Duration::from_millis(timeout.unwrap_or(DEFAULT_SEEK_TIMEOUT) as u64))
+      .seek(
+        &topic,
+        partition,
+        offset,
+        Duration::from_millis(timeout.unwrap_or(DEFAULT_SEEK_TIMEOUT) as u64),
+      )
       .map_err(|e| {
         error!("Error while seeking: {:?}", e);
         napi::Error::new(

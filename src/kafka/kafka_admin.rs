@@ -32,7 +32,9 @@ impl<'a> KafkaAdmin<'a> {
     KafkaAdmin {
       client_config,
       admin_client,
-      fetch_metadata_timeout: Duration::from_millis( fetch_metadata_timeout.unwrap_or(DEFAULT_FECTH_METADATA_TIMEOUT) as u64),
+      fetch_metadata_timeout: Duration::from_millis(
+        fetch_metadata_timeout.unwrap_or(DEFAULT_FECTH_METADATA_TIMEOUT) as u64,
+      ),
     }
   }
 
