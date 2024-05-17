@@ -103,7 +103,7 @@ impl KafkaConsumer {
       commit_mode,
       topic,
       fetch_metadata_timeout: Duration::from_millis(
-        fecth_metadata_timeout.unwrap_or(DEFAULT_FECTH_METADATA_TIMEOUT) as u64,
+        fecth_metadata_timeout.unwrap_or(DEFAULT_FECTH_METADATA_TIMEOUT.as_millis() as i64) as u64,
       ),
     })
   }
@@ -229,6 +229,6 @@ fn convert_to_consumer_configuration(config: &KafkaConsumerConfiguration) -> Con
     create_topic: config.create_topic,
     enable_auto_commit: config.enable_auto_commit,
     configuration: config.configuration.clone(),
-    fecth_metadata_timeout: Some(DEFAULT_FECTH_METADATA_TIMEOUT),
+    fecth_metadata_timeout: config.fecth_metadata_timeout,
   }
 }

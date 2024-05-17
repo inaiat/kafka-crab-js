@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, time::Duration};
 
 use rdkafka::{
   consumer::{ConsumerContext, Rebalance, StreamConsumer},
@@ -7,7 +7,7 @@ use rdkafka::{
 };
 use tracing::info;
 
-pub const DEFAULT_FECTH_METADATA_TIMEOUT: i64 = 2000;
+pub const DEFAULT_FECTH_METADATA_TIMEOUT: Duration = Duration::from_millis(2000);
 
 pub type LoggingConsumer = StreamConsumer<CustomContext>;
 

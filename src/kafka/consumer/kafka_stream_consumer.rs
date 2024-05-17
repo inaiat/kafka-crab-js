@@ -55,7 +55,7 @@ impl KafkaStreamConsumer {
       fecth_metadata_timeout: Duration::from_millis(
         consumer_configuration
           .fecth_metadata_timeout
-          .unwrap_or(DEFAULT_FECTH_METADATA_TIMEOUT) as u64,
+          .unwrap_or(DEFAULT_FECTH_METADATA_TIMEOUT.as_millis() as i64) as u64,
       ),
     })
   }
@@ -67,7 +67,7 @@ impl KafkaStreamConsumer {
   ) -> Result<()> {
     let topics = match topic_configs {
       Either::A(config) => {
-        info!("1.Subscribing to topic: {:#?}", &config);
+        debug!("Subscribing to topic: {:#?}", &config);
         vec![TopicPartitionConfig {
           topic: config,
           all_offsets: None,
@@ -75,7 +75,7 @@ impl KafkaStreamConsumer {
         }]
       }
       Either::B(config) => {
-        info!("2.Subscribing to topics: {:#?}", &config);
+        debug!("Subscribing to topic config: {:#?}", &config);
         config
       }
     };
@@ -89,9 +89,9 @@ impl KafkaStreamConsumer {
       .map(|x| x.as_str())
       .collect::<Vec<&str>>();
 
-    info!("Creating topics if not exists: {:?}", &topics_ref);
+    debug!("Creating topics if not exists: {:?}", &topics_ref);
     for topic in &topics_ref {
-      try_create_topic(&topic, &self.client_config)
+      try_create_topic(&topic, &self.client_config, self.fecth_metadata_timeout)
         .await
         .map_err(|e| e.convert_to_napi())?;
     }

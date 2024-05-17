@@ -36,7 +36,7 @@ pub async fn create_stream_consumer_and_setup_everything(
   let consumer = create_stream_consumer(client_config, consumer_configuration, configuration)?;
 
   if consumer_configuration.create_topic.unwrap_or(true) {
-    try_create_topic(topic, client_config).await?;
+    try_create_topic(topic, client_config, timeout).await?;
   }
 
   if let Some(offset_model) = offset {
@@ -99,9 +99,12 @@ pub fn try_subscribe(consumer: &LoggingConsumer, topic: &str) -> anyhow::Result<
   Ok(())
 }
 
-pub async fn try_create_topic(topic: &str, client_config: &ClientConfig) -> anyhow::Result<()> {
-  info!("Creating topic: {:?}", topic);
-  let admin = KafkaAdmin::new(client_config, None);
+pub async fn try_create_topic(
+  topic: &str,
+  client_config: &ClientConfig,
+  fetch_metadata_timeout: Duration,
+) -> anyhow::Result<()> {
+  let admin = KafkaAdmin::new(client_config, Some(fetch_metadata_timeout));
   let result = admin.create_topic(topic).await;
   if let Err(e) = result {
     warn!("Fail to create topic {:?}", e);
