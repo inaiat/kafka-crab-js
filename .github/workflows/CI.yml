@@ -49,7 +49,7 @@ jobs:
             build: |-
               set -e &&
               export CXXFLAGS="-stdlib=libc++ -L/usr/lib/llvm-18/lib -static"
-              pnpm build --target --target aarch64-unknown-linux-gnu &&
+              pnpm build --target aarch64-unknown-linux-gnu &&
               strip *.node
     name: stable - ${{ matrix.settings.target }} - node@20
     runs-on: ${{ matrix.settings.host }}
