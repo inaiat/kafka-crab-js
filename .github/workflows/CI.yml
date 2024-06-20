@@ -46,7 +46,11 @@ jobs:
           - host: ubuntu-latest
             target: aarch64-unknown-linux-gnu
             docker: ghcr.io/napi-rs/napi-rs/nodejs-rust:lts-debian-aarch64
-            build: pnpm build --target aarch64-unknown-linux-gnu
+            build: |-
+              set -e &&
+              export CXXFLAGS="-stdlib=libc++ -L/usr/lib/llvm-18/lib -static"
+              pnpm build --target --target aarch64-unknown-linux-gnu &&
+              strip *.node
     name: stable - ${{ matrix.settings.target }} - node@20
     runs-on: ${{ matrix.settings.host }}
     steps:
@@ -68,7 +72,7 @@ jobs:
           toolchain: stable
           targets: ${{ matrix.settings.target }}
       - name: Cache cargo
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: |
             ~/.cargo/registry/index/
@@ -110,7 +114,7 @@ jobs:
         if: ${{ !matrix.settings.docker }}
         shell: bash
       - name: Upload artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: bindings-${{ matrix.settings.target }}
           path: ${{ env.APP_NAME }}.*.node
@@ -141,7 +145,7 @@ jobs:
         with:
           run_install: true
       - name: Download artifacts
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: bindings-${{ matrix.settings.target }}
           path: .
@@ -173,7 +177,7 @@ jobs:
         with:
           run_install: true
       - name: Download artifacts
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: bindings-x86_64-unknown-linux-gnu
           path: .
@@ -240,7 +244,7 @@ jobs:
         with:
           run_install: true
       - name: Download all artifacts
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           path: artifacts
       - name: Move artifacts
