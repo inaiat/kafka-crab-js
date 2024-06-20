@@ -25,9 +25,6 @@ jobs:
       fail-fast: false
       matrix:
         settings:
-          - host: windows-latest
-            build: pnpm build
-            target: x86_64-pc-windows-msvc
           - host: macos-latest
             target: x86_64-apple-darwin
             build: |
@@ -46,6 +43,10 @@ jobs:
             build: |
               pnpm build --target aarch64-apple-darwin
               strip -x *.node
+          - host: ubuntu-latest
+            target: aarch64-unknown-linux-gnu
+            docker: ghcr.io/napi-rs/napi-rs/nodejs-rust:lts-debian-aarch64
+            build: pnpm build --target aarch64-unknown-linux-gnu
     name: stable - ${{ matrix.settings.target }} - node@20
     runs-on: ${{ matrix.settings.host }}
     steps:
@@ -124,8 +125,6 @@ jobs:
         settings:
           - host: macos-latest
             target: x86_64-apple-darwin
-          - host: windows-latest
-            target: x86_64-pc-windows-msvc
         node:
           - '18'
           - '20'
@@ -184,6 +183,46 @@ jobs:
       - name: Test bindings
         run: pnpm test
         # run: docker run --rm -v $(pwd):/build -w /build node:${{ matrix.node }}-slim pnpm test
+  test-linux-aarch64-gnu-binding:
+    name: Test bindings on aarch64-unknown-linux-gnu - node@${{ matrix.node }}
+    needs:
+      - build
+    strategy:
+      fail-fast: false
+      matrix:
+        node:
+          - '18'
+          - '20'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: bindings-aarch64-unknown-linux-gnu
+          path: .
+      - name: List packages
+        run: ls -R .
+        shell: bash
+      - name: Install dependencies
+        run: |
+          pnpm config set supportedArchitectures.cpu "arm64"
+          pnpm config set supportedArchitectures.libc "glibc"
+          pnpm install
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: arm64
+      - run: docker run --rm --privileged multiarch/qemu-user-static --reset -p yes
+      - name: Setup and run tests
+        uses: addnab/docker-run-action@v3
+        with:
+          image: node:${{ matrix.node }}-slim
+          options: '--platform linux/arm64 -v ${{ github.workspace }}:/build -w /build'
+          run: |
+            set -e
+            pnpm test
+            ls -la
   publish:
     name: Publish
     runs-on: ubuntu-latest
