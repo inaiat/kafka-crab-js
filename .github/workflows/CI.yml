@@ -48,7 +48,6 @@ jobs:
             docker: ghcr.io/napi-rs/napi-rs/nodejs-rust:lts-debian-aarch64
             build: |-
               set -e &&
-              export CXXFLAGS="-stdlib=libc++ -L/usr/lib/llvm-18/lib -static"
               pnpm build --target aarch64-unknown-linux-gnu &&
               strip *.node
     name: stable - ${{ matrix.settings.target }} - node@20
