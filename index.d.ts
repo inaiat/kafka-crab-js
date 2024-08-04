@@ -109,23 +109,23 @@ export interface KafkaCrabError {
   code: number
   message: string
 }
-export class KafkaConsumer {
+export declare class KafkaConsumer {
   startConsumer(callback: (error: Error | undefined, result: Payload) => Promise<ConsumerResult | undefined>): Promise<void>
 }
-export class KafkaStreamConsumer {
+export declare class KafkaStreamConsumer {
   subscribe(topicConfigs: string | Array<TopicPartitionConfig>): Promise<void>
   unsubscribe(): void
   seek(topic: string, partition: number, offsetModel: OffsetModel, timeout?: number | undefined | null): void
   recv(): Promise<Message>
   commit(topic: string, partition: number, offset: number, commit: CommitMode): void
 }
-export class KafkaClient {
+export declare class KafkaClient {
   readonly kafkaConfiguration: KafkaConfiguration
   constructor(kafkaConfiguration: KafkaConfiguration)
   createProducer(producerConfiguration: ProducerConfiguration): KafkaProducer
   createConsumer(consumerConfiguration: KafkaConsumerConfiguration): KafkaConsumer
   createStreamConsumer(consumerConfiguration: ConsumerConfiguration): KafkaStreamConsumer
 }
-export class KafkaProducer {
+export declare class KafkaProducer {
   send(producerRecord: ProducerRecord): Promise<Array<RecordMetadata>>
 }
