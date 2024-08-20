@@ -58,6 +58,5 @@
     "test": "ava",
     "universal": "napi universal",
     "version": "napi version"
-  },
-  "packageManager": "pnpm@9.7.2"
+  }
 }
