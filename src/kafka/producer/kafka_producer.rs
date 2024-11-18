@@ -88,7 +88,8 @@ where
 #[napi]
 pub struct KafkaProducer {
   queue_timeout: Duration,
-  client_config: ClientConfig,
+  context: CollectingContext,
+  producer: ThreadedProducer<CollectingContext>,
 }
 
 #[napi]
@@ -111,17 +112,34 @@ impl KafkaProducer {
         .map_err(|e| Error::new(Status::GenericFailure, e))?,
     );
 
+    let context = CollectingContext::new();
+    let producer: ThreadedProducer<CollectingContext> =
+      threaded_producer_with_context(context.clone(), producer_config);
+
     Ok(KafkaProducer {
       queue_timeout,
-      client_config: producer_config,
+      context,
+      producer,
     })
+  }
+
+  pub async fn in_flight_count(&self) -> Result<i32> {
+    let count = self.producer.in_flight_count();
+    Ok(count)
+  }
+
+  #[napi]
+  pub async fn flush(&self) -> Result<()> {
+    self
+      .producer
+      .flush(self.queue_timeout)
+      .map_err(|e| Error::new(Status::GenericFailure, e))?;
+    Ok(())
   }
 
   #[napi]
   pub async fn send(&self, producer_record: ProducerRecord) -> Result<Vec<RecordMetadata>> {
     let topic = producer_record.topic.as_str();
-    let context = CollectingContext::new();
-    let producer = threaded_producer_with_context(context.clone(), self.client_config.clone());
 
     let ids: HashSet<String> = producer_record
       .messages
@@ -147,16 +165,18 @@ impl KafkaProducer {
         .headers(headers)
         .key(rd_key);
 
-      producer
+      self
+        .producer
         .send(record)
         .map_err(|e| Error::new(Status::GenericFailure, e.0))?;
     }
 
-    producer
+    self
+      .producer
       .flush(self.queue_timeout)
       .map_err(|e| Error::new(Status::GenericFailure, e))?;
 
-    let delivery_results = context.results.lock().unwrap();
+    let delivery_results = self.context.results.lock().unwrap();
 
     let result: Vec<RecordMetadata> = delivery_results
       .iter()
