@@ -98,9 +98,7 @@ async function startConsumer() {
     const topic = process.argv[3]
     const messages = process.argv[4] ? Number(process.argv[4]) : 1
     console.log('Sending', messages, 'messages to', topic)
-    const r = await Promise.all([produce(topic, messages), produce(topic, messages)])
-    console.log(r)
-    // await produce(topic, messages);
+    await produce(topic, messages);
   } else { 
     await startConsumer();
   }

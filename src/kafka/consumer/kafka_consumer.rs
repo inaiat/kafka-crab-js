@@ -5,7 +5,7 @@ use rdkafka::{consumer::CommitMode as RdKfafkaCommitMode, producer::FutureProduc
 use std::{collections::HashMap, time::Duration};
 
 use crate::kafka::{
-  kafka_client::KafkaClient, kafka_util::AnyhowToNapiError, producer::model::Payload,
+  kafka_client::KafkaClient, kafka_util::AnyhowToNapiError, producer::model::Message,
 };
 
 use super::{
@@ -109,9 +109,9 @@ impl KafkaConsumer {
   }
 
   #[napi(
-    ts_args_type = "callback: (error: Error | undefined, result: Payload) => Promise<ConsumerResult | undefined>"
+    ts_args_type = "callback: (error: Error | undefined, result: Message) => Promise<ConsumerResult | undefined>"
   )]
-  pub async fn start_consumer(&self, func: ThreadsafeFunction<Payload>) -> Result<()> {
+  pub async fn start_consumer(&self, func: ThreadsafeFunction<Message>) -> Result<()> {
     let KafkaConsumerConfiguration { retry_strategy, .. } = self.consumer_configuration.clone();
 
     if let Some(strategy) = retry_strategy.clone() {
@@ -126,7 +126,7 @@ impl KafkaConsumer {
   async fn start_main_consumer(
     &self,
     retry_strategy: Option<RetryStrategy>,
-    func: &ThreadsafeFunction<Payload>,
+    func: &ThreadsafeFunction<Message>,
   ) -> Result<()> {
     let next_topic_on_fail = match retry_strategy {
       Some(strategy) => {
@@ -173,7 +173,7 @@ impl KafkaConsumer {
   async fn start_retry_consumer(
     &self,
     strategy: RetryStrategy,
-    func: &ThreadsafeFunction<Payload>,
+    func: &ThreadsafeFunction<Message>,
   ) -> Result<()> {
     let retry_topic = strategy
       .clone()

@@ -4,38 +4,6 @@ use napi::bindgen_prelude::Buffer;
 
 #[derive(Clone)]
 #[napi(object)]
-#[deprecated(note = "Use Message instead")]
-pub struct Payload {
-  pub value: Buffer,
-  pub key: Option<Buffer>,
-  pub headers: Option<HashMap<String, Buffer>>,
-  pub topic: String,
-  pub partition: i32,
-  pub offset: i64,
-}
-
-impl Payload {
-  pub fn new(
-    value: Buffer,
-    key: Option<Buffer>,
-    headers: Option<HashMap<String, Buffer>>,
-    topic: String,
-    partition: i32,
-    offset: i64,
-  ) -> Self {
-    Self {
-      value,
-      key,
-      headers,
-      topic,
-      partition,
-      offset,
-    }
-  }
-}
-
-#[derive(Clone)]
-#[napi(object)]
 pub struct Message {
   pub payload: Buffer,
   pub key: Option<Buffer>,

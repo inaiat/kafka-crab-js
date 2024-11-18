@@ -45,17 +45,18 @@ async function produce() {
 }
 
 async function startConsumer() {
-  consumer.startConsumer(async (error, { value, partition, offset }) => {
+  consumer.startConsumer(async (error, { payload, partition, offset }) => {
     if (error) {
       console.error('Js Consumer error', error);
       return;
     }
 
-    const message = JSON.parse(value.toString());
+    const message = JSON.parse(payload);
 
     console.log('Message received! Partition:', partition, 'Offset:', offset, 'Message =>', message);
 
     if (message._id === '5') {
+      console.error('Retrying message');
       return ConsumerResult.Retry;
     }
 

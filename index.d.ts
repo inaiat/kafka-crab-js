@@ -69,14 +69,6 @@ export interface KafkaConfiguration {
   logLevel?: string
   brokerAddressFamily?: string
 }
-export interface Payload {
-  value: Buffer
-  key?: Buffer
-  headers?: Record<string, Buffer>
-  topic: string
-  partition: number
-  offset: number
-}
 export interface Message {
   payload: Buffer
   key?: Buffer
@@ -111,7 +103,7 @@ export interface ProducerConfiguration {
   configuration?: Record<string, string>
 }
 export declare class KafkaConsumer {
-  startConsumer(callback: (error: Error | undefined, result: Payload) => Promise<ConsumerResult | undefined>): Promise<void>
+  startConsumer(callback: (error: Error | undefined, result: Message) => Promise<ConsumerResult | undefined>): Promise<void>
 }
 export declare class KafkaStreamConsumer {
   subscribe(topicConfigs: string | Array<TopicPartitionConfig>): Promise<void>

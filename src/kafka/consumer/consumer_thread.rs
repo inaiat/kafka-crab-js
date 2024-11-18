@@ -4,7 +4,7 @@ use rdkafka::{
   consumer::{stream_consumer::StreamConsumer, CommitMode as RdKfafkaCommitMode, Consumer},
   message::{BorrowedMessage, Header, OwnedHeaders},
   producer::FutureRecord,
-  Message,
+  Message as RdMessage,
 };
 
 use std::time::Duration;
@@ -15,7 +15,7 @@ use crate::kafka::{
   kafka_util::{
     kakfa_headers_to_hashmap, kakfa_headers_to_hashmap_buffer, ExtractValueOnKafkaHashMap,
   },
-  producer::model::Payload,
+  producer::model::Message,
 };
 
 use super::{
@@ -25,7 +25,7 @@ use super::{
 
 pub struct ConsumerThread {
   pub stream_consumer: StreamConsumer<CustomContext>,
-  pub func: ThreadsafeFunction<Payload>,
+  pub func: ThreadsafeFunction<Message>,
   pub commit_mode: Option<RdKfafkaCommitMode>,
   pub retries: i32,
   pub next_topic_on_fail: Option<String>,
@@ -41,7 +41,9 @@ impl ConsumerThread {
         tokio::time::sleep(*duration).await;
       };
       match self.stream_consumer.recv().await {
-        Err(e) => error!("Error while receiving from stream consumer: {:?}", e),
+        Err(e) => {
+          error!("Error while receiving from stream consumer: {:?}", e)
+        }
         Ok(message) => {
           let message_result = self.process_message(&message).await;
           match self.handle_message_result(&message, message_result).await {
@@ -89,13 +91,13 @@ impl ConsumerThread {
               }
               Some(ConsumerResult::Retry) => Ok(Some(ConsumerResult::Retry)),
             },
-            Err(_) => {
-              warn!("Error while calling return function");
+            Err(e) => {
+              warn!("Error while calling return function {:?}", e);
               Ok(Some(ConsumerResult::Ok))
             }
           },
-          Err(err) => {
-            warn!("Error while calling function: {:?}", err.to_string());
+          Err(e) => {
+            warn!("Error while calling function: {:?}", e);
             Ok(Some(ConsumerResult::Retry))
           }
         }
@@ -182,10 +184,10 @@ impl ConsumerThread {
   }
 }
 
-pub fn create_payload(message: &BorrowedMessage<'_>, payload: &[u8]) -> Payload {
+pub fn create_payload(message: &BorrowedMessage<'_>, payload: &[u8]) -> Message {
   let key: Option<Buffer> = message.key().map(|bytes| bytes.into());
   let headers = Some(kakfa_headers_to_hashmap_buffer(message.headers()));
-  let payload_js = Payload::new(
+  let payload_js = Message::new(
     payload.into(),
     key,
     headers,
