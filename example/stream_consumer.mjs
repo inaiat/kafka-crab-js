@@ -25,6 +25,7 @@ async function produce(topic, messages=1) {
 
   try {
     const result = await producer.send({ topic, messages: records });
+    console.log('Number of messages:', result.length);
     console.log('Js message sent. Offset:', result);
   } catch (error) {
     console.error('Js Error on send', error);

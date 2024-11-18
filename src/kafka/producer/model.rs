@@ -96,7 +96,6 @@ pub struct KafkaCrabError {
   pub message: String,
 }
 
-
 #[napi(object)]
 #[derive(Clone, Debug)]
 pub struct ProducerConfiguration {

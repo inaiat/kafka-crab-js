@@ -1,4 +1,5 @@
 use std::{
+  collections::HashSet,
   sync::{Arc, Mutex},
   time::Duration,
 };
@@ -122,29 +123,29 @@ impl KafkaProducer {
     let context = CollectingContext::new();
     let producer = threaded_producer_with_context(context.clone(), self.client_config.clone());
 
-    let mut ids: Vec<String> = Vec::new();
+    let ids: HashSet<String> = producer_record
+      .messages
+      .iter()
+      .map(|_| nanoid!(10))
+      .collect();
 
-    for message in producer_record.messages {
+    for (message, record_id) in producer_record.messages.into_iter().zip(ids.iter()) {
       let MessageProducer {
-        payload, headers, ..
+        payload,
+        headers,
+        key,
       } = message;
-      let headers = match headers {
-        Some(v) => hashmap_to_kafka_headers(&v),
-        None => OwnedHeaders::new(),
+      let headers = headers.map_or_else(OwnedHeaders::new, |v| hashmap_to_kafka_headers(&v));
+
+      let rd_key: &[u8] = match &key {
+        Some(k) => k.to_bytes(),
+        None => &[],
       };
 
-      let rd_key = if message.key.is_some() {
-        message.key.as_ref().unwrap().to_bytes()
-      } else {
-        &[]
-      };
-
-      let record = BaseRecord::with_opaque_to(topic, Arc::new(nanoid!(10)))
+      let record = BaseRecord::with_opaque_to(topic, Arc::new(record_id.clone()))
         .payload(payload.to_bytes())
         .headers(headers)
         .key(rd_key);
-
-      ids.push(record.delivery_opaque.to_string());
 
       producer
         .send(record)
@@ -156,23 +157,24 @@ impl KafkaProducer {
       .map_err(|e| Error::new(Status::GenericFailure, e))?;
 
     let delivery_results = context.results.lock().unwrap();
-    let mut result: Vec<RecordMetadata> = Vec::new();
-    for (message, error, id) in &(*delivery_results) {
-      if ids.contains(&id.to_string()) {
-        let crab_error = error.as_ref().map(|err| KafkaCrabError {
-          code: err
-            .rdkafka_error_code()
-            .unwrap_or(rdkafka::types::RDKafkaErrorCode::Unknown) as i32,
-          message: err.to_string(),
-        });
-        result.push(RecordMetadata {
+
+    let result: Vec<RecordMetadata> = delivery_results
+      .iter()
+      .filter_map(|(message, error, id)| {
+        ids.contains(&id.to_string()).then(|| RecordMetadata {
           topic: topic.to_string(),
           partition: message.partition(),
           offset: message.offset(),
-          error: crab_error,
-        });
-      }
-    }
+          error: error.as_ref().map(|err| KafkaCrabError {
+            code: err
+              .rdkafka_error_code()
+              .unwrap_or(rdkafka::types::RDKafkaErrorCode::Unknown) as i32,
+            message: err.to_string(),
+          }),
+        })
+      })
+      .collect();
+
     Ok(result)
   }
 }
