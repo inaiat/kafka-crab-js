@@ -69,11 +69,6 @@ export interface KafkaConfiguration {
   logLevel?: string
   brokerAddressFamily?: string
 }
-export interface ProducerConfiguration {
-  queueTimeout?: number
-  thrownOnError?: boolean
-  configuration?: Record<string, string>
-}
 export interface Payload {
   value: Buffer
   key?: Buffer
@@ -108,6 +103,11 @@ export interface ProducerRecord {
 export interface KafkaCrabError {
   code: number
   message: string
+}
+export interface ProducerConfiguration {
+  queueTimeout?: number
+  thrownOnError?: boolean
+  configuration?: Record<string, string>
 }
 export declare class KafkaConsumer {
   startConsumer(callback: (error: Error | undefined, result: Payload) => Promise<ConsumerResult | undefined>): Promise<void>

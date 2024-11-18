@@ -95,3 +95,12 @@ pub struct KafkaCrabError {
   pub code: i32,
   pub message: String,
 }
+
+
+#[napi(object)]
+#[derive(Clone, Debug)]
+pub struct ProducerConfiguration {
+  pub queue_timeout: Option<i64>,
+  pub thrown_on_error: Option<bool>,
+  pub configuration: Option<HashMap<String, String>>,
+}

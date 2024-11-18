@@ -1,9 +1,9 @@
 use std::{
-  collections::HashMap,
   sync::{Arc, Mutex},
   time::Duration,
 };
 
+use nanoid::nanoid;
 use napi::{Error, Result, Status};
 use rdkafka::message::ToBytes;
 use rdkafka::{
@@ -18,11 +18,13 @@ use rdkafka::{
 
 use crate::kafka::kafka_util::hashmap_to_kafka_headers;
 
-use super::model::{KafkaCrabError, MessageProducer, ProducerRecord, RecordMetadata};
+use super::model::{
+  KafkaCrabError, MessageProducer, ProducerConfiguration, ProducerRecord, RecordMetadata,
+};
 
 const DEFAULT_QUEUE_TIMEOUT: i64 = 5000;
 
-type ProducerDeliveryResult = (OwnedMessage, Option<KafkaError>);
+type ProducerDeliveryResult = (OwnedMessage, Option<KafkaError>, Arc<String>);
 
 #[derive(Clone)]
 struct CollectingContext<Part: Partitioner = NoCustomPartitioner> {
@@ -49,13 +51,15 @@ impl<Part: Partitioner + Send + Sync> ClientContext for CollectingContext<Part> 
 }
 
 impl<Part: Partitioner + Send + Sync> ProducerContext<Part> for CollectingContext<Part> {
-  type DeliveryOpaque = ();
+  type DeliveryOpaque = Arc<String>;
 
-  fn delivery(&self, delivery_result: &DeliveryResult, _: Self::DeliveryOpaque) {
+  fn delivery(&self, delivery_result: &DeliveryResult, delivery_opaque: Self::DeliveryOpaque) {
     let mut results = self.results.lock().unwrap();
     match *delivery_result {
-      Ok(ref message) => (*results).push((message.detach(), None)),
-      Err((ref err, ref message)) => (*results).push((message.detach(), Some(err.clone()))),
+      Ok(ref message) => (*results).push((message.detach(), None, delivery_opaque)),
+      Err((ref err, ref message)) => {
+        (*results).push((message.detach(), Some(err.clone()), delivery_opaque))
+      }
     }
   }
 
@@ -78,14 +82,6 @@ where
   client_config
     .create_with_context::<C, ThreadedProducer<_, _>>(context)
     .unwrap()
-}
-
-#[napi(object)]
-#[derive(Clone, Debug)]
-pub struct ProducerConfiguration {
-  pub queue_timeout: Option<i64>,
-  pub thrown_on_error: Option<bool>,
-  pub configuration: Option<HashMap<String, String>>,
 }
 
 #[napi]
@@ -126,6 +122,8 @@ impl KafkaProducer {
     let context = CollectingContext::new();
     let producer = threaded_producer_with_context(context.clone(), self.client_config.clone());
 
+    let mut ids: Vec<String> = Vec::new();
+
     for message in producer_record.messages {
       let MessageProducer {
         payload, headers, ..
@@ -140,13 +138,16 @@ impl KafkaProducer {
       } else {
         &[]
       };
+
+      let record = BaseRecord::with_opaque_to(topic, Arc::new(nanoid!(10)))
+        .payload(payload.to_bytes())
+        .headers(headers)
+        .key(rd_key);
+
+      ids.push(record.delivery_opaque.to_string());
+
       producer
-        .send(
-          BaseRecord::to(topic)
-            .payload(payload.to_bytes())
-            .headers(headers)
-            .key(rd_key),
-        )
+        .send(record)
         .map_err(|e| Error::new(Status::GenericFailure, e.0))?;
     }
 
@@ -156,19 +157,21 @@ impl KafkaProducer {
 
     let delivery_results = context.results.lock().unwrap();
     let mut result: Vec<RecordMetadata> = Vec::new();
-    for (message, error) in &(*delivery_results) {
-      let crab_error = error.as_ref().map(|err| KafkaCrabError {
-        code: err
-          .rdkafka_error_code()
-          .unwrap_or(rdkafka::types::RDKafkaErrorCode::Unknown) as i32,
-        message: err.to_string(),
-      });
-      result.push(RecordMetadata {
-        topic: topic.to_string(),
-        partition: message.partition(),
-        offset: message.offset(),
-        error: crab_error,
-      });
+    for (message, error, id) in &(*delivery_results) {
+      if ids.contains(&id.to_string()) {
+        let crab_error = error.as_ref().map(|err| KafkaCrabError {
+          code: err
+            .rdkafka_error_code()
+            .unwrap_or(rdkafka::types::RDKafkaErrorCode::Unknown) as i32,
+          message: err.to_string(),
+        });
+        result.push(RecordMetadata {
+          topic: topic.to_string(),
+          partition: message.partition(),
+          offset: message.offset(),
+          error: crab_error,
+        });
+      }
     }
     Ok(result)
   }

@@ -18,20 +18,20 @@ const kafkaClient = new KafkaClient({
 async function produce(topic, messages=1) {
   const producer = kafkaClient.createProducer({ topic, configuration: { 'message.timeout.ms': '5000' } });
   const index = Math.floor(Math.random() * 100_000)
+  const records = []
   for (let i = index ?? 0; i < index+messages; i++) {
-    try {
-      const result = await producer.send(
-        {
-          topic,
-          messages: [{ payload: Buffer.from(`{"_id":"${i}","name":"${fakerPT_BR.person.fullName()}","phone":"${fakerPT_BR.phone.number()}"}`) }],
-        },
-      );
-      console.log('Js message sent. Offset:', result);
-    } catch (error) {
-      console.error('Js Error on send', error);
-    }
+    records.push({ payload: Buffer.from(`{"_id":"${i}","name":"${fakerPT_BR.person.fullName()}","phone":"${fakerPT_BR.phone.number()}"}`) })
   }
+
+  try {
+    const result = await producer.send({ topic, messages: records });
+    console.log('Js message sent. Offset:', result);
+  } catch (error) {
+    console.error('Js Error on send', error);
+  }
+
 }
+
 
 class KafkaStreamReadable extends Readable {
   /**

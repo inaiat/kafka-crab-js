@@ -11,7 +11,7 @@ use super::{
     kafka_stream_consumer::KafkaStreamConsumer,
     model::ConsumerConfiguration,
   },
-  producer::kafka_producer::{KafkaProducer, ProducerConfiguration},
+  producer::{kafka_producer::KafkaProducer, model::ProducerConfiguration},
 };
 
 #[derive(Debug)]
