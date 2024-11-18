@@ -127,5 +127,6 @@ export declare class KafkaClient {
   createStreamConsumer(consumerConfiguration: ConsumerConfiguration): KafkaStreamConsumer
 }
 export declare class KafkaProducer {
+  flush(): Promise<void>
   send(producerRecord: ProducerRecord): Promise<Array<RecordMetadata>>
 }
