@@ -41,7 +41,7 @@
     "timeout": "3m"
   },
   "engines": {
-    "node": ">= 18"
+    "node": ">= 20"
   },
   "xo": {
     "space": true,
