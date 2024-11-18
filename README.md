@@ -64,9 +64,9 @@ const consumer = kafkaClient.createConsumer({
 You can consume messages using the run startConsumer:
 
 ```javascript
-consumer.startConsumer(async (error, {value, partition, offset}) => {
-  const message = JSON.parse(value.toString());
-  console.log('Message received! Partition:', partition, 'Offset:', offset, 'Message =>', message.toString());
+consumer.startConsumer(async (error, {payload, partition, offset}) => {
+  const message = JSON.parse(payload);
+  console.log('Message received! Partition:', partition, 'Offset:', offset, 'Message =>', message);
 
   return ConsumerResult.Ok;
 });
