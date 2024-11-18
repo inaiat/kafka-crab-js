@@ -16,6 +16,7 @@ use rdkafka::{
   },
   ClientConfig, ClientContext, Message, Statistics,
 };
+use tracing::debug;
 
 use crate::kafka::kafka_util::hashmap_to_kafka_headers;
 
@@ -88,6 +89,7 @@ where
 #[napi]
 pub struct KafkaProducer {
   queue_timeout: Duration,
+  auto_flush: bool,
   context: CollectingContext,
   producer: ThreadedProducer<CollectingContext>,
 }
@@ -112,18 +114,22 @@ impl KafkaProducer {
         .map_err(|e| Error::new(Status::GenericFailure, e))?,
     );
 
+    let auto_flush = producer_configuration.auto_flush.unwrap_or(true);
+
     let context = CollectingContext::new();
     let producer: ThreadedProducer<CollectingContext> =
       threaded_producer_with_context(context.clone(), producer_config);
 
     Ok(KafkaProducer {
       queue_timeout,
+      auto_flush,
       context,
       producer,
     })
   }
 
-  pub async fn in_flight_count(&self) -> Result<i32> {
+  #[napi]
+  pub fn in_flight_count(&self) -> Result<i32> {
     let count = self.producer.in_flight_count();
     Ok(count)
   }
@@ -144,7 +150,7 @@ impl KafkaProducer {
     let ids: HashSet<String> = producer_record
       .messages
       .iter()
-      .map(|_| nanoid!(10))
+      .map(|_| nanoid!(14))
       .collect();
 
     for (message, record_id) in producer_record.messages.into_iter().zip(ids.iter()) {
@@ -171,10 +177,13 @@ impl KafkaProducer {
         .map_err(|e| Error::new(Status::GenericFailure, e.0))?;
     }
 
-    self
-      .producer
-      .flush(self.queue_timeout)
-      .map_err(|e| Error::new(Status::GenericFailure, e))?;
+    if self.auto_flush {
+      debug!("Auto flushing");
+      self
+        .producer
+        .flush(self.queue_timeout)
+        .map_err(|e| Error::new(Status::GenericFailure, e))?;
+    }
 
     let delivery_results = self.context.results.lock().unwrap();
 

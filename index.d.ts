@@ -107,6 +107,7 @@ export interface KafkaCrabError {
 export interface ProducerConfiguration {
   queueTimeout?: number
   thrownOnError?: boolean
+  autoFlush?: boolean
   configuration?: Record<string, string>
 }
 export declare class KafkaConsumer {
@@ -127,6 +128,7 @@ export declare class KafkaClient {
   createStreamConsumer(consumerConfiguration: ConsumerConfiguration): KafkaStreamConsumer
 }
 export declare class KafkaProducer {
+  inFlightCount(): number
   flush(): Promise<void>
   send(producerRecord: ProducerRecord): Promise<Array<RecordMetadata>>
 }
