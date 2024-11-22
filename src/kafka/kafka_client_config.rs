@@ -6,12 +6,8 @@ use rdkafka::config::{ClientConfig, RDKafkaLogLevel};
 use tracing::Level;
 
 use super::{
-  consumer::{
-    kafka_consumer::{KafkaConsumer, KafkaConsumerConfiguration},
-    kafka_stream_consumer::KafkaStreamConsumer,
-    model::ConsumerConfiguration,
-  },
-  producer::kafka_producer::{KafkaProducer, ProducerConfiguration},
+  consumer::{kafka_consumer::KafkaConsumer, model::ConsumerConfiguration},
+  producer::{kafka_producer::KafkaProducer, model::ProducerConfiguration},
 };
 
 #[derive(Debug)]
@@ -47,14 +43,14 @@ pub struct KafkaConfiguration {
 
 #[derive(Clone, Debug)]
 #[napi]
-pub struct KafkaClient {
+pub struct KafkaClientConfig {
   rdkafka_client_config: ClientConfig,
   #[napi(readonly)]
   pub kafka_configuration: KafkaConfiguration,
 }
 
 #[napi]
-impl KafkaClient {
+impl KafkaClientConfig {
   #[napi(constructor)]
   pub fn new(kafka_configuration: KafkaConfiguration) -> Self {
     let log_level = kafka_configuration.clone().log_level;
@@ -71,7 +67,7 @@ impl KafkaClient {
         eprintln!("Failed to initialize tracing: {:?}", e);
       }
     };
-    KafkaClient::with_kafka_configuration(kafka_configuration)
+    KafkaClientConfig::with_kafka_configuration(kafka_configuration)
   }
 
   pub fn get_client_config(&self) -> &ClientConfig {
@@ -106,7 +102,7 @@ impl KafkaClient {
       }
     }
 
-    KafkaClient {
+    KafkaClientConfig {
       rdkafka_client_config,
       kafka_configuration,
     }
@@ -126,17 +122,9 @@ impl KafkaClient {
   #[napi]
   pub fn create_consumer(
     &self,
-    consumer_configuration: KafkaConsumerConfiguration,
-  ) -> Result<KafkaConsumer> {
-    KafkaConsumer::new(self.clone(), consumer_configuration)
-  }
-
-  #[napi]
-  pub fn create_stream_consumer(
-    &self,
     consumer_configuration: ConsumerConfiguration,
-  ) -> Result<KafkaStreamConsumer> {
-    KafkaStreamConsumer::new(self.clone(), &consumer_configuration).map_err(|e| {
+  ) -> Result<KafkaConsumer> {
+    KafkaConsumer::new(self.clone(), &consumer_configuration).map_err(|e| {
       Error::new(
         Status::GenericFailure,
         format!("Failed to create stream consumer: {:?}", e),

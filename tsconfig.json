@@ -1,0 +1,25 @@
+{
+  "compilerOptions": {
+    "strict": true,
+    "module": "CommonJS",
+    "esModuleInterop": true,
+    "declaration": true,
+    "emitDeclarationOnly": true,
+    "allowSyntheticDefaultImports": true,
+    "allowJs": true,
+    "skipLibCheck": true,
+    "rootDir": "."
+  },
+  "include": [
+    "index.js"
+  ],
+  "exclude": [
+    "__test__",
+    "src",
+    "node_modules",
+    "example",
+    "target",
+    "npm",
+    "js-bindind.js"
+  ]
+}
