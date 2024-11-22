@@ -89,6 +89,8 @@ export interface ProducerConfiguration {
 }
 export declare class KafkaConsumer {
   subscribe(topicConfigs: string | Array<TopicPartitionConfig>): Promise<void>
+  pause(): void
+  resume(): void
   unsubscribe(): void
   seek(topic: string, partition: number, offsetModel: OffsetModel, timeout?: number | undefined | null): void
   recv(): Promise<Message>

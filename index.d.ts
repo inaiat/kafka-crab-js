@@ -3,7 +3,7 @@
  */
 export class KafkaClient {
     /**
-     * Creates a KafkaStreamReadable instance
+     * Creates a KafkaClient instance
      * @param { KafkaConfiguration } config
      */
     constructor(config: KafkaConfiguration);
@@ -28,32 +28,7 @@ export class KafkaClient {
      */
     createStreamConsumer(consumerConfiguration: ConsumerConfiguration): KafkaStreamReadable;
 }
-/**
- * KafkaStreamReadable class
- * @extends Readable
- */
-export class KafkaStreamReadable extends Readable {
-    /**
-     * Creates a KafkaStreamReadable instance
-     * @param { KafkaConsumer } kafkaConsumer
-     */
-    constructor(kafkaConsumer: KafkaConsumer);
-    kafkaConsumer: KafkaConsumer;
-    /**
-     * Subscribes to topics
-     * @param {string | Array<TopicPartitionConfig>} topics
-     * @returns
-     */
-    subscribe(topics: string | Array<TopicPartitionConfig>): Promise<void>;
-    /**
-     * Unsubscribe from topics
-     */
-    unsubscribe(): void;
-    /**
-     * The internal method called by the Readable stream to fetch data
-     */
-    _read(): Promise<void>;
-}
+import { KafkaStreamReadable } from "./kafka-stream-readable";
 import { ProducerConfiguration } from "./js-binding";
 import { ConsumerConfiguration } from "./js-binding";
 import { KafkaConfiguration } from "./js-binding";
@@ -64,5 +39,4 @@ import { SecurityProtocol } from "./js-binding";
 import { KafkaClientConfig } from "./js-binding";
 import { TopicPartitionConfig } from "./js-binding";
 import { KafkaProducer } from "./js-binding";
-import { Readable } from "stream";
-export { ProducerConfiguration, ConsumerConfiguration, KafkaConfiguration, KafkaConsumer, CommitMode, PartitionPosition, SecurityProtocol, KafkaClientConfig, TopicPartitionConfig, KafkaProducer };
+export { KafkaStreamReadable, ProducerConfiguration, ConsumerConfiguration, KafkaConfiguration, KafkaConsumer, CommitMode, PartitionPosition, SecurityProtocol, KafkaClientConfig, TopicPartitionConfig, KafkaProducer };

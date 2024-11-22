@@ -2,42 +2,64 @@ const { Readable } = require('stream')
 
 const {
   KafkaConsumer,
-  CommitMode,
-  PartitionPosition,
-  SecurityProtocol,
-  KafkaClient,
-  KafkaProducer,
-} = require('./index.js')
+  TopicPartitionConfig,
+} = require('./js-binding')
 
+/**
+ * KafkaStreamReadable class
+ * @extends Readable
+ */
 class KafkaStreamReadable extends Readable {
   /**
    * Creates a KafkaStreamReadable instance
-   * @param { KafkaConsumer } kafkaStreamConsumer
+   * @param { KafkaConsumer } kafkaConsumer
    */
-  constructor(kafkaStreamConsumer) {
+  constructor(kafkaConsumer) {
     super({ objectMode: true })
-    this.kafkaStreamConsumer = kafkaStreamConsumer
+    this.kafkaConsumer = kafkaConsumer
+  }
+
+  /**
+   * Subscribes to topics
+   * @param {string | Array<TopicPartitionConfig>} topics
+   * @returns
+   */
+  async subscribe(topics) {
+    return this.kafkaConsumer.subscribe(topics)
+  }
+
+  /**
+   * Unsubscribe from topics
+   */
+  unsubscribe() {
+    this.kafkaConsumer.unsubscribe()
+  }
+
+  pause() {
+    this.kafkaConsumer.pause()
+  }
+
+  resume() {
+    this.kafkaConsumer.resume()
   }
 
   /**
    * The internal method called by the Readable stream to fetch data
    */
   async _read() {
-    const message = await this.kafkaStreamConsumer.recv() // Call the napi-rs method
-    if (message) {
-      this.push(message) // Push message into the stream
-    } else {
-      this.push(null) // No more data, end of stream
+    try {
+      const message = await this.kafkaConsumer.recv() // Call the napi-rs method
+      if (message) {
+        this.push(message) // Push message into the stream
+      } else {
+        this.push(null) // No more data, end of stream
+      }
+    } catch (error) {
+      this.emit('error', error)
     }
   }
 }
 
 module.exports = {
   KafkaStreamReadable,
-  KafkaConsumer,
-  CommitMode,
-  PartitionPosition,
-  SecurityProtocol,
-  KafkaClient,
-  KafkaProducer,
 }

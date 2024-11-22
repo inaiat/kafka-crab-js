@@ -130,6 +130,45 @@ impl KafkaConsumer {
     Ok(())
   }
 
+  fn get_partitions(&self) -> Result<RdTopicPartitionList> {
+    let partitions = self.stream_consumer.assignment().map_err(|e| {
+      napi::Error::new(
+        napi::Status::GenericFailure,
+        format!("Error while getting partitions: {:?}", e),
+      )
+    })?;
+
+    Ok(partitions)
+  }
+
+  #[napi]
+  pub fn pause(&self) -> Result<()> {
+    self
+      .stream_consumer
+      .pause(&self.get_partitions()?)
+      .map_err(|e| {
+        napi::Error::new(
+          napi::Status::GenericFailure,
+          format!("Error while pausing: {:?}", e),
+        )
+      })?;
+    Ok(())
+  }
+
+  #[napi]
+  pub fn resume(&self) -> Result<()> {
+    self
+      .stream_consumer
+      .resume(&self.get_partitions()?)
+      .map_err(|e| {
+        napi::Error::new(
+          napi::Status::GenericFailure,
+          format!("Error while resuming: {:?}", e),
+        )
+      })?;
+    Ok(())
+  }
+
   #[napi]
   pub fn unsubscribe(&self) -> Result<()> {
     self.stream_consumer.unsubscribe();

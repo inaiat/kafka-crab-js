@@ -59,9 +59,13 @@ async function startConsumer() {
     // streamerConsumer.commit(message.partition, message.offset+1, CommitMode.Sync)
   })
 
+  kafkaStream.on('error', (error) => {
+    console.error('Stream error', error)
+  })
+
   kafkaStream.on('close', () => {
-    kafkaStream.unsubscribe()
     console.log('Stream ended')
+    kafkaStream.unsubscribe()
   })
 }
 
