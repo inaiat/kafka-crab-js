@@ -25,29 +25,6 @@ pub fn convert_to_rdkafka_offset(offset_model: &OffsetModel) -> Offset {
   }
 }
 
-pub async fn create_stream_consumer_and_setup_everything(
-  client_config: &ClientConfig,
-  consumer_configuration: &ConsumerConfiguration,
-  topic: &str,
-  offset: &Option<OffsetModel>,
-  configuration: Option<HashMap<String, String>>,
-  timeout: Duration,
-) -> anyhow::Result<StreamConsumer<CustomContext>> {
-  let consumer = create_stream_consumer(client_config, consumer_configuration, configuration)?;
-
-  if consumer_configuration.create_topic.unwrap_or(true) {
-    try_create_topic(&vec![topic.to_owned()], client_config, timeout).await?;
-  }
-
-  if let Some(offset_model) = offset {
-    set_offset_of_all_partitions(offset_model, &consumer, topic, timeout)?;
-  }
-
-  try_subscribe(&consumer, &vec![topic.to_owned()])?;
-
-  Ok(consumer)
-}
-
 pub fn create_stream_consumer(
   client_config: &ClientConfig,
   consumer_configuration: &ConsumerConfiguration,

@@ -1,22 +1,22 @@
 use std::{
-  collections::HashSet,
+  collections::{HashMap, HashSet},
   sync::{Arc, Mutex},
   time::Duration,
 };
 
 use nanoid::nanoid;
 use napi::{Error, Result, Status};
-use rdkafka::message::ToBytes;
 use rdkafka::{
   error::KafkaError,
   message::{OwnedHeaders, OwnedMessage},
-  producer::{
-    BaseRecord, DeliveryResult, NoCustomPartitioner, Partitioner, Producer, ProducerContext,
-    ThreadedProducer,
-  },
+  producer::{BaseRecord, DeliveryResult, NoCustomPartitioner, Partitioner, ThreadedProducer},
   ClientConfig, ClientContext, Message, Statistics,
 };
-use tracing::debug;
+use rdkafka::{
+  message::ToBytes,
+  producer::{Producer, ProducerContext},
+};
+use tracing::{debug, info};
 
 use crate::kafka::kafka_util::hashmap_to_kafka_headers;
 
@@ -30,16 +30,14 @@ type ProducerDeliveryResult = (OwnedMessage, Option<KafkaError>, Arc<String>);
 
 #[derive(Clone)]
 struct CollectingContext<Part: Partitioner = NoCustomPartitioner> {
-  stats: Arc<Mutex<Vec<Statistics>>>,
-  results: Arc<Mutex<Vec<ProducerDeliveryResult>>>,
+  results: Arc<Mutex<HashMap<String, ProducerDeliveryResult>>>,
   partitioner: Option<Part>,
 }
 
 impl CollectingContext {
   fn new() -> CollectingContext {
     CollectingContext {
-      stats: Arc::new(Mutex::new(Vec::new())),
-      results: Arc::new(Mutex::new(Vec::new())),
+      results: Arc::new(Mutex::new(HashMap::new())),
       partitioner: None,
     }
   }
@@ -47,8 +45,7 @@ impl CollectingContext {
 
 impl<Part: Partitioner + Send + Sync> ClientContext for CollectingContext<Part> {
   fn stats(&self, stats: Statistics) {
-    let mut stats_vec = self.stats.lock().unwrap();
-    (*stats_vec).push(stats);
+    debug!("Stats: {:?}", stats);
   }
 }
 
@@ -57,19 +54,15 @@ impl<Part: Partitioner + Send + Sync> ProducerContext<Part> for CollectingContex
 
   fn delivery(&self, delivery_result: &DeliveryResult, delivery_opaque: Self::DeliveryOpaque) {
     let mut results = self.results.lock().unwrap();
-    match *delivery_result {
-      Ok(ref message) => (*results).push((message.detach(), None, delivery_opaque)),
-      Err((ref err, ref message)) => {
-        (*results).push((message.detach(), Some(err.clone()), delivery_opaque))
-      }
-    }
+    let (message, err) = match *delivery_result {
+      Ok(ref message) => (message.detach(), None),
+      Err((ref err, ref message)) => (message.detach(), Some(err.clone())),
+    };
+    results.insert((*delivery_opaque).clone(), (message, err, delivery_opaque));
   }
 
   fn get_custom_partitioner(&self) -> Option<&Part> {
-    match &self.partitioner {
-      None => None,
-      Some(p) => Some(p),
-    }
+    self.partitioner.as_ref()
   }
 }
 
@@ -116,6 +109,10 @@ impl KafkaProducer {
 
     let auto_flush = producer_configuration.auto_flush.unwrap_or(true);
 
+    if !auto_flush {
+      info!("Auto flush is disabled. You must call flush() manually.");
+    }
+
     let context = CollectingContext::new();
     let producer: ThreadedProducer<CollectingContext> =
       threaded_producer_with_context(context.clone(), producer_config);
@@ -130,17 +127,16 @@ impl KafkaProducer {
 
   #[napi]
   pub fn in_flight_count(&self) -> Result<i32> {
-    let count = self.producer.in_flight_count();
-    Ok(count)
+    Ok(self.producer.in_flight_count())
   }
 
   #[napi]
-  pub async fn flush(&self) -> Result<()> {
-    self
-      .producer
-      .flush(self.queue_timeout)
-      .map_err(|e| Error::new(Status::GenericFailure, e))?;
-    Ok(())
+  pub async fn flush(&self) -> Result<Vec<RecordMetadata>> {
+    if self.auto_flush {
+      Ok(vec![])
+    } else {
+      self.flush_delivery_results()
+    }
   }
 
   #[napi]
@@ -154,56 +150,93 @@ impl KafkaProducer {
       .collect();
 
     for (message, record_id) in producer_record.messages.into_iter().zip(ids.iter()) {
-      let MessageProducer {
-        payload,
-        headers,
-        key,
-      } = message;
-      let headers = headers.map_or_else(OwnedHeaders::new, |v| hashmap_to_kafka_headers(&v));
-
-      let rd_key: &[u8] = match &key {
-        Some(k) => k.to_bytes(),
-        None => &[],
-      };
-
-      let record = BaseRecord::with_opaque_to(topic, Arc::new(record_id.clone()))
-        .payload(payload.to_bytes())
-        .headers(headers)
-        .key(rd_key);
-
-      self
-        .producer
-        .send(record)
-        .map_err(|e| Error::new(Status::GenericFailure, e.0))?;
+      self.send_single_message(topic, &message, record_id)?;
     }
 
     if self.auto_flush {
-      debug!("Auto flushing");
-      self
-        .producer
-        .flush(self.queue_timeout)
-        .map_err(|e| Error::new(Status::GenericFailure, e))?;
+      self.flush_delivery_results_with_filter(&ids)
+    } else {
+      Ok(vec![])
     }
+  }
 
-    let delivery_results = self.context.results.lock().unwrap();
+  fn send_single_message(
+    &self,
+    topic: &str,
+    message: &MessageProducer,
+    record_id: &String,
+  ) -> Result<()> {
+    let headers = message
+      .headers
+      .as_ref()
+      .map_or_else(OwnedHeaders::new, |h| hashmap_to_kafka_headers(&h));
 
+    let key = message
+      .key
+      .as_deref()
+      .map(ToBytes::to_bytes)
+      .unwrap_or_default();
+
+    let record: BaseRecord<'_, [u8], [u8], Arc<String>> =
+      BaseRecord::with_opaque_to(topic, Arc::new(record_id.clone()))
+        .payload(message.payload.to_bytes())
+        .headers(headers)
+        .key(&key);
+
+    self
+      .producer
+      .send(record)
+      .map_err(|(e, _)| Error::new(Status::GenericFailure, e.to_string()))?;
+
+    Ok(())
+  }
+
+  fn flush_delivery_results(&self) -> Result<Vec<RecordMetadata>> {
+    self
+      .producer
+      .flush(self.queue_timeout)
+      .map_err(|e| Error::new(Status::GenericFailure, e))?;
+
+    let mut delivery_results = self.context.results.lock().unwrap();
     let result: Vec<RecordMetadata> = delivery_results
       .iter()
-      .filter_map(|(message, error, id)| {
-        ids.contains(&id.to_string()).then(|| RecordMetadata {
-          topic: topic.to_string(),
-          partition: message.partition(),
-          offset: message.offset(),
-          error: error.as_ref().map(|err| KafkaCrabError {
-            code: err
-              .rdkafka_error_code()
-              .unwrap_or(rdkafka::types::RDKafkaErrorCode::Unknown) as i32,
-            message: err.to_string(),
-          }),
-        })
+      .map(|(_, (message, error, _))| to_record_metadata(message, error))
+      .collect();
+    delivery_results.clear();
+    Ok(result)
+  }
+
+  fn flush_delivery_results_with_filter(
+    &self,
+    ids: &HashSet<String>,
+  ) -> Result<Vec<RecordMetadata>> {
+    self
+      .producer
+      .flush(self.queue_timeout)
+      .map_err(|e| Error::new(Status::GenericFailure, e))?;
+
+    let mut delivery_results = self.context.results.lock().unwrap();
+    let result: Vec<RecordMetadata> = delivery_results
+      .iter()
+      .filter_map(|(id, (message, error, _))| {
+        ids.contains(id).then(|| to_record_metadata(message, error))
       })
       .collect();
-
+    delivery_results.retain(|key, _| !ids.contains(key));
     Ok(result)
+  }
+}
+
+fn to_record_metadata(message: &OwnedMessage, error: &Option<KafkaError>) -> RecordMetadata {
+  RecordMetadata {
+    topic: message.topic().to_string(),
+    partition: message.partition(),
+    offset: message.offset(),
+    error: error.as_ref().map(|err| KafkaCrabError {
+      code: err
+        .rdkafka_error_code()
+        .unwrap_or(rdkafka::types::RDKafkaErrorCode::Unknown) as i32,
+      message: err.to_string(),
+    }),
   }
 }

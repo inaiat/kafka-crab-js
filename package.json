@@ -3,6 +3,13 @@
   "version": "1.0.0",
   "main": "index.js",
   "types": "index.d.ts",
+  "module": "commonjs",
+  "files": [
+    "index.d.ts",
+    "index.js",
+    "js-binding.js",
+    "js-binding.d.ts"
+  ],
   "napi": {
     "name": "kafka-crab-js",
     "triples": {
@@ -33,31 +40,22 @@
     "@napi-rs/cli": "^2.18.4",
     "@types/node": "22.9.0",
     "ava": "6.2.0",
+    "dprint": "^0.47.5",
     "nanoid": "5.0.8",
-    "typescript": "5.6.3",
-    "xo": "0.59.3"
+    "typescript": "5.6.3"
   },
   "ava": {
     "timeout": "3m"
   },
-  "engines": {
-    "node": ">=20"
-  },
-  "xo": {
-    "space": true,
-    "rules": {
-      "new-cap": "off",
-      "object-curly-spacing": "off"
-    }
-  },
   "scripts": {
     "artifacts": "napi artifacts",
-    "build": "napi build --no-const-enum --platform --release",
+    "build": "napi build --js js-binding.js --dts js-binding.d.ts --no-const-enum --platform --release && tsc",
     "build:debug": "napi build --platform",
     "prepublishOnly": "napi prepublish -t npm",
     "test": "ava",
     "universal": "napi universal",
-    "version": "napi version"
+    "version": "napi version",
+    "fmt": "dprint fmt"
   },
   "packageManager": "pnpm@9.7.1"
 }

@@ -1,234 +1,218 @@
-use napi::{threadsafe_function::ThreadsafeFunction, Result};
+use std::time::Duration;
 
-use rdkafka::{consumer::CommitMode as RdKfafkaCommitMode, producer::FutureProducer, ClientConfig};
+use napi::{Either, Result};
 
-use std::{collections::HashMap, time::Duration};
+use rdkafka::{
+  consumer::{stream_consumer::StreamConsumer, CommitMode as RdKfafkaCommitMode, Consumer},
+  topic_partition_list::TopicPartitionList as RdTopicPartitionList,
+  ClientConfig, Message as RdMessage, Offset,
+};
+
+use tracing::{debug, error, info};
 
 use crate::kafka::{
-  kafka_client::KafkaClient, kafka_util::AnyhowToNapiError, producer::model::Message,
+  consumer::consumer_helper::{
+    assign_offset_or_use_metadata, convert_to_rdkafka_offset, try_create_topic, try_subscribe,
+  },
+  kafka_client_config::KafkaClientConfig,
+  kafka_util::{create_message, AnyhowToNapiError},
+  producer::model::Message,
 };
 
 use super::{
-  consumer_helper::create_stream_consumer_and_setup_everything,
-  consumer_thread::ConsumerThread,
+  consumer_helper::{create_stream_consumer, set_offset_of_all_partitions},
   model::{
-    CommitMode, ConsumerConfiguration, OffsetModel, PartitionPosition, RetryStrategy,
+    CommitMode, ConsumerConfiguration, CustomContext, OffsetModel, TopicPartitionConfig,
     DEFAULT_FECTH_METADATA_TIMEOUT,
   },
 };
 
-pub const RETRY_COUNTER_NAME: &str = "kafka-crab-js-retry-counter";
-pub const DEFAULT_QUEUE_TIMEOUT: u64 = 5000;
-pub const DEFAULT_PAUSE_DURATION: i64 = 1000;
-pub const DEFAULT_RETRY_TOPIC_SUFFIX: &str = "-retry";
-pub const DEFAULT_DLQ_TOPIC_SUFFIX: &str = "-dlq";
+pub const DEFAULT_SEEK_TIMEOUT: i64 = 1500;
 
-#[napi(string_enum)]
-#[derive(Debug)]
-pub enum ConsumerResult {
-  Ok,
-  Retry,
-}
-
-#[derive(Clone)]
-pub struct ProducerHelper {
-  pub future_producer: FutureProducer,
-  pub queue_timeout: Duration,
-}
-
-fn setup_future_producer(
-  client_config: &ClientConfig,
-  queue_timeout_in_millis: Option<u64>,
-) -> anyhow::Result<ProducerHelper> {
-  let queue_timeout =
-    Duration::from_millis(queue_timeout_in_millis.unwrap_or(DEFAULT_QUEUE_TIMEOUT));
-
-  let future_producer = client_config.create::<FutureProducer>()?;
-
-  Ok(ProducerHelper {
-    future_producer,
-    queue_timeout,
-  })
-}
-
-#[napi(object)]
-#[derive(Clone, Debug)]
-pub struct KafkaConsumerConfiguration {
-  pub topic: String,
-  pub group_id: String,
-  pub retry_strategy: Option<RetryStrategy>,
-  pub offset: Option<OffsetModel>,
-  pub create_topic: Option<bool>,
-  pub commit_mode: Option<CommitMode>,
-  pub enable_auto_commit: Option<bool>,
-  pub configuration: Option<HashMap<String, String>>,
-  pub fecth_metadata_timeout: Option<i64>,
-}
-
-#[derive(Clone)]
 #[napi]
 pub struct KafkaConsumer {
   client_config: ClientConfig,
-  consumer_configuration: KafkaConsumerConfiguration,
-  producer: ProducerHelper,
-  commit_mode: Option<RdKfafkaCommitMode>,
-  topic: String,
-  fetch_metadata_timeout: Duration,
+  stream_consumer: StreamConsumer<CustomContext>,
+  fecth_metadata_timeout: Duration,
 }
 
 #[napi]
 impl KafkaConsumer {
   pub fn new(
-    kafka_client: KafkaClient,
-    consumer_configuration: KafkaConsumerConfiguration,
+    kafka_client: KafkaClientConfig,
+    consumer_configuration: &ConsumerConfiguration,
   ) -> Result<Self> {
     let client_config: &ClientConfig = kafka_client.get_client_config();
 
-    let commit_mode = match consumer_configuration.commit_mode {
-      None => None, //Default AutoCommit
-      Some(CommitMode::Sync) => Some(RdKfafkaCommitMode::Sync),
-      Some(CommitMode::Async) => Some(RdKfafkaCommitMode::Async),
-    };
-
-    let KafkaConsumerConfiguration {
-      topic,
-      fecth_metadata_timeout,
-      ..
-    } = consumer_configuration.clone();
+    let ConsumerConfiguration { configuration, .. } = consumer_configuration;
+    let stream_consumer =
+      create_stream_consumer(client_config, consumer_configuration, configuration.clone())
+        .map_err(|e| e.convert_to_napi())?;
 
     Ok(KafkaConsumer {
       client_config: client_config.clone(),
-      consumer_configuration,
-      producer: setup_future_producer(client_config, None).map_err(|e| e.convert_to_napi())?,
-      commit_mode,
-      topic,
-      fetch_metadata_timeout: Duration::from_millis(
-        fecth_metadata_timeout.unwrap_or(DEFAULT_FECTH_METADATA_TIMEOUT.as_millis() as i64) as u64,
+      stream_consumer,
+      fecth_metadata_timeout: Duration::from_millis(
+        consumer_configuration
+          .fecth_metadata_timeout
+          .unwrap_or(DEFAULT_FECTH_METADATA_TIMEOUT.as_millis() as i64) as u64,
       ),
     })
   }
 
-  #[napi(
-    ts_args_type = "callback: (error: Error | undefined, result: Message) => Promise<ConsumerResult | undefined>"
-  )]
-  pub async fn start_consumer(&self, func: ThreadsafeFunction<Message>) -> Result<()> {
-    let KafkaConsumerConfiguration { retry_strategy, .. } = self.consumer_configuration.clone();
-
-    if let Some(strategy) = retry_strategy.clone() {
-      self.start_retry_consumer(strategy, &func).await?;
-    };
-
-    self.start_main_consumer(retry_strategy, &func).await?;
-
-    Ok(())
-  }
-
-  async fn start_main_consumer(
+  #[napi]
+  pub async fn subscribe(
     &self,
-    retry_strategy: Option<RetryStrategy>,
-    func: &ThreadsafeFunction<Message>,
+    topic_configs: Either<String, Vec<TopicPartitionConfig>>,
   ) -> Result<()> {
-    let next_topic_on_fail = match retry_strategy {
-      Some(strategy) => {
-        let next_topic = if (strategy.retries) > 0 {
-          strategy
-            .retry_topic
-            .unwrap_or(format!("{}{}", &self.topic, DEFAULT_RETRY_TOPIC_SUFFIX))
-        } else {
-          strategy
-            .dql_topic
-            .unwrap_or(format!("{}{}", &self.topic, DEFAULT_DLQ_TOPIC_SUFFIX))
-        };
-        Some(next_topic)
+    let topics = match topic_configs {
+      Either::A(config) => {
+        debug!("Subscribing to topic: {:#?}", &config);
+        vec![TopicPartitionConfig {
+          topic: config,
+          all_offsets: None,
+          partition_offset: None,
+        }]
       }
-      None => None,
+      Either::B(config) => {
+        debug!("Subscribing to topic config: {:#?}", &config);
+        config
+      }
     };
 
-    let consumer_thread = ConsumerThread {
-      stream_consumer: create_stream_consumer_and_setup_everything(
-        &self.client_config,
-        &convert_to_consumer_configuration(&self.consumer_configuration),
-        &self.topic,
-        &self.consumer_configuration.offset.clone(),
-        self.consumer_configuration.configuration.clone(),
-        self.fetch_metadata_timeout,
-      )
-      .await
-      .map_err(|e| e.convert_to_napi())?,
-      func: func.clone(),
-      commit_mode: self.commit_mode,
-      retries: 0,
-      next_topic_on_fail,
-      producer: self.producer.clone(),
-      pause_consumer_duration: None,
-    };
+    let topics_name = topics
+      .iter()
+      .map(|x| x.topic.clone())
+      .collect::<Vec<String>>();
 
-    tokio::spawn(async move {
-      consumer_thread.start().await;
+    debug!("Creating topics if not exists: {:?}", &topics_name);
+    try_create_topic(
+      &topics_name,
+      &self.client_config,
+      self.fecth_metadata_timeout,
+    )
+    .await
+    .map_err(|e| e.convert_to_napi())?;
+
+    try_subscribe(&self.stream_consumer, &topics_name).map_err(|e| e.convert_to_napi())?;
+
+    topics.iter().for_each(|item| {
+      if let Some(all_offsets) = item.all_offsets.clone() {
+        info!(
+          "Subscribing to topic: {}. Setting all partitions to offset: {:?}",
+          &item.topic, &all_offsets
+        );
+        set_offset_of_all_partitions(
+          &all_offsets,
+          &self.stream_consumer,
+          &item.topic,
+          self.fecth_metadata_timeout,
+        )
+        .map_err(|e| e.convert_to_napi())
+        .unwrap();
+      } else if let Some(partition_offset) = item.partition_offset.clone() {
+        info!(
+          "Subscribing to topic: {} with partition offsets: {:?}",
+          &item.topic, &partition_offset
+        );
+        assign_offset_or_use_metadata(
+          &item.topic,
+          Some(partition_offset),
+          None,
+          &self.stream_consumer,
+          self.fecth_metadata_timeout,
+        )
+        .map_err(|e| e.convert_to_napi())
+        .unwrap();
+      };
     });
 
     Ok(())
   }
 
-  async fn start_retry_consumer(
+  #[napi]
+  pub fn unsubscribe(&self) -> Result<()> {
+    self.stream_consumer.unsubscribe();
+    Ok(())
+  }
+
+  #[napi]
+  pub fn seek(
     &self,
-    strategy: RetryStrategy,
-    func: &ThreadsafeFunction<Message>,
+    topic: String,
+    partition: i32,
+    offset_model: OffsetModel,
+    timeout: Option<i64>,
   ) -> Result<()> {
-    let retry_topic = strategy
-      .clone()
-      .retry_topic
-      .unwrap_or(format!("{}{}", self.topic, DEFAULT_RETRY_TOPIC_SUFFIX));
-
-    let next_topic_on_fail = Some(
-      strategy
-        .clone()
-        .dql_topic
-        .unwrap_or(format!("{}{}", self.topic, DEFAULT_DLQ_TOPIC_SUFFIX)),
+    let offset = convert_to_rdkafka_offset(&offset_model);
+    info!(
+      "Seeking to topic: {}, partition: {}, offset: {:?}",
+      topic, partition, offset
     );
-    let pause_consumer_duration = Some(Duration::from_millis(
-      strategy
-        .pause_consumer_duration
-        .unwrap_or(DEFAULT_PAUSE_DURATION) as u64,
-    ));
-    let offset_model = strategy.offset.clone().unwrap_or(OffsetModel {
-      position: Some(PartitionPosition::Stored),
-      offset: None,
-    });
-
-    let consumer_thread = ConsumerThread {
-      stream_consumer: create_stream_consumer_and_setup_everything(
-        &self.client_config,
-        &convert_to_consumer_configuration(&self.consumer_configuration),
-        &retry_topic,
-        &Some(offset_model),
-        strategy.configuration.clone(),
-        self.fetch_metadata_timeout,
+    self
+      .stream_consumer
+      .seek(
+        &topic,
+        partition,
+        offset,
+        Duration::from_millis(timeout.unwrap_or(DEFAULT_SEEK_TIMEOUT) as u64),
       )
-      .await
-      .map_err(|e| e.convert_to_napi())?,
-      func: func.clone(),
-      commit_mode: self.commit_mode,
-      retries: strategy.retries,
-      next_topic_on_fail,
-      producer: self.producer.clone(),
-      pause_consumer_duration,
-    };
-
-    tokio::spawn(async move {
-      consumer_thread.start().await;
-    });
-
+      .map_err(|e| {
+        error!("Error while seeking: {:?}", e);
+        napi::Error::new(
+          napi::Status::GenericFailure,
+          format!("Error while seeking: {:?}", e),
+        )
+      })?;
     Ok(())
   }
-}
 
-fn convert_to_consumer_configuration(config: &KafkaConsumerConfiguration) -> ConsumerConfiguration {
-  ConsumerConfiguration {
-    group_id: config.group_id.clone(),
-    create_topic: config.create_topic,
-    enable_auto_commit: config.enable_auto_commit,
-    configuration: config.configuration.clone(),
-    fecth_metadata_timeout: config.fecth_metadata_timeout,
+  #[napi]
+  pub async fn recv(&self) -> Result<Message> {
+    self
+      .stream_consumer
+      .recv()
+      .await
+      .map_err(|e| {
+        napi::Error::new(
+          napi::Status::GenericFailure,
+          format!("Error while receiving from stream consumer: {:?}", e),
+        )
+      })
+      .map(|message| create_message(&message, message.payload().unwrap_or(&[])))
+  }
+
+  #[napi]
+  pub fn commit(
+    &self,
+    topic: String,
+    partition: i32,
+    offset: i64,
+    commit: CommitMode,
+  ) -> Result<()> {
+    let mut tpl = RdTopicPartitionList::new();
+    tpl
+      .add_partition_offset(&topic, partition, Offset::Offset(offset))
+      .map_err(|e| {
+        napi::Error::new(
+          napi::Status::GenericFailure,
+          format!("Error while adding partition offset: {:?}", e),
+        )
+      })?;
+    let commit_mode = match commit {
+      CommitMode::Sync => RdKfafkaCommitMode::Sync,
+      CommitMode::Async => RdKfafkaCommitMode::Async,
+    };
+    self
+      .stream_consumer
+      .commit(&tpl, commit_mode)
+      .map_err(|e| {
+        napi::Error::new(
+          napi::Status::GenericFailure,
+          format!("Error while committing: {:?}", e),
+        )
+      })?;
+    debug!("Commiting done. Tpl: {:?}", &tpl);
+    Ok(())
   }
 }
