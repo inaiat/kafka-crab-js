@@ -10,7 +10,7 @@ const kafkaClient = new KafkaClient({
 })
 
 async function produce(topic, messages = 1) {
-  const producer = kafkaClient.createProducer({ topic, configuration: { 'message.timeout.ms': '5000' } })
+  const producer = kafkaClient.createProducer({ configuration: { 'message.timeout.ms': '5000' } })
   const index = Math.floor(Math.random() * 100_000)
   const records = []
   for (let i = index ?? 0; i < index + messages; i++) {
