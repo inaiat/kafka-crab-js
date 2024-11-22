@@ -1,5 +1,4 @@
 import { fakerPT_BR } from '@faker-js/faker'
-import { setTimeout as sleep } from 'node:timers/promises'
 import { CommitMode, KafkaClient, KafkaStreamReadable, PartitionPosition } from '../index.js'
 
 const kafkaClient = new KafkaClient({
@@ -42,26 +41,35 @@ async function startConsumer() {
 
   await kafkaStream.subscribe([{ topic: 'foo' }, { topic: 'bar' }])
 
-  const maxMessages = 20
   let counter = 0
   console.log('Starting consumer')
   kafkaStream.on('data', (message) => {
     counter++
+    if (counter === 5) {
+      console.log('Pausing stream')
+      kafkaStream.pause()
+      setTimeout(() => {
+        console.log('Resuming stream')
+        kafkaStream.resume()
+      }, 5_000)
+    }
     console.log('>>> Message received:', {
+      counter,
       payload: message.payload.toString(),
       offset: message.offset,
       partition: message.partition,
       topic: message.topic,
     })
-    if (counter === maxMessages) {
-      kafkaStream.destroy()
-    }
     // streamerConsumer.commit(message.partition, message.offset+1, CommitMode.Sync)
   })
 
+  kafkaStream.on('error', (error) => {
+    console.error('Stream error', error)
+  })
+
   kafkaStream.on('close', () => {
-    kafkaStream.unsubscribe()
     console.log('Stream ended')
+    kafkaStream.unsubscribe()
   })
 }
 

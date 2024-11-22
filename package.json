@@ -1,12 +1,13 @@
 {
   "name": "kafka-crab-js",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "main": "index.js",
   "types": "index.d.ts",
   "module": "commonjs",
   "files": [
     "index.d.ts",
     "index.js",
+    "kafka-stream-readable.js",
     "js-binding.js",
     "js-binding.d.ts"
   ],

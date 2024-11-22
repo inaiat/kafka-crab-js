@@ -13,56 +13,16 @@ const {
   KafkaProducer,
 } = require('./js-binding')
 
-/**
- * KafkaStreamReadable class
- * @extends Readable
- */
-class KafkaStreamReadable extends Readable {
-  /**
-   * Creates a KafkaStreamReadable instance
-   * @param { KafkaConsumer } kafkaConsumer
-   */
-  constructor(kafkaConsumer) {
-    super({ objectMode: true })
-    this.kafkaConsumer = kafkaConsumer
-  }
-
-  /**
-   * Subscribes to topics
-   * @param {string | Array<TopicPartitionConfig>} topics
-   * @returns
-   */
-  async subscribe(topics) {
-    return this.kafkaConsumer.subscribe(topics)
-  }
-
-  /**
-   * Unsubscribe from topics
-   */
-  unsubscribe() {
-    this.kafkaConsumer.unsubscribe()
-  }
-
-  /**
-   * The internal method called by the Readable stream to fetch data
-   */
-  async _read() {
-    const message = await this.kafkaConsumer.recv() // Call the napi-rs method
-    if (message) {
-      this.push(message) // Push message into the stream
-    } else {
-      this.push(null) // No more data, end of stream
-    }
-  }
-}
+const { KafkaStreamReadable } = require('./kafka-stream-readable')
 
 /**
  * KafkaClient class
  */
 class KafkaClient {
   /**
-   * Creates a KafkaStreamReadable instance
-   * @param { KafkaConfiguration } config
+   * Creates a KafkaClient instance
+   * @param {KafkaConfiguration} config - The Kafka configuration object
+   * @throws {Error} If the configuration is invalid
    */
   constructor(config) {
     this.kafkaConfiguration = config
@@ -71,8 +31,8 @@ class KafkaClient {
 
   /**
    * Creates a KafkaProducer instance
-   * @param { ProducerConfiguration | undefined } producerConfiguration
-   * @returns {KafkaProducer}
+   * @param {ProducerConfiguration} [producerConfiguration] - Optional producer configuration
+   * @returns {KafkaProducer} A KafkaProducer instance
    */
   createProducer(producerConfiguration) {
     if (producerConfiguration) {
@@ -83,8 +43,9 @@ class KafkaClient {
 
   /**
    * Creates a KafkaConsumer instance
-   * @param {ConsumerConfiguration } consumerConfiguration
-   * @returns {KafkaConsumer}
+   * @param {ConsumerConfiguration} consumerConfiguration - Consumer configuration
+   * @returns {KafkaConsumer} A KafkaConsumer instance
+   * @throws {Error} If the configuration is invalid
    */
   createConsumer(consumerConfiguration) {
     return this.kafkaClientConfig.createConsumer(consumerConfiguration)
@@ -92,8 +53,9 @@ class KafkaClient {
 
   /**
    * Creates a KafkaStreamReadable instance
-   * @param { ConsumerConfiguration } consumerConfiguration
-   * @returns {KafkaStreamReadable}
+   * @param {ConsumerConfiguration} consumerConfiguration - Consumer configuration
+   * @returns {KafkaStreamReadable} A KafkaStreamReadable instance
+   * @throws {Error} If the configuration is invalid
    */
   createStreamConsumer(consumerConfiguration) {
     return new KafkaStreamReadable(this.kafkaClientConfig.createConsumer(consumerConfiguration))
