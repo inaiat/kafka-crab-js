@@ -71,11 +71,14 @@ class KafkaClient {
 
   /**
    * Creates a KafkaProducer instance
-   * @param { ProducerConfiguration } producerConfiguration
+   * @param { ProducerConfiguration | undefined } producerConfiguration
    * @returns {KafkaProducer}
    */
   createProducer(producerConfiguration) {
-    return this.kafkaClientConfig.createProducer(producerConfiguration)
+    if (producerConfiguration) {
+      return this.kafkaClientConfig.createProducer(producerConfiguration)
+    }
+    return this.kafkaClientConfig.createProducer({})
   }
 
   /**

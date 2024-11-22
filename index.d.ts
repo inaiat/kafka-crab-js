@@ -11,10 +11,10 @@ export class KafkaClient {
     kafkaClientConfig: KafkaClientConfig;
     /**
      * Creates a KafkaProducer instance
-     * @param { ProducerConfiguration } producerConfiguration
+     * @param { ProducerConfiguration | undefined } producerConfiguration
      * @returns {KafkaProducer}
      */
-    createProducer(producerConfiguration: ProducerConfiguration): KafkaProducer;
+    createProducer(producerConfiguration: ProducerConfiguration | undefined): KafkaProducer;
     /**
      * Creates a KafkaConsumer instance
      * @param {ConsumerConfiguration } consumerConfiguration
