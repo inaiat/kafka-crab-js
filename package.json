@@ -1,6 +1,6 @@
 {
   "name": "kafka-crab-js",
-  "version": "1.0.0",
+  "version": "0.8.1",
   "main": "index.js",
   "types": "index.d.ts",
   "module": "commonjs",
@@ -49,7 +49,8 @@
   },
   "scripts": {
     "artifacts": "napi artifacts",
-    "build": "napi build --js js-binding.js --dts js-binding.d.ts --no-const-enum --platform --release && tsc",
+    "build": "napi build --js js-binding.js --dts js-binding.d.ts --no-const-enum --platform --release",
+    "postbuild": "tsc",
     "build:debug": "napi build --platform",
     "prepublishOnly": "napi prepublish -t npm",
     "test": "ava",

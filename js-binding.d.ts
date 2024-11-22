@@ -13,7 +13,7 @@ export interface RetryStrategy {
 }
 export enum CommitMode {
   Sync = 0,
-  Async = 1,
+  Async = 1
 }
 export interface ConsumerConfiguration {
   groupId: string
@@ -25,7 +25,7 @@ export interface ConsumerConfiguration {
 export enum PartitionPosition {
   Beginning = 'Beginning',
   End = 'End',
-  Stored = 'Stored',
+  Stored = 'Stored'
 }
 export interface OffsetModel {
   offset?: number
@@ -44,7 +44,7 @@ export enum SecurityProtocol {
   Plaintext = 'Plaintext',
   Ssl = 'Ssl',
   SaslPlaintext = 'SaslPlaintext',
-  SaslSsl = 'SaslSsl',
+  SaslSsl = 'SaslSsl'
 }
 export interface KafkaConfiguration {
   brokers: string
