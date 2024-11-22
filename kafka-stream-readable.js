@@ -12,39 +12,47 @@ const {
 class KafkaStreamReadable extends Readable {
   /**
    * Creates a KafkaStreamReadable instance
-   * @param { KafkaConsumer } kafkaConsumer
+   * @param { KafkaConsumer } kafkaConsumer - The Kafka consumer instance
    */
   constructor(kafkaConsumer) {
     super({ objectMode: true })
+    if (!kafkaConsumer) {
+      throw new Error('A valid KafkaConsumer instance is required.')
+    }
     this.kafkaConsumer = kafkaConsumer
   }
 
   /**
    * Subscribes to topics
-   * @param {string | Array<TopicPartitionConfig>} topics
-   * @returns
+   * @param {string | Array<TopicPartitionConfig>} topics  - Topics to subscribe to
+   * @returns {Promise<void>} - A promise that resolves when the subscription is successful
    */
   async subscribe(topics) {
-    return this.kafkaConsumer.subscribe(topics)
+    if (!topics || (Array.isArray(topics) && topics.length === 0)) {
+      throw new Error('Topics must be a non-empty string or array.')
+    }
+    await this.kafkaConsumer.subscribe(topics)
   }
 
   /**
    * Unsubscribe from topics
+   * @returns {void}
    */
   unsubscribe() {
     this.kafkaConsumer.unsubscribe()
   }
 
-  pause() {
-    this.kafkaConsumer.pause()
-  }
-
-  resume() {
-    this.kafkaConsumer.resume()
+  /**
+   * Returns the raw Kafka consumer
+   * @returns {KafkaConsumer} The Kafka consumer instance
+   */
+  rawConsumer() {
+    return this.kafkaConsumer
   }
 
   /**
-   * The internal method called by the Readable stream to fetch data
+   * Internal method called by the Readable stream to fetch data
+   * @private
    */
   async _read() {
     try {
@@ -55,7 +63,7 @@ class KafkaStreamReadable extends Readable {
         this.push(null) // No more data, end of stream
       }
     } catch (error) {
-      this.emit('error', error)
+      this.destroy(error)
     }
   }
 }

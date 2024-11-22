@@ -21,7 +21,8 @@ const { KafkaStreamReadable } = require('./kafka-stream-readable')
 class KafkaClient {
   /**
    * Creates a KafkaClient instance
-   * @param { KafkaConfiguration } config
+   * @param {KafkaConfiguration} config - The Kafka configuration object
+   * @throws {Error} If the configuration is invalid
    */
   constructor(config) {
     this.kafkaConfiguration = config
@@ -30,8 +31,8 @@ class KafkaClient {
 
   /**
    * Creates a KafkaProducer instance
-   * @param { ProducerConfiguration | undefined } producerConfiguration
-   * @returns {KafkaProducer}
+   * @param {ProducerConfiguration} [producerConfiguration] - Optional producer configuration
+   * @returns {KafkaProducer} A KafkaProducer instance
    */
   createProducer(producerConfiguration) {
     if (producerConfiguration) {
@@ -42,8 +43,9 @@ class KafkaClient {
 
   /**
    * Creates a KafkaConsumer instance
-   * @param {ConsumerConfiguration } consumerConfiguration
-   * @returns {KafkaConsumer}
+   * @param {ConsumerConfiguration} consumerConfiguration - Consumer configuration
+   * @returns {KafkaConsumer} A KafkaConsumer instance
+   * @throws {Error} If the configuration is invalid
    */
   createConsumer(consumerConfiguration) {
     return this.kafkaClientConfig.createConsumer(consumerConfiguration)
@@ -51,8 +53,9 @@ class KafkaClient {
 
   /**
    * Creates a KafkaStreamReadable instance
-   * @param { ConsumerConfiguration } consumerConfiguration
-   * @returns {KafkaStreamReadable}
+   * @param {ConsumerConfiguration} consumerConfiguration - Consumer configuration
+   * @returns {KafkaStreamReadable} A KafkaStreamReadable instance
+   * @throws {Error} If the configuration is invalid
    */
   createStreamConsumer(consumerConfiguration) {
     return new KafkaStreamReadable(this.kafkaClientConfig.createConsumer(consumerConfiguration))
