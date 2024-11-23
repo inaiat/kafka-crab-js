@@ -11,6 +11,7 @@
     "rootDir": "."
   },
   "include": [
+    "kafka-*.js",
     "index.js"
   ],
   "exclude": [
