@@ -94,6 +94,4 @@ async function startConsumer() {
   await setupConsumerWithRetry()
 }
 
-
 await startConsumer()
-

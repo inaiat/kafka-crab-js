@@ -9,14 +9,14 @@
     "allowJs": true,
     "skipLibCheck": true,
     "rootDir": "./js-src",
-    "outDir": "./dist",
+    "outDir": "./dist"
   },
   "include": [
-    "**/*.ts",
+    "**/*.ts"
   ],
   "copyFiles": [
     "js_src/js-binding.d.ts",
-    "js_src/js-binding.js",
+    "js_src/js-binding.js"
   ],
   "exclude": [
     "__test__",
@@ -27,5 +27,5 @@
     "npm",
     "js-binding.js",
     "js-binding.d.ts"
-  ],
+  ]
 }
