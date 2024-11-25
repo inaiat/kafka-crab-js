@@ -1,18 +1,22 @@
 {
   "compilerOptions": {
     "strict": true,
+    "target": "ES2020",
     "module": "CommonJS",
     "esModuleInterop": true,
     "declaration": true,
-    "emitDeclarationOnly": true,
     "allowSyntheticDefaultImports": true,
     "allowJs": true,
     "skipLibCheck": true,
-    "rootDir": "."
+    "rootDir": "./js-src",
+    "outDir": "./dist",
   },
   "include": [
-    "kafka-*.js",
-    "index.js"
+    "**/*.ts",
+  ],
+  "copyFiles": [
+    "js_src/js-binding.d.ts",
+    "js_src/js-binding.js",
   ],
   "exclude": [
     "__test__",
@@ -21,6 +25,7 @@
     "example",
     "target",
     "npm",
-    "js-bindind.js"
-  ]
+    "js-binding.js",
+    "js-binding.d.ts"
+  ],
 }
