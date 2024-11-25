@@ -45,14 +45,6 @@ async function startConsumer() {
   console.log('Starting consumer')
   kafkaStream.on('data', (message) => {
     counter++
-    if (counter === 5) {
-      console.log('Pausing stream')
-      kafkaStream.pause()
-      setTimeout(() => {
-        console.log('Resuming stream')
-        kafkaStream.resume()
-      }, 5_000)
-    }
     console.log('>>> Message received:', {
       counter,
       payload: message.payload.toString(),

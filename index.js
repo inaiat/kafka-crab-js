@@ -1,78 +1,14 @@
-const { Readable } = require('stream')
-
-const {
-  ProducerConfiguration,
-  ConsumerConfiguration,
-  KafkaConfiguration,
-  KafkaConsumer,
-  CommitMode,
-  PartitionPosition,
-  SecurityProtocol,
-  KafkaClientConfig,
-  TopicPartitionConfig,
-  KafkaProducer,
-} = require('./js-binding')
-
-const { KafkaStreamReadable } = require('./kafka-stream-readable')
-
-/**
- * KafkaClient class
- */
-class KafkaClient {
-  /**
-   * Creates a KafkaClient instance
-   * @param {KafkaConfiguration} config - The Kafka configuration object
-   * @throws {Error} If the configuration is invalid
-   */
-  constructor(config) {
-    this.kafkaConfiguration = config
-    this.kafkaClientConfig = new KafkaClientConfig(config)
-  }
-
-  /**
-   * Creates a KafkaProducer instance
-   * @param {ProducerConfiguration} [producerConfiguration] - Optional producer configuration
-   * @returns {KafkaProducer} A KafkaProducer instance
-   */
-  createProducer(producerConfiguration) {
-    if (producerConfiguration) {
-      return this.kafkaClientConfig.createProducer(producerConfiguration)
-    }
-    return this.kafkaClientConfig.createProducer({})
-  }
-
-  /**
-   * Creates a KafkaConsumer instance
-   * @param {ConsumerConfiguration} consumerConfiguration - Consumer configuration
-   * @returns {KafkaConsumer} A KafkaConsumer instance
-   * @throws {Error} If the configuration is invalid
-   */
-  createConsumer(consumerConfiguration) {
-    return this.kafkaClientConfig.createConsumer(consumerConfiguration)
-  }
-
-  /**
-   * Creates a KafkaStreamReadable instance
-   * @param {ConsumerConfiguration} consumerConfiguration - Consumer configuration
-   * @returns {KafkaStreamReadable} A KafkaStreamReadable instance
-   * @throws {Error} If the configuration is invalid
-   */
-  createStreamConsumer(consumerConfiguration) {
-    return new KafkaStreamReadable(this.kafkaClientConfig.createConsumer(consumerConfiguration))
-  }
-}
-
-module.exports = {
-  KafkaClient,
-  KafkaStreamReadable,
-  ProducerConfiguration,
-  ConsumerConfiguration,
-  KafkaConfiguration,
-  KafkaConsumer,
-  CommitMode,
-  PartitionPosition,
-  SecurityProtocol,
-  KafkaClientConfig,
-  TopicPartitionConfig,
-  KafkaProducer,
-}
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.KafkaStreamReadable = exports.KafkaClient = exports.SecurityProtocol = exports.PartitionPosition = exports.KafkaProducer = exports.KafkaConsumer = exports.KafkaClientConfig = exports.CommitMode = void 0;
+var js_binding_1 = require("./js-binding");
+Object.defineProperty(exports, "CommitMode", { enumerable: true, get: function () { return js_binding_1.CommitMode; } });
+Object.defineProperty(exports, "KafkaClientConfig", { enumerable: true, get: function () { return js_binding_1.KafkaClientConfig; } });
+Object.defineProperty(exports, "KafkaConsumer", { enumerable: true, get: function () { return js_binding_1.KafkaConsumer; } });
+Object.defineProperty(exports, "KafkaProducer", { enumerable: true, get: function () { return js_binding_1.KafkaProducer; } });
+Object.defineProperty(exports, "PartitionPosition", { enumerable: true, get: function () { return js_binding_1.PartitionPosition; } });
+Object.defineProperty(exports, "SecurityProtocol", { enumerable: true, get: function () { return js_binding_1.SecurityProtocol; } });
+var kafka_client_1 = require("./kafka-client");
+Object.defineProperty(exports, "KafkaClient", { enumerable: true, get: function () { return kafka_client_1.KafkaClient; } });
+var kafka_stream_readable_1 = require("./kafka-stream-readable");
+Object.defineProperty(exports, "KafkaStreamReadable", { enumerable: true, get: function () { return kafka_stream_readable_1.KafkaStreamReadable; } });
