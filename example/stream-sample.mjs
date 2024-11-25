@@ -1,5 +1,5 @@
 import { fakerPT_BR } from '@faker-js/faker'
-import { CommitMode, KafkaClient, KafkaStreamReadable, PartitionPosition } from '../index.js'
+import { KafkaClient } from '../index.js'
 
 const kafkaClient = new KafkaClient({
   brokers: 'localhost:29092',
@@ -33,13 +33,13 @@ async function produce(topic, messages = 1) {
   }
 }
 
-async function startConsumer() {
+async function startConsumer(topic) {
   const kafkaStream = kafkaClient.createStreamConsumer({
     groupId: `crab-test`,
     enableAutoCommit: true,
   })
 
-  await kafkaStream.subscribe([{ topic: 'foo' }, { topic: 'bar' }])
+  await kafkaStream.subscribe(topic)
 
   let counter = 0
   console.log('Starting consumer')
@@ -52,7 +52,6 @@ async function startConsumer() {
       partition: message.partition,
       topic: message.topic,
     })
-    // streamerConsumer.commit(message.partition, message.offset+1, CommitMode.Sync)
   })
 
   kafkaStream.on('error', (error) => {
@@ -71,5 +70,10 @@ if (process.argv[2] === 'send') {
   console.log('Sending', messages, 'messages to', topic)
   await produce(topic, messages)
 } else {
-  await startConsumer()
+  const topic = process.argv[2]
+  await startConsumer(topic)
 }
+
+// Usage:
+// node stream-sample.mjs send foo 10 // send 10 messages on topic foo
+// node stream-sample.mjs foo // process messages on topic foo

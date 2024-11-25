@@ -2,9 +2,12 @@ import { KafkaClient } from '../index.js'
 
 const kafkaClient = new KafkaClient({
   brokers: 'localhost:29092',
-  clientId: 'my-js-group-11',
+  clientId: 'reconnect-test',
   logLevel: 'debug',
   brokerAddressFamily: 'v4',
+  configuration: {
+    'auto.offset.reset': 'earliest',
+  },
 })
 
 /**
@@ -12,15 +15,16 @@ const kafkaClient = new KafkaClient({
  */
 async function createConsumer() {
   const kafkaStream = kafkaClient.createStreamConsumer({
-    groupId: `crab-test`,
+    groupId: `reconnect-test-3`,
     enableAutoCommit: true,
+    configuration: {
+      'auto.offset.reset': 'earliest',
+    },
   })
-
   await kafkaStream.subscribe([
     { topic: 'foo' },
     { topic: 'bar' },
   ])
-
   return kafkaStream
 }
 
@@ -28,15 +32,28 @@ async function createConsumer() {
  * Starts a Kafka consumer with auto-restart capability
  */
 async function startConsumer() {
+  let counter = 0
   let retryCount = 0
   const MAX_RETRIES = 5
   const RETRY_DELAY = 5000 // 5 seconds
+
+  async function handleRetry() {
+    if (retryCount < MAX_RETRIES) {
+      retryCount++
+      console.log(
+        `Attempting to restart consumer (attempt ${retryCount}/${MAX_RETRIES}) in ${RETRY_DELAY / 1000} seconds...`,
+      )
+      setTimeout(setupConsumerWithRetry, RETRY_DELAY)
+    } else {
+      console.error(`Maximum retry attempts (${MAX_RETRIES}) reached. Stopping consumer.`)
+      process.exit(1)
+    }
+  }
 
   async function setupConsumerWithRetry() {
     try {
       const kafkaStream = await createConsumer()
       retryCount = 0 // Reset retry count on successful connection
-      let counter = 0
 
       console.log('Starting consumer')
 
@@ -53,41 +70,20 @@ async function startConsumer() {
 
       kafkaStream.on('error', async (error) => {
         console.error('Stream error:', error)
+        handleRetry()
+      })
 
+      kafkaStream.on('close', () => {
+        console.log('Stream ended')
         try {
           kafkaStream.unsubscribe()
         } catch (unsubError) {
           console.error('Error unsubscribing:', unsubError)
         }
-
-        if (retryCount < MAX_RETRIES) {
-          retryCount++
-          console.log(
-            `Attempting to restart consumer (attempt ${retryCount}/${MAX_RETRIES}) in ${RETRY_DELAY / 1000} seconds...`,
-          )
-          setTimeout(setupConsumerWithRetry, RETRY_DELAY)
-        } else {
-          console.error(`Maximum retry attempts (${MAX_RETRIES}) reached. Stopping consumer.`)
-          process.exit(1)
-        }
-      })
-
-      kafkaStream.on('close', () => {
-        console.log('Stream ended')
-        kafkaStream.unsubscribe()
       })
     } catch (error) {
       console.error('Error setting up consumer:', error)
-      if (retryCount < MAX_RETRIES) {
-        retryCount++
-        console.log(
-          `Attempting to restart consumer (attempt ${retryCount}/${MAX_RETRIES}) in ${RETRY_DELAY / 1000} seconds...`,
-        )
-        setTimeout(setupConsumerWithRetry, RETRY_DELAY)
-      } else {
-        console.error(`Maximum retry attempts (${MAX_RETRIES}) reached. Stopping consumer.`)
-        process.exit(1)
-      }
+      handleRetry()
     }
   }
 

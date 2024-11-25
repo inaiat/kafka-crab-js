@@ -14,10 +14,6 @@
   "include": [
     "**/*.ts"
   ],
-  "copyFiles": [
-    "js_src/js-binding.d.ts",
-    "js_src/js-binding.js"
-  ],
   "exclude": [
     "__test__",
     "src",

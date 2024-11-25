@@ -17,7 +17,7 @@ napi-derive = "2.16"
 
 anyhow = { version = "1.0", features = ["backtrace"] }
 
-rdkafka = { version = "0.36", features = [
+rdkafka = { version = "0.37", features = [
     "libz-static",
     "cmake-build",
     "tokio",

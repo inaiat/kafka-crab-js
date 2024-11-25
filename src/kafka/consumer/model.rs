@@ -1,7 +1,7 @@
 use std::{collections::HashMap, time::Duration};
 
 use rdkafka::{
-  consumer::{ConsumerContext, Rebalance, StreamConsumer},
+  consumer::{BaseConsumer, ConsumerContext, Rebalance, StreamConsumer},
   error::KafkaResult,
   ClientContext, TopicPartitionList,
 };
@@ -16,12 +16,20 @@ pub struct CustomContext;
 impl ClientContext for CustomContext {}
 
 impl ConsumerContext for CustomContext {
-  fn pre_rebalance(&self, rebalance: &Rebalance) {
-    info!("Pre rebalance {:?}", rebalance);
+  fn pre_rebalance(&self, consumer: &BaseConsumer<Self>, rebalance: &Rebalance) {
+    info!(
+      "Pre rebalance {:?}, consumer closed: {}",
+      rebalance,
+      consumer.closed()
+    );
   }
 
-  fn post_rebalance(&self, rebalance: &Rebalance) {
-    info!("Post rebalance {:?}", rebalance);
+  fn post_rebalance(&self, consumer: &BaseConsumer<Self>, rebalance: &Rebalance) {
+    info!(
+      "Post rebalance {:?}, consumer closed: {} ",
+      rebalance,
+      consumer.closed()
+    );
   }
 
   fn commit_callback(&self, result: KafkaResult<()>, _offsets: &TopicPartitionList) {
