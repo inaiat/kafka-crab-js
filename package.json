@@ -1,6 +1,6 @@
 {
   "name": "kafka-crab-js",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "main": "index.js",
   "types": "index.d.ts",
   "module": "commonjs",
@@ -40,13 +40,13 @@
     "url": "https://github.com/inaiat/kafka-crab-js.git"
   },
   "devDependencies": {
-    "@faker-js/faker": "9.2.0",
+    "@faker-js/faker": "9.3.0",
     "@napi-rs/cli": "^2.18.4",
-    "@types/node": "22.9.0",
+    "@types/node": "22.10.1",
     "ava": "6.2.0",
-    "dprint": "^0.47.5",
-    "nanoid": "5.0.8",
-    "typescript": "5.6.3",
+    "dprint": "^0.47.6",
+    "nanoid": "5.0.9",
+    "typescript": "5.7.2",
     "copyfiles": "^2.4.1",
     "@types/copyfiles": "^2.4.4",
     "rimraf": "^6.0.1"
