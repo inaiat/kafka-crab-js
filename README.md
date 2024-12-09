@@ -319,9 +319,9 @@ You can find some examples on the [example](https://github.com/mthssdrbrg/kafka-
 | `securityProtocol` | `SecurityProtocol` || Security protocol to use (PLAINTEXT, SSL, SASL_PLAINTEXT, SASL_SSL) |
 | `logLevel` | `string` | `info`  | Client id to use for the connection |
 | `brokerAddressFamily` | `string` | `"v4"` | Address family to use for the connection (v4, v6) |
-| `configuration` | `Map<string, string>` | `{}` | Additional configuration options for the client. See [librdkafka](https://github.com/edenhill/librdkafka/blob/master/CONFIGURATION.md) |
+| `configuration` | `Map<string, string>` | `{}` | Additional configuration options for the client. See [librdkafka](https://docs.confluent.io/platform/current/clients/librdkafka/html/md_CONFIGURATION.html) |
 
-You can see the available options here: [librdkafka](https://github.com/edenhill/librdkafka/blob/master/CONFIGURATION.md).
+You can see the available options here: [librdkafka](https://docs.confluent.io/platform/current/clients/librdkafka/html/md_CONFIGURATION.html).
 
 
 
