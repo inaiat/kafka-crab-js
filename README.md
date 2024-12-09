@@ -38,6 +38,8 @@ A lightweight, flexible, and reliable Kafka client for JavaScript/TypeScript. It
 npm install kafka-crab-js
 # or
 yarn add kafka-crab-js
+# or
+pnpm add kafka-crab-js
 ```
 
 ## Quick Start
