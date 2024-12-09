@@ -1,5 +1,6 @@
 import { Readable } from 'stream';
-import { KafkaConsumer, TopicPartitionConfig } from './js-binding';
+import { CommitMode } from '../js-binding';
+import { KafkaConsumer, OffsetModel, TopicPartitionConfig } from './js-binding';
 /**
  * KafkaStreamReadable class
  * @extends Readable
@@ -14,6 +15,8 @@ export declare class KafkaStreamReadable extends Readable {
      * Subscribes to topics
      */
     subscribe(topics: string | Array<TopicPartitionConfig>): Promise<void>;
+    seek(topic: string, partition: number, offsetModel: OffsetModel, timeout?: number | undefined): void;
+    commit(topic: string, partition: number, offset: number, commit: CommitMode): void;
     /**
      * Unsubscribe from topics
      */

@@ -1,6 +1,7 @@
 import { Readable } from 'stream'
 
-import { KafkaConsumer, TopicPartitionConfig } from './js-binding'
+import { CommitMode } from '../js-binding'
+import { KafkaConsumer, OffsetModel, TopicPartitionConfig } from './js-binding'
 
 /**
  * KafkaStreamReadable class
@@ -26,6 +27,14 @@ export class KafkaStreamReadable extends Readable {
       throw new Error('Topics must be a non-empty string or array.')
     }
     await this.kafkaConsumer.subscribe(topics)
+  }
+
+  seek(topic: string, partition: number, offsetModel: OffsetModel, timeout?: number | undefined) {
+    this.kafkaConsumer.seek(topic, partition, offsetModel, timeout)
+  }
+
+  commit(topic: string, partition: number, offset: number, commit: CommitMode) {
+    this.kafkaConsumer.commit(topic, partition, offset, commit)
   }
 
   /**

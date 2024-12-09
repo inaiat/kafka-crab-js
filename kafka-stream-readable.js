@@ -27,6 +27,12 @@ class KafkaStreamReadable extends stream_1.Readable {
         }
         await this.kafkaConsumer.subscribe(topics);
     }
+    seek(topic, partition, offsetModel, timeout) {
+        this.kafkaConsumer.seek(topic, partition, offsetModel, timeout);
+    }
+    commit(topic, partition, offset, commit) {
+        this.kafkaConsumer.commit(topic, partition, offset, commit);
+    }
     /**
      * Unsubscribe from topics
      */
