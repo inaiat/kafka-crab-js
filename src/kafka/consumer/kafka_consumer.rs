@@ -1,4 +1,5 @@
 use std::time::Duration;
+use tokio::sync::watch::{self};
 
 use napi::{Either, Result};
 
@@ -27,13 +28,18 @@ use super::{
   },
 };
 
+use tokio::select;
+
 pub const DEFAULT_SEEK_TIMEOUT: i64 = 1500;
+
+type ShutdownSignal = (watch::Sender<()>, watch::Receiver<()>);
 
 #[napi]
 pub struct KafkaConsumer {
   client_config: ClientConfig,
   stream_consumer: StreamConsumer<CustomContext>,
   fecth_metadata_timeout: Duration,
+  shutdown_signal: ShutdownSignal,
 }
 
 #[napi]
@@ -57,6 +63,7 @@ impl KafkaConsumer {
           .fecth_metadata_timeout
           .unwrap_or(DEFAULT_FECTH_METADATA_TIMEOUT.as_millis() as i64) as u64,
       ),
+      shutdown_signal: watch::channel(()),
     })
   }
 
@@ -171,7 +178,27 @@ impl KafkaConsumer {
 
   #[napi]
   pub fn unsubscribe(&self) -> Result<()> {
+    info!("Unsubscribing from topics");
     self.stream_consumer.unsubscribe();
+    Ok(())
+  }
+
+  #[napi]
+  pub async fn shutdown_consumer(&self) -> Result<()> {
+    info!("Shutting down consumer - this will unsubscribe and stop the consumer from receiving messages");
+
+    // First unsubscribe from topics
+    self.stream_consumer.unsubscribe();
+
+    // Then send shutdown signal
+    let tx = self.shutdown_signal.0.clone();
+    tx.send(()).map_err(|e| {
+      napi::Error::new(
+        napi::Status::GenericFailure,
+        format!("Error sending shutdown signal: {:?}", e),
+      )
+    })?;
+
     Ok(())
   }
 
@@ -207,18 +234,24 @@ impl KafkaConsumer {
   }
 
   #[napi]
-  pub async fn recv(&self) -> Result<Message> {
-    self
-      .stream_consumer
-      .recv()
-      .await
-      .map_err(|e| {
-        napi::Error::new(
-          napi::Status::GenericFailure,
-          format!("Error while receiving from stream consumer: {:?}", e),
-        )
-      })
-      .map(|message| create_message(&message, message.payload().unwrap_or(&[])))
+  pub async fn recv(&self) -> Result<Option<Message>> {
+    let mut rx = self.shutdown_signal.1.clone();
+    select! {
+        message = self.stream_consumer.recv() => {
+            message
+                .map_err(|e| {
+                    napi::Error::new(
+                        napi::Status::GenericFailure,
+                        format!("Error while receiving from stream consumer: {:?}", e),
+                    )
+                })
+                .map(|message| Some(create_message(&message, message.payload().unwrap_or(&[]))))
+        }
+        _ = rx.changed() => {
+            info!("Shutdown signal received and this will stop the consumer from receiving messages");
+            Ok(None)
+        }
+    }
   }
 
   #[napi]

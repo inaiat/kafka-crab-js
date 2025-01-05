@@ -92,8 +92,9 @@ export declare class KafkaConsumer {
   pause(): void
   resume(): void
   unsubscribe(): void
+  shutdownConsumer(): Promise<void>
   seek(topic: string, partition: number, offsetModel: OffsetModel, timeout?: number | undefined | null): void
-  recv(): Promise<Message>
+  recv(): Promise<Message | null>
   commit(topic: string, partition: number, offset: number, commit: CommitMode): void
 }
 export declare class KafkaClientConfig {
