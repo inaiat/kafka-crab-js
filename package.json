@@ -44,7 +44,7 @@
     "@napi-rs/cli": "^2.18.4",
     "@types/node": "22.10.1",
     "ava": "6.2.0",
-    "dprint": "^0.47.6",
+    "dprint": "^0.48.0",
     "nanoid": "5.0.9",
     "typescript": "5.7.2",
     "copyfiles": "^2.4.1",
@@ -65,5 +65,5 @@
     "version": "napi version",
     "fmt": "dprint fmt"
   },
-  "packageManager": "pnpm@9.14.2"
+  "packageManager": "pnpm@9.15.1"
 }

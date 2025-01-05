@@ -12,7 +12,7 @@ export class KafkaClient {
    * @throws {Error} If the configuration is invalid
    */
   constructor(private readonly kafkaConfiguration: KafkaConfiguration) {
-    this.kafkaClientConfig = new KafkaClientConfig(kafkaConfiguration)
+    this.kafkaClientConfig = new KafkaClientConfig(this.kafkaConfiguration)
   }
 
   /**

@@ -1,5 +1,5 @@
 import { Readable } from 'stream';
-import { CommitMode } from '../js-binding';
+import { CommitMode } from './js-binding';
 import { KafkaConsumer, OffsetModel, TopicPartitionConfig } from './js-binding';
 /**
  * KafkaStreamReadable class

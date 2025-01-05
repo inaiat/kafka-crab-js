@@ -13,7 +13,7 @@ class KafkaClient {
      */
     constructor(kafkaConfiguration) {
         this.kafkaConfiguration = kafkaConfiguration;
-        this.kafkaClientConfig = new js_binding_js_1.KafkaClientConfig(kafkaConfiguration);
+        this.kafkaClientConfig = new js_binding_js_1.KafkaClientConfig(this.kafkaConfiguration);
     }
     /**
      * Creates a KafkaProducer instance

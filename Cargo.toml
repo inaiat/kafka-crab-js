@@ -15,7 +15,7 @@ napi = { version = "2.16", default-features = false, features = [
 ] }
 napi-derive = "2.16"
 
-anyhow = { version = "1.0", features = ["backtrace"] }
+anyhow = { version = "1.0.95", features = ["backtrace"] }
 
 rdkafka = { version = "0.37", features = [
     "libz-static",
@@ -30,7 +30,7 @@ tracing-subscriber = { version = "0.3", features = ["json"] }
 nanoid = "0.4.0"
 
 [build-dependencies]
-napi-build = "2.1"
+napi-build = "2.1.4"
 
 [profile.release]
 lto = true
