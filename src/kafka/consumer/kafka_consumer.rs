@@ -185,7 +185,12 @@ impl KafkaConsumer {
 
   #[napi]
   pub async fn shutdown_consumer(&self) -> Result<()> {
-    info!("Shutting down consumer - this will stop the consumer from receiving messages");
+    info!("Shutting down consumer - this will unsubscribe and stop the consumer from receiving messages");
+    
+    // First unsubscribe from topics
+    self.stream_consumer.unsubscribe();
+    
+    // Then send shutdown signal
     let tx = self.shutdown_signal.0.clone();
     tx.send(()).map_err(|e| {
       napi::Error::new(
