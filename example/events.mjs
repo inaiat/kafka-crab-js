@@ -17,9 +17,7 @@ consumer.onEvents((err, event) => {
   console.log(
     'Event:',
     event.name,
-    event
-      .payload
-      .tpl
+    event.payload.tpl
       .map(it =>
         `Topic: ${it.topic}, 
                 ${

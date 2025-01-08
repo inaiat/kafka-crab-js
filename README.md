@@ -24,7 +24,7 @@ A lightweight, flexible, and reliable Kafka client for JavaScript/TypeScript. It
 
 1. [Installation](#installation)
 2. [Quick Start](#quick-start)
-3. [Consumer Examples](#consumer-examples)
+3. [Consumer Examples](#basic-consumer-setup)
 4. [Producer Examples](#producer-examples)
 5. [Stream Processing](#stream-processing)
 6. [Configuration](#configuration)
