@@ -88,7 +88,7 @@ impl KafkaConsumer {
                 }
             }
             _ = shutdown_signal.changed() => {
-                info!("Shutdown signal received and this will stop the consumer from receiving messages");
+                debug!("Subscription to consumer events is stopped");
                 break;
             }
         }
@@ -135,7 +135,7 @@ impl KafkaConsumer {
 
     topics.iter().for_each(|item| {
       if let Some(all_offsets) = item.all_offsets.clone() {
-        info!(
+        debug!(
           "Subscribing to topic: {}. Setting all partitions to offset: {:?}",
           &item.topic, &all_offsets
         );
@@ -148,7 +148,7 @@ impl KafkaConsumer {
         .map_err(|e| e.convert_to_napi())
         .unwrap();
       } else if let Some(partition_offset) = item.partition_offset.clone() {
-        info!(
+        debug!(
           "Subscribing to topic: {} with partition offsets: {:?}",
           &item.topic, &partition_offset
         );
@@ -224,7 +224,7 @@ impl KafkaConsumer {
     timeout: Option<i64>,
   ) -> Result<()> {
     let offset = convert_to_rdkafka_offset(&offset_model);
-    info!(
+    debug!(
       "Seeking to topic: {}, partition: {}, offset: {:?}",
       topic, partition, offset
     );
@@ -259,7 +259,7 @@ impl KafkaConsumer {
                 .map(|message| Some(create_message(&message, message.payload().unwrap_or(&[]))))
         }
         _ = rx.changed() => {
-            info!("Shutdown signal received and this will stop the consumer from receiving messages");
+            debug!("Shutdown signal received and this will stop the consumer from receiving messages");
             Ok(None)
         }
     }

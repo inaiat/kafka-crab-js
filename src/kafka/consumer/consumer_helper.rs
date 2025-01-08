@@ -5,7 +5,7 @@ use rdkafka::{
   consumer::{Consumer, StreamConsumer},
   ClientConfig, Offset, TopicPartitionList,
 };
-use tracing::{debug, error, info, warn};
+use tracing::{debug, error, warn};
 
 use crate::kafka::{consumer::context::LoggingConsumer, kafka_admin::KafkaAdmin};
 
@@ -90,7 +90,7 @@ pub fn create_stream_consumer(
     .set_log_level(RDKafkaLogLevel::Debug)
     .create_with_context(context)?;
 
-  info!("Consumer created. Group id: {:?}", group_id);
+  debug!("Consumer created. Group id: {:?}", group_id);
   Ok(consumer)
 }
 
@@ -117,7 +117,7 @@ pub async fn try_create_topic(
     warn!("Fail to create topic {:?}", e);
     return Err(anyhow::Error::msg(format!("Fail to create topic: {:?}", e)));
   }
-  info!("Topic(s) created: {:?}", topics);
+  debug!("Topic(s) created: {:?}", topics);
   Ok(())
 }
 
@@ -134,7 +134,7 @@ pub fn set_offset_of_all_partitions(
   metadata.topics().iter().for_each(|meta_topic| {
     let mut tpl = TopicPartitionList::new();
     meta_topic.partitions().iter().for_each(|meta_partition| {
-      info!("Adding partition: {:?}", meta_partition.id());
+      debug!("Adding partition: {:?}", meta_partition.id());
       tpl.add_partition(topic, meta_partition.id());
     });
     match tpl.set_all_offsets(offset) {
@@ -181,7 +181,7 @@ pub fn assign_offset_or_use_metadata(
     let metadata = consumer.fetch_metadata(Some(topic), timeout)?;
     for meta_topic in metadata.topics() {
       for meta_partition in meta_topic.partitions() {
-        info!(
+        debug!(
           "Adding partition: {:?} with offset: {:?} for topic: {:?}",
           meta_partition.id(),
           offset,
