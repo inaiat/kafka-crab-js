@@ -7,10 +7,11 @@ use rdkafka::{
 };
 use tracing::{debug, error, info, warn};
 
-use crate::kafka::{consumer::model::LoggingConsumer, kafka_admin::KafkaAdmin};
+use crate::kafka::{consumer::context::LoggingConsumer, kafka_admin::KafkaAdmin};
 
-use super::model::{
-  ConsumerConfiguration, CustomContext, OffsetModel, PartitionOffset, PartitionPosition,
+use super::{
+  context::KafkaCrabContext,
+  model::{ConsumerConfiguration, OffsetModel, PartitionOffset, PartitionPosition, TopicPartition},
 };
 
 pub fn convert_to_rdkafka_offset(offset_model: &OffsetModel) -> Offset {
@@ -18,9 +19,39 @@ pub fn convert_to_rdkafka_offset(offset_model: &OffsetModel) -> Offset {
     Some(PartitionPosition::Beginning) => Offset::Beginning,
     Some(PartitionPosition::End) => Offset::End,
     Some(PartitionPosition::Stored) => Offset::Stored,
+    Some(PartitionPosition::Invalid) => Offset::Invalid,
     None => match offset_model.offset {
       Some(value) => Offset::Offset(value),
       None => Offset::Stored, // Default to stored
+    },
+  }
+}
+
+pub fn convert_to_offset_model(offset: &Offset) -> OffsetModel {
+  match offset {
+    Offset::Beginning => OffsetModel {
+      position: Some(PartitionPosition::Beginning),
+      offset: None,
+    },
+    Offset::End => OffsetModel {
+      position: Some(PartitionPosition::End),
+      offset: None,
+    },
+    Offset::Stored => OffsetModel {
+      position: Some(PartitionPosition::Stored),
+      offset: None,
+    },
+    Offset::Invalid => OffsetModel {
+      position: Some(PartitionPosition::Invalid),
+      offset: None,
+    },
+    Offset::Offset(value) => OffsetModel {
+      position: None,
+      offset: Some(*value),
+    },
+    Offset::OffsetTail(value) => OffsetModel {
+      position: None,
+      offset: Some(*value),
     },
   }
 }
@@ -29,8 +60,8 @@ pub fn create_stream_consumer(
   client_config: &ClientConfig,
   consumer_configuration: &ConsumerConfiguration,
   configuration: Option<HashMap<String, String>>,
-) -> anyhow::Result<StreamConsumer<CustomContext>> {
-  let context = CustomContext;
+) -> anyhow::Result<StreamConsumer<KafkaCrabContext>> {
+  let context = KafkaCrabContext::new();
 
   let ConsumerConfiguration {
     group_id,
@@ -92,7 +123,7 @@ pub async fn try_create_topic(
 
 pub fn set_offset_of_all_partitions(
   offset_model: &OffsetModel,
-  consumer: &StreamConsumer<CustomContext>,
+  consumer: &StreamConsumer<KafkaCrabContext>,
   topic: &str,
   timeout: Duration,
 ) -> anyhow::Result<()> {
@@ -131,7 +162,7 @@ pub fn assign_offset_or_use_metadata(
   topic: &str,
   partition_offset: Option<Vec<PartitionOffset>>,
   offset_model: Option<&OffsetModel>,
-  consumer: &StreamConsumer<CustomContext>,
+  consumer: &StreamConsumer<KafkaCrabContext>,
   timeout: Duration,
 ) -> anyhow::Result<()> {
   let mut tpl = TopicPartitionList::new();
@@ -164,4 +195,20 @@ pub fn assign_offset_or_use_metadata(
   }
   consumer.assign(&tpl)?;
   Ok(())
+}
+
+pub fn convert_tpl_to_array_of_topic_partition(tpl: &TopicPartitionList) -> Vec<TopicPartition> {
+  tpl
+    .elements()
+    .iter()
+    .map(|tp| {
+      return TopicPartition {
+        topic: tp.topic().to_owned(),
+        partition_offset: vec![PartitionOffset {
+          partition: tp.partition(),
+          offset: convert_to_offset_model(&tp.offset()),
+        }],
+      };
+    })
+    .collect()
 }

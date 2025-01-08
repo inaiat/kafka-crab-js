@@ -1,41 +1,10 @@
 use std::{collections::HashMap, time::Duration};
 
-use rdkafka::{
-  consumer::{BaseConsumer, ConsumerContext, Rebalance, StreamConsumer},
-  error::KafkaResult,
-  ClientContext, TopicPartitionList,
-};
-use tracing::info;
+use tokio::sync::watch;
 
 pub const DEFAULT_FECTH_METADATA_TIMEOUT: Duration = Duration::from_millis(2000);
 
-pub type LoggingConsumer = StreamConsumer<CustomContext>;
-
-pub struct CustomContext;
-
-impl ClientContext for CustomContext {}
-
-impl ConsumerContext for CustomContext {
-  fn pre_rebalance(&self, consumer: &BaseConsumer<Self>, rebalance: &Rebalance) {
-    info!(
-      "Pre rebalance {:?}, consumer closed: {}",
-      rebalance,
-      consumer.closed()
-    );
-  }
-
-  fn post_rebalance(&self, consumer: &BaseConsumer<Self>, rebalance: &Rebalance) {
-    info!(
-      "Post rebalance {:?}, consumer closed: {} ",
-      rebalance,
-      consumer.closed()
-    );
-  }
-
-  fn commit_callback(&self, result: KafkaResult<()>, _offsets: &TopicPartitionList) {
-    info!("Committing offsets: {:?}. Offset: {:?}", result, _offsets);
-  }
-}
+pub type ShutdownSignal = (watch::Sender<()>, watch::Receiver<()>);
 
 #[napi(object)]
 #[derive(Clone, Debug)]
@@ -71,6 +40,7 @@ pub enum PartitionPosition {
   Beginning,
   End,
   Stored,
+  Invalid,
 }
 #[napi(object)]
 #[derive(Clone, Debug)]
@@ -92,4 +62,11 @@ pub struct TopicPartitionConfig {
   pub topic: String,
   pub all_offsets: Option<OffsetModel>,
   pub partition_offset: Option<Vec<PartitionOffset>>,
+}
+
+#[napi(object)]
+#[derive(Clone, Debug)]
+pub struct TopicPartition {
+  pub topic: String,
+  pub partition_offset: Vec<PartitionOffset>,
 }

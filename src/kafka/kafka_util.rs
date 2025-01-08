@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use napi::{bindgen_prelude::Buffer, Status};
+use napi::{bindgen_prelude::Buffer, Error, Status};
 use rdkafka::{
   message::{BorrowedHeaders, BorrowedMessage, Header, Headers, OwnedHeaders},
   Message as RdMessage,
@@ -15,6 +15,19 @@ pub trait AnyhowToNapiError {
 impl AnyhowToNapiError for anyhow::Error {
   fn convert_to_napi(&self) -> napi::Error {
     napi::Error::new(Status::GenericFailure, format!("Error: {}", self))
+  }
+}
+
+pub trait IntoNapiError {
+  fn into_napi_error(self, context: &str) -> Error;
+}
+
+impl<E: std::fmt::Debug> IntoNapiError for E {
+  fn into_napi_error(self, context: &str) -> Error {
+    Error::new(
+      Status::GenericFailure,
+      format!("Error while {}: {:?}", context, self),
+    )
   }
 }
 

@@ -42,7 +42,7 @@
   "devDependencies": {
     "@faker-js/faker": "9.3.0",
     "@napi-rs/cli": "^2.18.4",
-    "@types/node": "22.10.1",
+    "@types/node": "22.10.5",
     "ava": "6.2.0",
     "dprint": "^0.48.0",
     "nanoid": "5.0.9",
@@ -65,5 +65,5 @@
     "version": "napi version",
     "fmt": "dprint fmt"
   },
-  "packageManager": "pnpm@9.15.2"
+  "packageManager": "pnpm@9.15.3"
 }
