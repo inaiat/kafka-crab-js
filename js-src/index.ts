@@ -2,6 +2,8 @@ export type {
   ConsumerConfiguration,
   KafkaConfiguration,
   KafkaCrabError,
+  KafkaEvent,
+  KafkaEventPayload,
   Message,
   MessageProducer,
   OffsetModel,
@@ -10,6 +12,7 @@ export type {
   ProducerRecord,
   RecordMetadata,
   RetryStrategy,
+  TopicPartition,
   TopicPartitionConfig,
 } from './js-binding'
 

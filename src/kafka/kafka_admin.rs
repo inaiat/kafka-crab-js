@@ -8,7 +8,7 @@ use rdkafka::{
   error::KafkaError,
   types::RDKafkaErrorCode,
 };
-use tracing::{debug, info, trace};
+use tracing::{debug, trace};
 
 use std::{collections::HashMap, str::FromStr, time::Duration};
 
@@ -42,8 +42,8 @@ impl<'a> KafkaAdmin<'a> {
     let metadata = consumer.fetch_metadata(None, self.fetch_metadata_timeout)?;
 
     for broker in metadata.brokers() {
-      info!(
-        "Id: {}  Host: {}:{}  ",
+      debug!(
+        "Metadata borker id:{}  Host: {}:{}",
         broker.id(),
         broker.host(),
         broker.port()
@@ -87,7 +87,7 @@ impl<'a> KafkaAdmin<'a> {
       .await
       .map_err(anyhow::Error::new)?;
 
-    info!("Topic(s) {:?} was created successfully", topics);
+    debug!("Topic(s) {:?} was created successfully", topics);
     Ok(())
   }
 }
