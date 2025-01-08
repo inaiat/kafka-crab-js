@@ -102,7 +102,7 @@ export interface ProducerConfiguration {
   configuration?: Record<string, string>
 }
 export declare class KafkaConsumer {
-  subscribeToConsumerEvents(callback: (error: Error | undefined, event: KafkaEvent) => void): void
+  onEvents(callback: (error: Error | undefined, event: KafkaEvent) => void): void
   subscribe(topicConfigs: string | Array<TopicPartitionConfig>): Promise<void>
   pause(): void
   resume(): void

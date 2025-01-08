@@ -72,10 +72,7 @@ impl KafkaConsumer {
   }
 
   #[napi(ts_args_type = "callback: (error: Error | undefined, event: KafkaEvent) => void")]
-  pub fn subscribe_to_consumer_events(
-    &self,
-    callback: ThreadsafeFunction<KafkaEvent>,
-  ) -> Result<()> {
+  pub fn on_events(&self, callback: ThreadsafeFunction<KafkaEvent>) -> Result<()> {
     let mut rx = self.stream_consumer.context().tx_rx_signal.1.clone();
     let mut shutdown_signal = self.shutdown_signal.1.clone();
 
