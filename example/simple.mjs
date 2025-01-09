@@ -6,7 +6,7 @@ const kafkaClient = new KafkaClient({
   brokers: 'localhost:29092',
   clientId: 'my-js-group',
   securityProtocol: SecurityProtocol.Plaintext,
-  logLevel: 'debug',
+  logLevel: 'info',
   brokerAddressFamily: 'v4',
 })
 const topic = `topic-${nanoid()}`

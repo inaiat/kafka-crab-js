@@ -29,8 +29,8 @@ use super::{
   },
   context::{KafkaCrabContext, KafkaEvent},
   model::{
-    CommitMode, ConsumerConfiguration, OffsetModel, ShutdownSignal, TopicPartition,
-    TopicPartitionConfig, DEFAULT_FECTH_METADATA_TIMEOUT,
+    CommitMode, ConsumerConfiguration, OffsetModel, TopicPartition, TopicPartitionConfig,
+    DEFAULT_FECTH_METADATA_TIMEOUT,
   },
 };
 
@@ -38,12 +38,14 @@ use tokio::select;
 
 pub const DEFAULT_SEEK_TIMEOUT: i64 = 1500;
 
+type DisconnectSignal = (watch::Sender<()>, watch::Receiver<()>);
+
 #[napi]
 pub struct KafkaConsumer {
   client_config: ClientConfig,
   stream_consumer: StreamConsumer<KafkaCrabContext>,
   fecth_metadata_timeout: Duration,
-  shutdown_signal: ShutdownSignal,
+  disconnect_signal: DisconnectSignal,
 }
 
 #[napi]
@@ -67,14 +69,14 @@ impl KafkaConsumer {
           .fecth_metadata_timeout
           .unwrap_or(DEFAULT_FECTH_METADATA_TIMEOUT.as_millis() as i64) as u64,
       ),
-      shutdown_signal: watch::channel(()),
+      disconnect_signal: watch::channel(()),
     })
   }
 
   #[napi(ts_args_type = "callback: (error: Error | undefined, event: KafkaEvent) => void")]
   pub fn on_events(&self, callback: ThreadsafeFunction<KafkaEvent>) -> Result<()> {
-    let mut rx = self.stream_consumer.context().tx_rx_signal.1.clone();
-    let mut shutdown_signal = self.shutdown_signal.1.clone();
+    let mut rx = self.stream_consumer.context().event_channel.1.clone();
+    let mut disconnect_signal = self.disconnect_signal.1.clone();
 
     tokio::spawn(async move {
       loop {
@@ -84,7 +86,7 @@ impl KafkaConsumer {
                     callback.call(Ok(event), ThreadsafeFunctionCallMode::NonBlocking);
                 }
             }
-            _ = shutdown_signal.changed() => {
+            _ = disconnect_signal.changed() => {
                 debug!("Subscription to consumer events is stopped");
                 break;
             }
@@ -198,16 +200,16 @@ impl KafkaConsumer {
   }
 
   #[napi]
-  pub async fn shutdown_consumer(&self) -> Result<()> {
-    info!("Shutting down consumer - this will unsubscribe and stop the consumer from receiving messages");
+  pub async fn disconnect(&self) -> Result<()> {
+    info!("Disconnecting consumer - This will stop the consumer from receiving messages");
 
     // First unsubscribe from topics
     self.stream_consumer.unsubscribe();
 
-    // Then send shutdown signal
-    let tx = self.shutdown_signal.0.clone();
+    // Then send disconnect signal
+    let tx = self.disconnect_signal.0.clone();
     tx.send(())
-      .map_err(|e| e.into_napi_error("Error sending shutdown signal"))?;
+      .map_err(|e| e.into_napi_error("Error sending disconnect signal"))?;
 
     Ok(())
   }
@@ -248,7 +250,7 @@ impl KafkaConsumer {
 
   #[napi]
   pub async fn recv(&self) -> Result<Option<Message>> {
-    let mut rx = self.shutdown_signal.1.clone();
+    let mut rx = self.disconnect_signal.1.clone();
     select! {
         message = self.stream_consumer.recv() => {
             message
@@ -256,7 +258,7 @@ impl KafkaConsumer {
                 .map(|message| Some(create_message(&message, message.payload().unwrap_or(&[]))))
         }
         _ = rx.changed() => {
-            debug!("Shutdown signal received and this will stop the consumer from receiving messages");
+            debug!("Disconnect signal received and this will stop the consumer from receiving messages");
             Ok(None)
         }
     }

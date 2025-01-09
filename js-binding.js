@@ -310,8 +310,9 @@ if (!nativeBinding) {
   throw new Error(`Failed to load native binding`)
 }
 
-const { KafkaConsumer, CommitMode, PartitionPosition, SecurityProtocol, KafkaClientConfig, KafkaProducer } = nativeBinding
+const { KafkaEventName, KafkaConsumer, CommitMode, PartitionPosition, SecurityProtocol, KafkaClientConfig, KafkaProducer } = nativeBinding
 
+module.exports.KafkaEventName = KafkaEventName
 module.exports.KafkaConsumer = KafkaConsumer
 module.exports.CommitMode = CommitMode
 module.exports.PartitionPosition = PartitionPosition

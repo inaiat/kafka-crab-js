@@ -20,6 +20,7 @@ export {
   CommitMode,
   KafkaClientConfig,
   KafkaConsumer,
+  KafkaEventName,
   KafkaProducer,
   PartitionPosition,
   SecurityProtocol,

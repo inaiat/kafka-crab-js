@@ -1,50 +1,67 @@
-import { KafkaClient } from '../index.js'
+import { KafkaClient, KafkaEventName } from '../index.js'
+
+const TOPIC = 'foo'
 
 const kafkaClient = new KafkaClient({
   brokers: 'localhost:29092',
-  clientId: 'abc',
+  clientId: 'kakfa-crab-js',
   logLevel: 'info',
   brokerAddressFamily: 'v4',
 })
 
 const consumer = kafkaClient.createConsumer({
-  topic,
-  groupId: 'xyz',
+  topic: TOPIC,
+  groupId: 'my-gropu-id',
 })
 
-// If you want to consume events, you need call shutdownConsumer() to stop the consumer and release resources
-consumer.onEvents((err, event) => {
-  console.log(
-    'Event:',
-    event.name,
-    event.payload.tpl
-      .map(it =>
-        `Topic: ${it.topic}, 
-                ${
-          it.partitionOffset.map(po => `partition: ${po.partition}, offset: ${po.offset.offset}`)
-            .join(',')
-        }`
-      ),
-  )
+// If you want to consume events, you need call disconnect() to stop the consumer and release resources
+consumer.onEvents((_err, event) => {
+  switch (event.name) {
+    case KafkaEventName.CommitCallback: {
+      const offsetCommitted = event.payload.tpl.filter(it => it.partitionOffset.find(it => it.offset.offset)) // Filter only committed offsets
+        .flatMap(p =>
+          p.partitionOffset.map(it => ({ topic: p.topic, partition: it.partition, offset: it.offset.offset }))
+        )
+      console.log(
+        'Offset committed:',
+        offsetCommitted,
+      )
+      return
+    }
+    default: {
+      console.log(
+        'Relalance:',
+        event.name,
+        event.payload.tpl
+          .map(it =>
+            `Topic: ${it.topic}, 
+                    ${
+              it.partitionOffset.map(po => `partition: ${po.partition}`)
+                .join(',')
+            }`
+          ),
+      )
+    }
+  }
 })
 
-consumer.subscribe('foo')
+consumer.subscribe(TOPIC)
 
 const printMessage = async () => {
-  let shutdown = false
-  while (!shutdown) {
+  let disconnect = false
+  while (!disconnect) {
     const msg = await consumer.recv()
     if (msg) {
       console.log('Message receive', msg.payload.toString())
     } else {
-      console.log('The consumer has been shutdown')
-      shutdown = true
+      console.log('The consumer has been disconnected')
+      disconnect = true
     }
   }
 }
 
 process.on('SIGINT', () => {
-  consumer.shutdownConsumer()
+  consumer.disconnect()
 })
 
 await printMessage()

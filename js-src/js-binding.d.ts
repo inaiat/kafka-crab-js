@@ -8,8 +8,13 @@ export interface KafkaEventPayload {
   tpl: Array<TopicPartition>
   error?: string
 }
+export enum KafkaEventName {
+  PreRebalance = 'PreRebalance',
+  PostRebalance = 'PostRebalance',
+  CommitCallback = 'CommitCallback'
+}
 export interface KafkaEvent {
-  name: string
+  name: KafkaEventName
   payload: KafkaEventPayload
 }
 export interface RetryStrategy {
@@ -107,7 +112,7 @@ export declare class KafkaConsumer {
   pause(): void
   resume(): void
   unsubscribe(): void
-  shutdownConsumer(): Promise<void>
+  disconnect(): Promise<void>
   seek(topic: string, partition: number, offsetModel: OffsetModel, timeout?: number | undefined | null): void
   assignment(): Array<TopicPartition>
   recv(): Promise<Message | null>
