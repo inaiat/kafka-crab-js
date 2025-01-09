@@ -1,10 +1,6 @@
 use std::{collections::HashMap, time::Duration};
 
-use tokio::sync::watch;
-
 pub const DEFAULT_FECTH_METADATA_TIMEOUT: Duration = Duration::from_millis(2000);
-
-pub type ShutdownSignal = (watch::Sender<()>, watch::Receiver<()>);
 
 #[napi(object)]
 #[derive(Clone, Debug)]

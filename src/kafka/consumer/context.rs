@@ -25,29 +25,41 @@ pub struct KafkaEventPayload {
   pub error: Option<String>,
 }
 
+#[napi(string_enum)]
+#[derive(Debug)]
+pub enum KafkaEventName {
+  PreRebalance,
+  PostRebalance,
+  CommitCallback,
+}
+
 #[napi(object)]
 #[derive(Clone, Debug)]
 pub struct KafkaEvent {
-  pub name: String,
+  pub name: KafkaEventName,
   pub payload: KafkaEventPayload,
 }
 
 pub struct KafkaCrabContext {
-  pub tx_rx_signal: TxRxContext,
+  pub event_channel: TxRxContext,
 }
 
 impl KafkaCrabContext {
   pub fn new() -> Self {
     let (tx, rx) = watch::channel(None);
     KafkaCrabContext {
-      tx_rx_signal: (tx, rx),
+      event_channel: (tx, rx),
     }
   }
 
   fn send_event(&self, event: KafkaEvent) {
-    self.tx_rx_signal.0.send(Some(event)).unwrap_or_else(|err| {
-      error!("Error while sending event: {:?}", err);
-    });
+    self
+      .event_channel
+      .0
+      .send(Some(event))
+      .unwrap_or_else(|err| {
+        error!("Error while sending event: {:?}", err);
+      });
   }
 }
 
@@ -56,7 +68,7 @@ impl ClientContext for KafkaCrabContext {}
 impl ConsumerContext for KafkaCrabContext {
   fn pre_rebalance(&self, consumer: &BaseConsumer<Self>, rebalance: &Rebalance) {
     let event = KafkaEvent {
-      name: "rebalance".to_string(),
+      name: KafkaEventName::PreRebalance,
       payload: convert_rebalance_to_kafka_payload(rebalance),
     };
 
@@ -71,7 +83,7 @@ impl ConsumerContext for KafkaCrabContext {
 
   fn post_rebalance(&self, consumer: &BaseConsumer<Self>, rebalance: &Rebalance) {
     let event = KafkaEvent {
-      name: "post_rebalance".to_string(),
+      name: KafkaEventName::PostRebalance,
       payload: convert_rebalance_to_kafka_payload(rebalance),
     };
 
@@ -86,7 +98,7 @@ impl ConsumerContext for KafkaCrabContext {
 
   fn commit_callback(&self, result: KafkaResult<()>, offsets: &TopicPartitionList) {
     let event = KafkaEvent {
-      name: "commit_callback".to_string(),
+      name: KafkaEventName::CommitCallback,
       payload: KafkaEventPayload {
         action: None,
         tpl: convert_tpl_to_array_of_topic_partition(offsets),
