@@ -216,11 +216,10 @@ impl KafkaProducer {
       .map_err(|e| Error::new(Status::GenericFailure, e))?;
 
     let mut delivery_results = self.context.results.lock().unwrap();
-    let result: Vec<RecordMetadata> = delivery_results
+    let result = delivery_results
       .iter()
-      .filter_map(|(id, (message, error, _))| {
-        ids.contains(id).then(|| to_record_metadata(message, error))
-      })
+      .filter(|(id, _)| ids.contains(*id))
+      .map(|(_, (message, error, _))| to_record_metadata(message, error))
       .collect();
     delivery_results.retain(|key, _| !ids.contains(key));
     Ok(result)
