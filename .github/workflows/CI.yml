@@ -127,7 +127,7 @@ jobs:
       - name: Setup node
         uses: actions/setup-node@v4
         with:
-          node-version: ${{ matrix.node }}
+          node-version: 22
           cache: pnpm
           architecture: ${{ matrix.settings.architecture }}
       - uses: pnpm/action-setup@v4
