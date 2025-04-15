@@ -21,7 +21,7 @@ rdkafka = { version = "0.37", features = [
     "libz-static",
     "cmake-build",
     "tokio",
-    "ssl-vendored",
+    "ssl",
 ] }
 tokio = { version = "1", features = ["full"] }
 
