@@ -159,7 +159,8 @@ jobs:
       - name: Setup node
         uses: actions/setup-node@v4
         with:
-          node-version: ${{ matrix.node }}
+          node-version: 22
+          cache: pnpm
           check-latest: true
       - uses: pnpm/action-setup@v4
         name: Install pnpm
