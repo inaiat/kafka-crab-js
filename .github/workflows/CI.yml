@@ -83,14 +83,14 @@ jobs:
               docker run --rm -v $(pwd):/app -w /app \
                 -e OPENSSL_STATIC=1 \
                 -e OPENSSL_DIR="/usr/local" \
+                -e CI="true" \
                 ghcr.io/napi-rs/napi-rs/nodejs-rust:lts-debian \
                 bash -c "apt-get update && \
                          apt-get install -y --no-install-recommends \
                          gcc-aarch64-linux-gnu g++-aarch64-linux-gnu \
                          libc6-dev-arm64-cross && \
                          rustup target add aarch64-unknown-linux-gnu && \
-                         corepack disable && \
-                         npm install -g pnpm@latest-10 && \
+                         npm install --global corepack@latest-10 && \
                          pnpm install && \
                          CC_aarch64_unknown_linux_gnu=aarch64-linux-gnu-gcc \
                          CXX_aarch64_unknown_linux_gnu=aarch64-linux-gnu-g++ \
