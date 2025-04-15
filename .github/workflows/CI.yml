@@ -35,9 +35,7 @@ jobs:
             docker: ghcr.io/napi-rs/napi-rs/nodejs-rust:lts-debian
             build: |-
               set -e &&
-              curl -f https://get.pnpm.io/v6.16.js | node - add --global pnpm@10.8.1 &&
-              export CXXFLAGS="-stdlib=libc++ -L/usr/lib/llvm-18/lib -static" &&
-              pnpm install &&
+              export CXXFLAGS="-stdlib=libc++ -L/usr/lib/llvm-18/lib -static"
               pnpm build --target x86_64-unknown-linux-gnu &&
               strip *.node
           - host: macos-latest
@@ -45,7 +43,7 @@ jobs:
             build: |
               pnpm build --target aarch64-apple-darwin
               strip -x *.node
-    name: stable - ${{ matrix.settings.target }} - node@20
+    name: stable - ${{ matrix.settings.target }} - node@22
     runs-on: ${{ matrix.settings.host }}
     steps:
       - uses: actions/checkout@v4
@@ -53,7 +51,7 @@ jobs:
         uses: actions/setup-node@v4
         if: ${{ !matrix.settings.docker }}
         with:
-          node-version: 20
+          node-version: 22
           check-latest: true
       - uses: pnpm/action-setup@v4
         name: Install pnpm
@@ -93,7 +91,7 @@ jobs:
         uses: actions/setup-node@v3
         if: matrix.settings.target == 'i686-pc-windows-msvc'
         with:
-          node-version: 20
+          node-version: 22
           check-latest: true
           architecture: x86
       - name: Build in docker
@@ -124,8 +122,8 @@ jobs:
           - host: macos-latest
             target: x86_64-apple-darwin
         node:
-          - '18'
           - '20'
+          - '22'
     runs-on: ${{ matrix.settings.host }}
     steps:
       - uses: actions/checkout@v4
@@ -157,7 +155,7 @@ jobs:
       matrix:
         node:
           - '18'
-          - '22'
+          - '20'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -180,6 +178,7 @@ jobs:
         shell: bash
       - name: Test bindings
         run: pnpm test
+        # run: docker run --rm -v $(pwd):/build -w /build node:${{ matrix.node }}-slim pnpm test
   publish:
     name: Publish
     runs-on: ubuntu-latest
@@ -191,7 +190,7 @@ jobs:
       - name: Setup node
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
       - uses: pnpm/action-setup@v4
         name: Install pnpm
         with:
