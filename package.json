@@ -63,7 +63,8 @@
     "test": "ava",
     "universal": "napi universal",
     "version": "napi version",
-    "fmt": "dprint fmt"
+    "fmt": "dprint fmt",
+    "lint": "true"
   },
   "packageManager": "pnpm@10.8.1"
 }
