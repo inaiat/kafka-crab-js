@@ -80,7 +80,11 @@ jobs:
           - host: ubuntu-latest
             target: aarch64-unknown-linux-gnu
             build: |
-              export OPENSSL_DIR=/tmp/openssl
+              export PKG_CONFIG_ALLOW_CROSS=1
+              export PKG_CONFIG_PATH=/tmp/aarch64/usr/share/pkgconfig
+              export PKG_CONFIG_LIBDIR=/tmp/aarch64/usr/lib/aarch64-linux-gnu/pkgconfig/
+              export PKG_CONFIG_SYSROOT_DIR=/tmp/aarch64/
+              export CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=/usr/bin/aarch64-linux-gnu-gcc
               export OPENSSL_LIB_DIR="$OPENSSL_DIR/lib"
               export OPENSSL_INCLUDE_DIR="$OPENSSL_DIR/include"
               pnpm build --target aarch64-unknown-linux-gnu --zig
