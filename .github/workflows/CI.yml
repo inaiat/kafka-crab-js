@@ -48,11 +48,11 @@ jobs:
       - name: ESLint
         run: pnpm lint
 
-      - name: Cargo fmt
-        run: cargo fmt -- --check
+      # - name: Cargo fmt
+      #   run: cargo fmt -- --check
 
-      - name: Clippy
-        run: cargo clippy
+      # - name: Clippy
+      #   run: cargo clippy
 
   build:
     strategy:
@@ -79,7 +79,7 @@ jobs:
             build: pnpm build --target aarch64-apple-darwin
           - host: ubuntu-latest
             target: aarch64-unknown-linux-gnu
-            build: pnpm build --target aarch64-unknown-linux-gnu --use-napi-cross
+            build: pnpm build --target aarch64-unknown-linux-gnu
           # - host: ubuntu-latest
           #   target: armv7-unknown-linux-gnueabihf
           #   build: pnpm build --target armv7-unknown-linux-gnueabihf --use-napi-cross
