@@ -126,7 +126,7 @@ jobs:
             target/
           key: ${{ matrix.settings.target }}-cargo-${{ matrix.settings.host }}
       - uses: goto-bus-stop/setup-zig@v2
-        if: ${{ contains(matrix.settings.target, 'musl') }}
+        if: ${{ contains(matrix.settings.target, 'aarch64') || contains(matrix.settings.target, 'musl') }}
         with:
           version: 0.13.0
       - name: Install cargo-zigbuild
