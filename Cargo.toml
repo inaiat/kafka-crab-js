@@ -22,14 +22,12 @@ rdkafka = { version = "0.37", features = [
     "cmake-build",
     "tokio",
     "ssl-vendored",
-    "gssapi-vendored"
 ] }
 tokio = { version = "1", features = ["full"] }
 
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["json"] }
 nanoid = "0.4"
-openssl-sys = "0.9.107"
 
 [build-dependencies]
 napi-build = "2.1"
