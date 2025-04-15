@@ -79,7 +79,11 @@ jobs:
             build: pnpm build --target aarch64-apple-darwin
           - host: ubuntu-latest
             target: aarch64-unknown-linux-gnu
-            build: pnpm build --target aarch64-unknown-linux-gnu --zig
+            build: |
+              export OPENSSL_DIR=/tmp/openssl
+              export OPENSSL_LIB_DIR="$OPENSSL_DIR/lib"
+              export OPENSSL_INCLUDE_DIR="$OPENSSL_DIR/include"
+              pnpm build --target aarch64-unknown-linux-gnu --zig
           # - host: ubuntu-latest
           #   target: armv7-unknown-linux-gnueabihf
           #   build: pnpm build --target armv7-unknown-linux-gnueabihf --use-napi-cross
