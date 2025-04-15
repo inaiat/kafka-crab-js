@@ -22,6 +22,7 @@ rdkafka = { version = "0.37", features = [
     "cmake-build",
     "tokio",
     "ssl-vendored",
+    "gssapi-vendored"
 ] }
 tokio = { version = "1", features = ["full"] }
 
