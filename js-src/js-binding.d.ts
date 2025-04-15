@@ -34,7 +34,7 @@ export interface ConsumerConfiguration {
   createTopic?: boolean
   enableAutoCommit?: boolean
   configuration?: Record<string, string>
-  fecthMetadataTimeout?: number
+  fetchMetadataTimeout?: number
 }
 export enum PartitionPosition {
   Beginning = 'Beginning',
