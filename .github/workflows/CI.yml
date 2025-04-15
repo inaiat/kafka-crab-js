@@ -35,7 +35,9 @@ jobs:
             docker: ghcr.io/napi-rs/napi-rs/nodejs-rust:lts-debian
             build: |-
               set -e &&
-              export CXXFLAGS="-stdlib=libc++ -L/usr/lib/llvm-18/lib -static"
+              curl -f https://get.pnpm.io/v6.16.js | node - add --global pnpm@10.8.1 &&
+              export CXXFLAGS="-stdlib=libc++ -L/usr/lib/llvm-18/lib -static" &&
+              pnpm install &&
               pnpm build --target x86_64-unknown-linux-gnu &&
               strip *.node
           - host: macos-latest
@@ -155,7 +157,7 @@ jobs:
       matrix:
         node:
           - '18'
-          - '20'
+          - '22'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -178,7 +180,6 @@ jobs:
         shell: bash
       - name: Test bindings
         run: pnpm test
-        # run: docker run --rm -v $(pwd):/build -w /build node:${{ matrix.node }}-slim pnpm test
   publish:
     name: Publish
     runs-on: ubuntu-latest
