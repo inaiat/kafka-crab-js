@@ -79,25 +79,26 @@ jobs:
             build: pnpm build --target aarch64-apple-darwin
           - host: ubuntu-latest
             target: aarch64-unknown-linux-gnu
-            build: |
-              docker run --rm -v $(pwd):/app -w /app \
-                -e OPENSSL_STATIC=1 \
-                -e OPENSSL_DIR="/usr/local" \
-                -e CI="true" \
-                ghcr.io/napi-rs/napi-rs/nodejs-rust:lts-debian \
-                bash -c "apt-get update && \
-                         apt-get install -y --no-install-recommends \
-                         gcc-aarch64-linux-gnu g++-aarch64-linux-gnu \
-                         libc6-dev-arm64-cross libc6-dev-i386 && \
-                         rustup target add aarch64-unknown-linux-gnu && \
-                         corepack disable && \
-                         npm install --global corepack@latest && \
-                         pnpm install && \
-                         CC_aarch64_unknown_linux_gnu=aarch64-linux-gnu-gcc \
-                         CXX_aarch64_unknown_linux_gnu=aarch64-linux-gnu-g++ \
-                         CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=aarch64-linux-gnu-gcc \
-                         SYSROOT=/usr/aarch64-linux-gnu \
-                         pnpm build --target aarch64-unknown-linux-gnu"
+            build: pnpm build --target aarch64-unknown-linux-gnu
+            # build: |
+            #   docker run --rm -v $(pwd):/app -w /app \
+            #     -e OPENSSL_STATIC=1 \
+            #     -e OPENSSL_DIR="/usr/local" \
+            #     -e CI="true" \
+            #     ghcr.io/napi-rs/napi-rs/nodejs-rust:lts-debian-aarch64 \
+            #     bash -c "apt-get update && \
+            #              apt-get install -y --no-install-recommends \
+            #              gcc-aarch64-linux-gnu g++-aarch64-linux-gnu \
+            #              libc6-dev-arm64-cross libc6-dev-i386 && \
+            #              rustup target add aarch64-unknown-linux-gnu && \
+            #              corepack disable && \
+            #              npm install --global corepack@latest && \
+            #              pnpm install && \
+            #              CC_aarch64_unknown_linux_gnu=aarch64-linux-gnu-gcc \
+            #              CXX_aarch64_unknown_linux_gnu=aarch64-linux-gnu-g++ \
+            #              CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=aarch64-linux-gnu-gcc \
+            #              SYSROOT=/usr/aarch64-linux-gnu \
+            #              pnpm build --target aarch64-unknown-linux-gnu"
           # - host: ubuntu-latest
           #   target: armv7-unknown-linux-gnueabihf
           #   build: pnpm build --target armv7-unknown-linux-gnueabihf --use-napi-cross
@@ -144,12 +145,12 @@ jobs:
             target/
           key: ${{ matrix.settings.target }}-cargo-${{ matrix.settings.host }}
       - uses: goto-bus-stop/setup-zig@v2
-        if: ${{ contains(matrix.settings.target, 'aarch64') || contains(matrix.settings.target, 'musl') }}
+        if: ${{ contains(matrix.settings.target, 'musl') }}
         with:
           version: 0.13.0
       - name: Install cargo-zigbuild
         uses: taiki-e/install-action@v2
-        if: ${{ contains(matrix.settings.target, 'aarch64') || contains(matrix.settings.target, 'musl') }}
+        if: ${{ contains(matrix.settings.target, 'musl') }}
         env:
           GITHUB_TOKEN: ${{ github.token }}
         with:
@@ -359,7 +360,7 @@ jobs:
       - name: Setup node
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: pnpm
       - name: Install dependencies
         run: pnpm install
@@ -391,7 +392,7 @@ jobs:
       - name: Setup node
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: pnpm
       - name: Install dependencies
         run: pnpm install
