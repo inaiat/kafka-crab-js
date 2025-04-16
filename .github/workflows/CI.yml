@@ -77,11 +77,11 @@ jobs:
           - host: macos-latest
             target: aarch64-apple-darwin
             build: pnpm build --target aarch64-apple-darwin
-          - host: ubuntu-latest
+          - host: ubuntu-24.04-arm
             target: aarch64-unknown-linux-gnu
             build: |
-              sudo apt-get install build-essential -y
               pnpm build --target aarch64-unknown-linux-gnu
+          # sudo apt-get install build-essential -y
           # - host: ubuntu-latest
           #   target: armv7-unknown-linux-gnueabihf
           #   build: pnpm build --target armv7-unknown-linux-gnueabihf --use-napi-cross
