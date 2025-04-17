@@ -71,8 +71,9 @@ jobs:
           - host: ubuntu-latest
             target: x86_64-unknown-linux-gnu
             build: pnpm build --target x86_64-unknown-linux-gnu
-          - host: ghcr.io/rust-cross/rust-musl-cross:x86_64-musl
+          - host: ubuntu-latest
             target: x86_64-unknown-linux-musl
+            container: ghcr.io/rust-cross/rust-musl-cross:x86_64-musl
             build: pnpm build --target x86_64-unknown-linux-musl
           - host: macos-latest
             target: aarch64-apple-darwin
