@@ -100,18 +100,6 @@ jobs:
                 zlib1g-dev \
                 libssl-dev \
                 libsasl2-dev
-
-              # --- Optional: Verify tools ---
-              echo "Verifying tools in PATH:"
-              which x86_64-linux-musl-gcc
-              which x86_64-linux-musl-g++
-              which cmake
-              which make
-              echo "CC is: $CC"
-              echo "CXX is: $CXX"
-              echo "RUSTFLAGS is: $RUSTFLAGS"
-              # --- End Verification ---
-
               # Run your build command
               pnpm build --target x86_64-unknown-linux-musl
           - host: macos-latest
