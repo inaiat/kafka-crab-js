@@ -77,12 +77,12 @@ jobs:
             build: |
               sudo apt update
               sudo apt install -y musl-tools musl-dev g++-multilib cmake zlib1g-dev libssl-dev libsasl2-dev
-              sudo ln -s $(which musl-gcc) /usr/bin/x86_64-linux-musl-g++
-              export CC=x86_64-linux-musl-gcc
-              export CXX=x86_64-linux-musl-g++
-              export RUSTFLAGS="-C linker=x86_64-linux-musl-gcc"
-              export PKG_CONFIG_ALLOW_CROSS=1
-              export RDKAFKA_STATIC=1
+              # sudo ln -s $(which musl-gcc) /usr/bin/x86_64-linux-musl-g++
+              wget https://musl.cc/x86_64-linux-musl-cross.tgz
+              tar -xvzf x86_64-linux-musl-cross.tgz
+              sudo mv x86_64-linux-musl-cross /opt/musl
+              export PATH=/opt/musl/bin:$PATH
+              export CMAKE_TOOLCHAIN_FILE=/opt/musl/x86_64-linux-musl-cross.cmake
               pnpm build --target x86_64-unknown-linux-musl
           - host: macos-latest
             target: aarch64-apple-darwin
