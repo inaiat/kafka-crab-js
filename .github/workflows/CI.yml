@@ -76,13 +76,14 @@ jobs:
             container: ghcr.io/rust-cross/rust-musl-cross:x86_64-musl
             build: |
               sudo apt update
-              sudo apt install build-essential musl-dev musl-tools g++ cmake zlib1g-dev libssl-dev librdkafka-dev
-              sudo ln -s $(which musl-gcc) /usr/bin/x86_64-linux-musl-g++
-              rustup target add x86_64-unknown-linux-musl
+              sudo apt install -y musl-tools musl-dev musl-gcc g++-multilib cmake zlib1g-dev libssl-dev
               export CC=x86_64-linux-musl-gcc
               export CXX=x86_64-linux-musl-g++
-              export PKG_CONFIG_PATH=/usr/lib/pkgconfig:/usr/local/lib/pkgconfig
-              pnpm build --target x86_64-unknown-linux-musl
+              export RUSTFLAGS="-C linker=x86_64-linux-musl-gcc"
+              export PKG_CONFIG_ALLOW_CROSS=1
+              export OPENSSL_DIR=/usr
+              export OPENSSL_LIB_DIR=/usr/lib
+              RDKAFKA_STATIC=1 pnpm build --target x86_64-unknown-linux-musl
           - host: macos-latest
             target: aarch64-apple-darwin
             build: pnpm build --target aarch64-apple-darwin
