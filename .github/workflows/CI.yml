@@ -74,33 +74,7 @@ jobs:
           - host: ubuntu-latest
             target: x86_64-unknown-linux-musl
             container: ghcr.io/rust-cross/rust-musl-cross:x86_64-musl
-            env:
-              # Compilers are provided by the container and should be in PATH already
-              CC: x86_64-linux-musl-gcc
-              CXX: x86_64-linux-musl-g++
-              # Tell Rust which linker to use for the Musl target
-              RUSTFLAGS: "-C linker=x86_64-linux-musl-gcc"
-              # Allow pkg-config to work correctly during cross-compilation
-              PKG_CONFIG_ALLOW_CROSS: "1"
-              # Tell rdkafka-sys crate to build librdkafka statically
-              RDKAFKA_STATIC: "1"
-              # Explicitly point openssl-sys crate to system libs if needed.
-              # The paths might need adjustment depending on the container's layout.
-              # Often, openssl-sys finds these automatically if libssl-dev is installed.
-              # OPENSSL_DIR: /usr
-              # OPENSSL_LIB_DIR: /usr/lib/x86_64-linux-gnu
-              # OPENSSL_INCLUDE_DIR: /usr/include
             build: |
-              # Install ONLY the RUNTIME C library dependencies needed by librdkafka
-              # Use apt-get as the container is likely Debian-based
-              sudo apt-get update -y
-              sudo apt-get install -y --no-install-recommends \
-                cmake \
-                make \
-                zlib1g-dev \
-                libssl-dev \
-                libsasl2-dev
-              # Run your build command
               pnpm build --target x86_64-unknown-linux-musl
           - host: macos-latest
             target: aarch64-apple-darwin
