@@ -93,8 +93,8 @@ jobs:
             build: |
               # Install ONLY the RUNTIME C library dependencies needed by librdkafka
               # Use apt-get as the container is likely Debian-based
-              apt-get update -y
-              apt-get install -y --no-install-recommends \
+              sudo apt-get update -y
+              sudo apt-get install -y --no-install-recommends \
                 cmake \
                 make \
                 zlib1g-dev \
