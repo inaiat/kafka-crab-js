@@ -136,17 +136,17 @@ jobs:
             .cargo-cache
             target/
           key: ${{ matrix.settings.target }}-cargo-${{ matrix.settings.host }}
-      # - uses: goto-bus-stop/setup-zig@v2
-      #   if: ${{ contains(matrix.settings.target, 'musl') }}
-      #   with:
-      #     version: 0.13.0
-      # - name: Install cargo-zigbuild
-      #   uses: taiki-e/install-action@v2
-      #   if: ${{ contains(matrix.settings.target, 'musl') }}
-      #   env:
-      #     GITHUB_TOKEN: ${{ github.token }}
-      #   with:
-      #     tool: cargo-zigbuild
+      - uses: goto-bus-stop/setup-zig@v2
+        if: ${{ contains(matrix.settings.target, 'musl') }}
+        with:
+          version: 0.13.0
+      - name: Install cargo-zigbuild
+        uses: taiki-e/install-action@v2
+        if: ${{ contains(matrix.settings.target, 'musl') }}
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        with:
+          tool: cargo-zigbuild
       - name: Setup toolchain
         run: ${{ matrix.settings.setup }}
         if: ${{ matrix.settings.setup }}
