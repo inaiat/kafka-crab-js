@@ -75,7 +75,9 @@ jobs:
             target: x86_64-unknown-linux-musl
             container: ghcr.io/rust-cross/rust-musl-cross:x86_64-unknown-linux-musl
             build: |
-              sudo apt-get update && sudo apt-get install -y --no-install-recommends cmake make musl-tools g++ musl-dev zlib1g-dev libssl-dev libsasl2-dev g++-multilib libc++-dev libc++abi-dev
+              sudo apt-get update && sudo apt-get install -y --no-install-recommends \
+                cmake make musl-tools g++ musl-dev zlib1g-dev libssl-dev libsasl2-dev g++-multilib libc++-dev libc++abi-dev
+              sudo ln -sf /usr/bin/musl-gcc /usr/bin/musl-g++
               sudo ln -sf /usr/bin/musl-gcc /usr/bin/x86_64-linux-musl-g++
               export RUST_BACKTRACE=1
               export CC=musl-gcc
