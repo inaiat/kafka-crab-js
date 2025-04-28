@@ -73,16 +73,9 @@ jobs:
             build: pnpm build --target x86_64-unknown-linux-gnu
           - host: ubuntu-latest
             target: x86_64-unknown-linux-musl
-            container: ghcr.io/rust-cross/rust-musl-cross:x86_64-unknown-linux-musl
+            container: rust:bookworm
             build: |
-              sudo apt-get update && sudo apt-get install -y --no-install-recommends \
-                cmake make musl-tools g++ musl-dev zlib1g-dev libssl-dev libsasl2-dev g++-multilib libc++-dev libc++abi-dev
-              sudo ln -sf /usr/bin/musl-gcc /usr/bin/musl-g++
-              sudo ln -sf /usr/bin/musl-gcc /usr/bin/x86_64-linux-musl-g++
-              export RUST_BACKTRACE=1
-              export CC=musl-gcc
-              export CXX=musl-g++
-              export CARGO_PROFILE_RELEASE_BUILD_OVERRIDE_DEBUG=true
+              sudo apt-get update && sudo apt-get install -y cmake
               pnpm build --target x86_64-unknown-linux-musl
           - host: macos-latest
             target: aarch64-apple-darwin
@@ -139,7 +132,7 @@ jobs:
       - uses: goto-bus-stop/setup-zig@v2
         if: ${{ contains(matrix.settings.target, 'musl') }}
         with:
-          version: 0.13.0
+          version: 0.15.0
       - name: Install cargo-zigbuild
         uses: taiki-e/install-action@v2
         if: ${{ contains(matrix.settings.target, 'musl') }}
