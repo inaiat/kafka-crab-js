@@ -62,7 +62,7 @@ jobs:
           - host: macos-latest
             target: x86_64-apple-darwin
             build: pnpm build --target x86_64-apple-darwin
-          - host: ubuntu-latest
+          - host: ubuntu-22.04 # Need to fix test GLIB 2.35
             target: x86_64-unknown-linux-gnu
             build: pnpm build --target x86_64-unknown-linux-gnu
           - host: ubuntu-latest
