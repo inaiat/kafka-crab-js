@@ -339,7 +339,6 @@ jobs:
       # - build-freebsd
       - test-macOS-windows-binding
       - test-linux-binding
-      - test-wasi
     steps:
       - uses: actions/checkout@v4
       - name: setup pnpm
