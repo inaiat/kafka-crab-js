@@ -74,11 +74,10 @@ jobs:
           - host: ubuntu-latest
             target: x86_64-unknown-linux-musl
             container: ghcr.io/rust-cross/rust-musl-cross:x86_64-musl
-            env:
-              CARGO_TARGET_X86_64_UNKNOWN_LINUX_MUSL_LINKER: musl-gcc
-              RUSTFLAGS: -C target-feature=+crt-static
-              RUST_BACKTRACE: 1
             build: |
+              export CARGO_TARGET_X86_64_UNKNOWN_LINUX_MUSL_LINKER=musl-gcc
+              export RUSTFLAG="-C target-feature=+crt-static"
+              export RUST_BACKTRACE=1
               pnpm build --target x86_64-unknown-linux-musl
           - host: macos-latest
             target: aarch64-apple-darwin
@@ -121,6 +120,7 @@ jobs:
         with:
           toolchain: stable
           targets: ${{ matrix.settings.target }}
+        if: matrix.settings.target != 'x86_64-unknown-linux-musl'
       - name: Cache cargo
         uses: actions/cache@v4
         with:
