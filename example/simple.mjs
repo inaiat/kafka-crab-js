@@ -1,12 +1,13 @@
 import { nanoid } from 'nanoid'
 import { Buffer } from 'node:buffer'
-import { CommitMode, KafkaClient, SecurityProtocol } from '../index.js'
+import { KafkaClient } from '../index.js'
+process.env.NAPI_RS_TOKIO_RUNTIME = '1'
 
 const kafkaClient = new KafkaClient({
   brokers: 'localhost:29092',
   clientId: 'my-js-group',
-  securityProtocol: SecurityProtocol.Plaintext,
-  logLevel: 'info',
+  securityProtocol: 'Plaintext',
+  logLevel: 'debug',
   brokerAddressFamily: 'v4',
 })
 const topic = `topic-${nanoid()}`

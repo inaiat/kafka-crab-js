@@ -1,5 +1,5 @@
 import { fakerPT_BR } from '@faker-js/faker'
-import { KafkaClient, PartitionPosition } from '../index.js'
+import { KafkaClient } from '../index.js'
 
 const kafkaClient = new KafkaClient({
   brokers: 'localhost:29092',
@@ -39,7 +39,7 @@ async function startConsumer(topic) {
     enableAutoCommit: true,
   })
 
-  await kafkaStream.subscribe([{ topic: 'foo', allOffsets: { position: PartitionPosition.Beginning } }])
+  await kafkaStream.subscribe([{ topic: 'foo', allOffsets: { position: 'Beginning' } }])
 
   let counter = 0
   console.log('Starting consumer')

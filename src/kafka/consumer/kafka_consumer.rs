@@ -51,7 +51,7 @@ pub struct KafkaConsumer {
 #[napi]
 impl KafkaConsumer {
   pub fn new(
-    kafka_client: KafkaClientConfig,
+    kafka_client: &KafkaClientConfig,
     consumer_configuration: &ConsumerConfiguration,
   ) -> Result<Self> {
     let client_config: &ClientConfig = kafka_client.get_client_config();
@@ -74,7 +74,10 @@ impl KafkaConsumer {
     })
   }
 
-  #[napi(ts_args_type = "callback: (error: Error | undefined, event: KafkaEvent) => void")]
+  #[napi(
+    async_runtime,
+    ts_args_type = "callback: (error: Error | undefined, event: KafkaEvent) => void"
+  )]
   pub fn on_events(&self, callback: ThreadsafeFunction<KafkaEvent>) -> Result<()> {
     let mut rx = self.stream_consumer.context().event_channel.1.clone();
     let mut disconnect_signal = self.disconnect_signal.1.clone();

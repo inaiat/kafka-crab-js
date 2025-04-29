@@ -41,7 +41,7 @@ pub struct KafkaConfiguration {
   pub broker_address_family: Option<String>,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 #[napi]
 pub struct KafkaClientConfig {
   rdkafka_client_config: ClientConfig,
@@ -107,6 +107,7 @@ impl KafkaClientConfig {
       kafka_configuration,
     }
   }
+
   #[napi(getter)] // Expose this as a property named 'kafkaConfiguration' in JS
   pub fn configuration(&self) -> KafkaConfiguration {
     // Return a clone. Since KafkaConfiguration derives Clone and has
@@ -125,12 +126,12 @@ impl KafkaClientConfig {
     }
   }
 
-  #[napi]
+  #[napi(async_runtime)]
   pub fn create_consumer(
     &self,
     consumer_configuration: ConsumerConfiguration,
   ) -> Result<KafkaConsumer> {
-    KafkaConsumer::new(self.clone(), &consumer_configuration).map_err(|e| {
+    KafkaConsumer::new(self, &consumer_configuration).map_err(|e| {
       Error::new(
         Status::GenericFailure,
         format!("Failed to create stream consumer: {:?}", e),

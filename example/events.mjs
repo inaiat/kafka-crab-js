@@ -1,4 +1,4 @@
-import { KafkaClient, KafkaEventName } from '../index.js'
+import { KafkaClient } from '../index.js'
 
 const TOPIC = 'foo'
 
@@ -17,7 +17,7 @@ const consumer = kafkaClient.createConsumer({
 // If you want to consume events, you need call disconnect() to stop the consumer and release resources
 consumer.onEvents((_err, event) => {
   switch (event.name) {
-    case KafkaEventName.CommitCallback: {
+    case 'CommitCallback': {
       const offsetCommitted = event.payload.tpl.filter(it => it.partitionOffset.find(it => it.offset.offset)) // Filter only committed offsets
         .flatMap(p =>
           p.partitionOffset.map(it => ({ topic: p.topic, partition: it.partition, offset: it.offset.offset }))
