@@ -31,7 +31,7 @@ pub struct ConsumerConfiguration {
 }
 
 #[napi(string_enum)]
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum PartitionPosition {
   Beginning,
   End,

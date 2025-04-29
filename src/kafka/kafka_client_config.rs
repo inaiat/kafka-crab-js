@@ -10,7 +10,7 @@ use super::{
   producer::{kafka_producer::KafkaProducer, model::ProducerConfiguration},
 };
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 #[napi(string_enum)]
 pub enum SecurityProtocol {
   Plaintext,
@@ -45,8 +45,8 @@ pub struct KafkaConfiguration {
 #[napi]
 pub struct KafkaClientConfig {
   rdkafka_client_config: ClientConfig,
-  #[napi(readonly)]
-  pub kafka_configuration: KafkaConfiguration,
+  // #[napi(readonly)]
+  kafka_configuration: KafkaConfiguration,
 }
 
 #[napi]
@@ -106,6 +106,12 @@ impl KafkaClientConfig {
       rdkafka_client_config,
       kafka_configuration,
     }
+  }
+  #[napi(getter)] // Expose this as a property named 'kafkaConfiguration' in JS
+  pub fn configuration(&self) -> KafkaConfiguration {
+    // Return a clone. Since KafkaConfiguration derives Clone and has
+    // #[napi(object)], napi-rs knows how to convert the owned value.
+    self.kafka_configuration.clone()
   }
 
   #[napi]

@@ -29,7 +29,8 @@ use super::{
   },
   context::{KafkaCrabContext, KafkaEvent},
   model::{
-    CommitMode, ConsumerConfiguration, OffsetModel, TopicPartition, TopicPartitionConfig, DEFAULT_FETCH_METADATA_TIMEOUT,
+    CommitMode, ConsumerConfiguration, OffsetModel, TopicPartition, TopicPartitionConfig,
+    DEFAULT_FETCH_METADATA_TIMEOUT,
   },
 };
 
@@ -64,9 +65,10 @@ impl KafkaConsumer {
       client_config: client_config.clone(),
       stream_consumer,
       fetch_metadata_timeout: Duration::from_millis(
-        consumer_configuration
-            .fetch_metadata_timeout
-          .map_or_else(|| DEFAULT_FETCH_METADATA_TIMEOUT.as_millis() as u64, |t| t as u64),
+        consumer_configuration.fetch_metadata_timeout.map_or_else(
+          || DEFAULT_FETCH_METADATA_TIMEOUT.as_millis() as u64,
+          |t| t as u64,
+        ),
       ),
       disconnect_signal: watch::channel(()),
     })
@@ -129,7 +131,8 @@ impl KafkaConsumer {
     .await
     .map_err(|e| e.into_napi_error("error while creating topics"))?;
 
-    try_subscribe(&self.stream_consumer, &topics_name).map_err(|e| e.into_napi_error("error while subscribing"))?;
+    try_subscribe(&self.stream_consumer, &topics_name)
+      .map_err(|e| e.into_napi_error("error while subscribing"))?;
 
     topics.iter().for_each(|item| {
       if let Some(all_offsets) = item.all_offsets.clone() {
