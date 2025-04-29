@@ -74,8 +74,7 @@ jobs:
           - host: ubuntu-latest
             target: x86_64-unknown-linux-musl
             container_image: ghcr.io/rust-cross/rust-musl-cross:x86_64-musl
-            build: |
-              pnpm build --target x86_64-unknown-linux-musl
+            build: pnpm build --target x86_64-unknown-linux-musl
           - host: macos-latest
             target: aarch64-apple-darwin
             build: pnpm build --target aarch64-apple-darwin
@@ -101,7 +100,7 @@ jobs:
           # - host: ubuntu-latest
           #   target: wasm32-wasip1-threads
           #   build: pnpm build --target wasm32-wasip1-threads
-    name: stable - ${{ matrix.settings.target }} - node@20
+    name: stable - ${{ matrix.settings.target }} - node@22
     runs-on: ${{ matrix.settings.host }}
     container: ${{ matrix.settings.container_image || '' }}
     steps:
@@ -237,7 +236,6 @@ jobs:
             target: aarch64-apple-darwin
             architecture: arm64
         node:
-          - '18'
           - '20'
           - '22'
     runs-on: ${{ matrix.settings.host }}
@@ -277,7 +275,6 @@ jobs:
           - aarch64-unknown-linux-musl
           - armv7-unknown-linux-gnueabihf
         node:
-          - '18'
           - '20'
           - '22'
     runs-on: ${{ contains(matrix.target, 'aarch64') && 'ubuntu-24.04-arm' || 'ubuntu-latest' }}
@@ -334,34 +331,6 @@ jobs:
           image: ${{ steps.docker.outputs.IMAGE }}
           options: -v ${{ steps.docker.outputs.PNPM_STORE_PATH }}:${{ steps.docker.outputs.PNPM_STORE_PATH }} -v ${{ github.workspace }}:${{ github.workspace }} -w ${{ github.workspace }} --platform ${{ steps.docker.outputs.PLATFORM }}
           run: npm run test
-  test-wasi:
-    name: Test WASI target
-    needs:
-      - build
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: setup pnpm
-        uses: pnpm/action-setup@v4
-      - name: Setup node
-        uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: pnpm
-      - name: Install dependencies
-        run: pnpm install
-      - name: Download artifacts
-        uses: actions/download-artifact@v4
-        with:
-          name: bindings-wasm32-wasip1-threads
-          path: .
-      - name: List packages
-        run: ls -R .
-        shell: bash
-      - name: Test bindings
-        run: pnpm test
-        env:
-          NAPI_RS_FORCE_WASI: 1
   publish:
     name: Publish
     runs-on: ubuntu-latest
