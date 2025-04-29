@@ -62,12 +62,6 @@ jobs:
           - host: macos-latest
             target: x86_64-apple-darwin
             build: pnpm build --target x86_64-apple-darwin
-          # - host: windows-latest
-          #   build: pnpm build --target x86_64-pc-windows-msvc
-          #   target: x86_64-pc-windows-msvc
-          # - host: windows-latest
-          #   build: pnpm build --target i686-pc-windows-msvc
-          #   target: i686-pc-windows-msvc
           - host: ubuntu-latest
             target: x86_64-unknown-linux-gnu
             build: pnpm build --target x86_64-unknown-linux-gnu
@@ -81,25 +75,12 @@ jobs:
           - host: ubuntu-24.04-arm
             target: aarch64-unknown-linux-gnu
             build: pnpm build --target aarch64-unknown-linux-gnu
-          # sudo apt-get install build-essential -y
           # - host: ubuntu-latest
           #   target: armv7-unknown-linux-gnueabihf
           #   build: pnpm build --target armv7-unknown-linux-gnueabihf --use-napi-cross
           # - host: ubuntu-latest
-          #   target: aarch64-linux-android
-          #   build: pnpm build --target aarch64-linux-android
-          # - host: ubuntu-latest
-          #   target: armv7-linux-androideabi
-          #   build: pnpm build --target armv7-linux-androideabi
-          # - host: ubuntu-latest
           #   target: aarch64-unknown-linux-musl
           #   build: pnpm build --target aarch64-unknown-linux-musl -x
-          # - host: windows-latest
-          #   target: aarch64-pc-windows-msvc
-          #   build: pnpm build --target aarch64-pc-windows-msvc
-          # - host: ubuntu-latest
-          #   target: wasm32-wasip1-threads
-          #   build: pnpm build --target wasm32-wasip1-threads
     name: stable - ${{ matrix.settings.target }} - node@22
     runs-on: ${{ matrix.settings.host }}
     container: ${{ matrix.settings.container_image || '' }}
@@ -226,9 +207,6 @@ jobs:
       fail-fast: false
       matrix:
         settings:
-          - host: windows-latest
-            target: x86_64-pc-windows-msvc
-            architecture: x64
           - host: macos-latest
             target: x86_64-apple-darwin
             architecture: x64
