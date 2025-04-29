@@ -106,6 +106,7 @@ jobs:
           #   build: pnpm build --target wasm32-wasip1-threads
     name: stable - ${{ matrix.settings.target }} - node@20
     runs-on: ${{ matrix.settings.host }}
+    container: ${{ matrix.settings.container_image || '' }}
     steps:
       - uses: actions/checkout@v4
       - name: setup pnpm
