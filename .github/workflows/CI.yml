@@ -96,7 +96,7 @@ jobs:
         with:
           toolchain: stable
           targets: ${{ matrix.settings.target }}
-        if: matrix.settings.target != 'x86_64-unknown-linux-musl'
+        # if: matrix.settings.target != 'x86_64-unknown-linux-musl'
       - name: Cache cargo
         uses: actions/cache@v4
         with:
@@ -108,17 +108,6 @@ jobs:
             .cargo-cache
             target/
           key: ${{ matrix.settings.target }}-cargo-${{ matrix.settings.host }}
-      # - uses: goto-bus-stop/setup-zig@v2
-      #   if: ${{ contains(matrix.settings.target, 'musl') }}
-      #   with:
-      #     version: 0.15.0
-      # - name: Install cargo-zigbuild
-      #   uses: taiki-e/install-action@v2
-      #   if: ${{ contains(matrix.settings.target, 'musl') }}
-      #   env:
-      #     GITHUB_TOKEN: ${{ github.token }}
-      #   with:
-      #     tool: cargo-zigbuild
       - name: Setup toolchain
         run: ${{ matrix.settings.setup }}
         if: ${{ matrix.settings.setup }}
@@ -202,7 +191,6 @@ jobs:
           - x86_64-unknown-linux-musl
           - aarch64-unknown-linux-gnu
           - aarch64-unknown-linux-musl
-          - armv7-unknown-linux-gnueabihf
         node:
           - '20'
           - '22'
@@ -265,7 +253,6 @@ jobs:
     runs-on: ubuntu-latest
     needs:
       - lint
-      # - build-freebsd
       - test-macOS-windows-binding
       - test-linux-binding
     steps:
