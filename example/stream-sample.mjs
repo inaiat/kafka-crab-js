@@ -2,7 +2,7 @@ import { fakerPT_BR } from '@faker-js/faker'
 import { KafkaClient } from '../index.js'
 
 const kafkaClient = new KafkaClient({
-  brokers: 'localhost:29092',
+  brokers: 'localhost:9092',
   clientId: 'my-js-group-11',
   logLevel: 'debug',
   brokerAddressFamily: 'v4',

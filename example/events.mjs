@@ -3,7 +3,7 @@ import { KafkaClient } from '../index.js'
 const TOPIC = 'foo'
 
 const kafkaClient = new KafkaClient({
-  brokers: 'localhost:29092',
+  brokers: 'localhost:9092',
   clientId: 'kakfa-crab-js',
   logLevel: 'info',
   brokerAddressFamily: 'v4',

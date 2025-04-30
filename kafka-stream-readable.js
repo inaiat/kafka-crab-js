@@ -40,6 +40,12 @@ class KafkaStreamReadable extends stream_1.Readable {
         this.kafkaConsumer.unsubscribe();
     }
     /**
+     * Disconnects the Kafka consumer
+     */
+    async disconnect() {
+        await this.kafkaConsumer.disconnect();
+    }
+    /**
      * Returns the raw Kafka consumer
      * @returns {KafkaConsumer} The Kafka consumer instance
      */

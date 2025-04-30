@@ -22,6 +22,10 @@ export declare class KafkaStreamReadable extends Readable {
      */
     unsubscribe(): void;
     /**
+     * Disconnects the Kafka consumer
+     */
+    disconnect(): Promise<void>;
+    /**
      * Returns the raw Kafka consumer
      * @returns {KafkaConsumer} The Kafka consumer instance
      */
