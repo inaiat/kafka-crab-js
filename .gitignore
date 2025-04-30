@@ -55,6 +55,7 @@ typings/
 
 # Optional npm cache directory
 .npm
+npm
 
 # Optional eslint cache
 .eslintcache
@@ -123,7 +124,7 @@ dist
 .AppleDouble
 .LSOverride
 
-# Icon must end with two 
+# Icon must end with two
 Icon
 
 

@@ -44,6 +44,7 @@ export class KafkaClient {
    * @throws {Error} If the configuration is invalid
    */
   createStreamConsumer(consumerConfiguration: ConsumerConfiguration) {
-    return new KafkaStreamReadable(this.kafkaClientConfig.createConsumer(consumerConfiguration))
+    const consumer = this.kafkaClientConfig.createConsumer(consumerConfiguration)
+    return new KafkaStreamReadable(consumer)
   }
 }

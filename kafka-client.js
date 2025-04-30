@@ -42,7 +42,8 @@ class KafkaClient {
      * @throws {Error} If the configuration is invalid
      */
     createStreamConsumer(consumerConfiguration) {
-        return new kafka_stream_readable_1.KafkaStreamReadable(this.kafkaClientConfig.createConsumer(consumerConfiguration));
+        const consumer = this.kafkaClientConfig.createConsumer(consumerConfiguration);
+        return new kafka_stream_readable_1.KafkaStreamReadable(consumer);
     }
 }
 exports.KafkaClient = KafkaClient;

@@ -13,11 +13,11 @@ pub struct RetryStrategy {
   pub configuration: Option<HashMap<String, String>>,
 }
 
-#[napi]
+#[napi(string_enum)]
 #[derive(Debug, PartialEq)]
 pub enum CommitMode {
-  Sync = 0,
-  Async = 1,
+  Sync,
+  Async,
 }
 
 #[napi(object)]
@@ -31,7 +31,7 @@ pub struct ConsumerConfiguration {
 }
 
 #[napi(string_enum)]
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum PartitionPosition {
   Beginning,
   End,

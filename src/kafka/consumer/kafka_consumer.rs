@@ -29,7 +29,8 @@ use super::{
   },
   context::{KafkaCrabContext, KafkaEvent},
   model::{
-    CommitMode, ConsumerConfiguration, OffsetModel, TopicPartition, TopicPartitionConfig, DEFAULT_FETCH_METADATA_TIMEOUT,
+    CommitMode, ConsumerConfiguration, OffsetModel, TopicPartition, TopicPartitionConfig,
+    DEFAULT_FETCH_METADATA_TIMEOUT,
   },
 };
 
@@ -50,7 +51,7 @@ pub struct KafkaConsumer {
 #[napi]
 impl KafkaConsumer {
   pub fn new(
-    kafka_client: KafkaClientConfig,
+    kafka_client: &KafkaClientConfig,
     consumer_configuration: &ConsumerConfiguration,
   ) -> Result<Self> {
     let client_config: &ClientConfig = kafka_client.get_client_config();
@@ -64,15 +65,19 @@ impl KafkaConsumer {
       client_config: client_config.clone(),
       stream_consumer,
       fetch_metadata_timeout: Duration::from_millis(
-        consumer_configuration
-            .fetch_metadata_timeout
-          .map_or_else(|| DEFAULT_FETCH_METADATA_TIMEOUT.as_millis() as u64, |t| t as u64),
+        consumer_configuration.fetch_metadata_timeout.map_or_else(
+          || DEFAULT_FETCH_METADATA_TIMEOUT.as_millis() as u64,
+          |t| t as u64,
+        ),
       ),
       disconnect_signal: watch::channel(()),
     })
   }
 
-  #[napi(ts_args_type = "callback: (error: Error | undefined, event: KafkaEvent) => void")]
+  #[napi(
+    async_runtime,
+    ts_args_type = "callback: (error: Error | undefined, event: KafkaEvent) => void"
+  )]
   pub fn on_events(&self, callback: ThreadsafeFunction<KafkaEvent>) -> Result<()> {
     let mut rx = self.stream_consumer.context().event_channel.1.clone();
     let mut disconnect_signal = self.disconnect_signal.1.clone();
@@ -129,7 +134,8 @@ impl KafkaConsumer {
     .await
     .map_err(|e| e.into_napi_error("error while creating topics"))?;
 
-    try_subscribe(&self.stream_consumer, &topics_name).map_err(|e| e.into_napi_error("error while subscribing"))?;
+    try_subscribe(&self.stream_consumer, &topics_name)
+      .map_err(|e| e.into_napi_error("error while subscribing"))?;
 
     topics.iter().for_each(|item| {
       if let Some(all_offsets) = item.all_offsets.clone() {

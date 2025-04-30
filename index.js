@@ -1,14 +1,10 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.KafkaStreamReadable = exports.KafkaClient = exports.SecurityProtocol = exports.PartitionPosition = exports.KafkaProducer = exports.KafkaEventName = exports.KafkaConsumer = exports.KafkaClientConfig = exports.CommitMode = void 0;
+exports.KafkaStreamReadable = exports.KafkaClient = exports.KafkaProducer = exports.KafkaConsumer = exports.KafkaClientConfig = void 0;
 var js_binding_1 = require("./js-binding");
-Object.defineProperty(exports, "CommitMode", { enumerable: true, get: function () { return js_binding_1.CommitMode; } });
 Object.defineProperty(exports, "KafkaClientConfig", { enumerable: true, get: function () { return js_binding_1.KafkaClientConfig; } });
 Object.defineProperty(exports, "KafkaConsumer", { enumerable: true, get: function () { return js_binding_1.KafkaConsumer; } });
-Object.defineProperty(exports, "KafkaEventName", { enumerable: true, get: function () { return js_binding_1.KafkaEventName; } });
 Object.defineProperty(exports, "KafkaProducer", { enumerable: true, get: function () { return js_binding_1.KafkaProducer; } });
-Object.defineProperty(exports, "PartitionPosition", { enumerable: true, get: function () { return js_binding_1.PartitionPosition; } });
-Object.defineProperty(exports, "SecurityProtocol", { enumerable: true, get: function () { return js_binding_1.SecurityProtocol; } });
 var kafka_client_1 = require("./kafka-client");
 Object.defineProperty(exports, "KafkaClient", { enumerable: true, get: function () { return kafka_client_1.KafkaClient; } });
 var kafka_stream_readable_1 = require("./kafka-stream-readable");

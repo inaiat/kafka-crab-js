@@ -45,6 +45,13 @@ export class KafkaStreamReadable extends Readable {
   }
 
   /**
+   * Disconnects the Kafka consumer
+   */
+  async disconnect() {
+    await this.kafkaConsumer.disconnect()
+  }
+
+  /**
    * Returns the raw Kafka consumer
    * @returns {KafkaConsumer} The Kafka consumer instance
    */

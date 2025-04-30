@@ -2,7 +2,6 @@ use std::collections::HashMap;
 
 use napi::bindgen_prelude::Buffer;
 
-#[derive(Clone)]
 #[napi(object)]
 pub struct Message {
   pub payload: Buffer,
@@ -43,7 +42,6 @@ pub struct RecordMetadata {
 }
 
 #[napi(object)]
-#[derive(Clone)]
 pub struct MessageProducer {
   pub payload: Buffer,
   pub key: Option<Buffer>,
@@ -51,7 +49,6 @@ pub struct MessageProducer {
 }
 
 #[napi(object)]
-#[derive(Clone)]
 pub struct ProducerRecord {
   pub topic: String,
   pub messages: Vec<MessageProducer>,
