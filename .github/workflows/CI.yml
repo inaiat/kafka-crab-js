@@ -10,7 +10,7 @@ permissions:
 'on':
   push:
     branches:
-      - main
+      - 1.4.0
     tags-ignore:
       - '**'
     paths-ignore:
