@@ -8,6 +8,34 @@ A lightweight, flexible, and reliable Kafka client for JavaScript/TypeScript. It
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 </div>
 
+---
+
+## What's New in Version 1.4.x
+
+### Major Updates:
+1. **Enums Replaced by Unions**:
+   - Removed enums such as `KafkaEventName`, `PartitionPosition`, `CommitMode`, and `SecurityProtocol`.
+   - These enums were replaced with union types for better flexibility and usability.
+
+2. **Improved TypeScript Definitions**:
+   - Enhanced TypeScript definitions for better clarity and usability:
+     - Changes in `KafkaClientConfig`, `KafkaConsumer`, and `KafkaProducer`.
+
+3. **CI/CD Enhancements**:
+   - Updated GitHub Actions workflow:
+     - Added matrix builds for better coverage across platforms (e.g., `x86_64`, `aarch64` on Linux and macOS).
+
+4. **Updated Dependencies**:
+   - Upgraded dependencies to their latest versions for improved performance and security.
+
+5. **New Tests and Examples**:
+   - Added new integration tests and examples for Kafka to ensure reliability.
+
+6. **Enhanced Documentation**:
+   - Comprehensive API reference and usage examples added to the `docs/wiki` directory.
+
+---
+
 ## Features
 
 - 🦀 Simple and intuitive API
