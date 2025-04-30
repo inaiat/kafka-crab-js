@@ -26,10 +26,8 @@ export declare class KafkaProducer {
   send(producerRecord: ProducerRecord): Promise<Array<RecordMetadata>>
 }
 
-export declare enum CommitMode {
-  Sync = 0,
-  Async = 1
-}
+export type CommitMode =  'Sync'|
+'Async';
 
 export interface ConsumerConfiguration {
   groupId: string

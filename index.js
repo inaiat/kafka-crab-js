@@ -1,8 +1,7 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.KafkaStreamReadable = exports.KafkaClient = exports.KafkaProducer = exports.KafkaConsumer = exports.KafkaClientConfig = exports.CommitMode = void 0;
+exports.KafkaStreamReadable = exports.KafkaClient = exports.KafkaProducer = exports.KafkaConsumer = exports.KafkaClientConfig = void 0;
 var js_binding_1 = require("./js-binding");
-Object.defineProperty(exports, "CommitMode", { enumerable: true, get: function () { return js_binding_1.CommitMode; } });
 Object.defineProperty(exports, "KafkaClientConfig", { enumerable: true, get: function () { return js_binding_1.KafkaClientConfig; } });
 Object.defineProperty(exports, "KafkaConsumer", { enumerable: true, get: function () { return js_binding_1.KafkaConsumer; } });
 Object.defineProperty(exports, "KafkaProducer", { enumerable: true, get: function () { return js_binding_1.KafkaProducer; } });
