@@ -317,8 +317,8 @@ await test('Kafka Crab JS Integration Tests', async (t) => {
       // Check if the error message indicates a connection or timeout issue
       const errMsg = error.message.toLowerCase()
       ok(
-        errMsg.includes('broker') || errMsg.includes('connect') || errMsg.includes('timeout')
-          || errMsg.includes('failed'),
+        errMsg.includes('broker') || errMsg.includes('connect') || errMsg.includes('timeout') ||
+          errMsg.includes('failed'),
         `Error message should indicate connection/broker/timeout issue (got: ${error.message})`,
       )
       console.log('Expected error occurred for invalid configuration:', error.message)
