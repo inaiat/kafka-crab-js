@@ -10,7 +10,7 @@ A lightweight, flexible, and reliable Kafka client for JavaScript/TypeScript. It
 
 ---
 
-## What's New in Version 1.4.x
+## What's New in Version 1.4.0
 
 ### Major Updates:
 1. **Enums Replaced by Unions**:
