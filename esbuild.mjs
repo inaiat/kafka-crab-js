@@ -24,7 +24,7 @@ await esbuild.build({
       name: 'js-binding-path-replacer',
       setup(build) {
         // Replace js-binding.js imports with js-binding.cjs
-        build.onResolve({ filter: /\.\.\/js-binding\.js$/ }, args => {
+        build.onResolve({ filter: /\.\.\/js-binding\.js$/ }, _args => {
           return {
             path: '../js-binding.cjs',
             external: true,

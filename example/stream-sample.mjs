@@ -39,7 +39,7 @@ async function startConsumer(topic) {
     enableAutoCommit: true,
   })
 
-  await kafkaStream.subscribe([{ topic: 'foo', allOffsets: { position: 'Beginning' } }])
+  await kafkaStream.subscribe([{ topic, allOffsets: { position: 'Beginning' } }])
 
   let counter = 0
   console.log('Starting consumer')

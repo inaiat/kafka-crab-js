@@ -164,12 +164,12 @@ impl KafkaProducer {
     &self,
     topic: &str,
     message: &MessageProducer,
-    record_id: &String,
+    record_id: &str,
   ) -> Result<()> {
     let headers = message
       .headers
       .as_ref()
-      .map_or_else(OwnedHeaders::new, |h| hashmap_to_kafka_headers(&h));
+      .map_or_else(OwnedHeaders::new, hashmap_to_kafka_headers);
 
     let key = message
       .key
@@ -177,11 +177,11 @@ impl KafkaProducer {
       .map(ToBytes::to_bytes)
       .unwrap_or_default();
 
-    let record: BaseRecord<'_, [u8], [u8], Arc<String>> =
-      BaseRecord::with_opaque_to(topic, Arc::new(record_id.clone()))
-        .payload(message.payload.to_bytes())
-        .headers(headers)
-        .key(&key);
+    let opaque = Arc::new(record_id.to_string());
+    let record: BaseRecord<'_, [u8], [u8], Arc<String>> = BaseRecord::with_opaque_to(topic, opaque)
+      .payload(message.payload.to_bytes())
+      .headers(headers)
+      .key(key);
 
     self
       .producer

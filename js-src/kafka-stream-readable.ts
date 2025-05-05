@@ -16,7 +16,6 @@ export class KafkaStreamReadable extends Readable {
     if (!kafkaConsumer) {
       throw new Error('A valid KafkaConsumer instance is required.')
     }
-    this.kafkaConsumer = kafkaConsumer
   }
 
   /**

@@ -104,7 +104,6 @@ await test('Kafka Crab JS Integration Tests', async (t) => {
     const receivedMessages = []
     let pollingCount = 0
     const maxPolls = 20 // Maximum number of polling attempts
-    const pollTimeoutMs = 1000 // Increase poll timeout slightly
 
     console.log(`Polling for ${testMessages.length} messages on ${TEST_TOPIC}...`)
 
@@ -604,7 +603,7 @@ await test('Kafka Crab JS Integration Tests', async (t) => {
       const payload = JSON.parse(message.payload.toString())
       equal(payload.testId, TEST_ID, 'Payload testId should match')
     } catch (e) {
-      ok(false, 'Failed to parse payload of headers message')
+      ok(false, 'Failed to parse payload of headers message' + e.message)
     }
 
     await consumer.disconnect()
