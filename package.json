@@ -58,20 +58,16 @@
   },
   "scripts": {
     "artifacts": "napi artifacts",
-    "build:types": "tsc --emitDeclarationOnly --declaration --outDir dist",
-    "build:esm": "napi build --esm --js js-binding.js --dts js-binding.d.ts --no-const-enum --platform --release",
-    "build:cjs": "napi build --js js-binding.cjs --dts js-binding.d.ts --no-const-enum --no-dts-header --platform --release",
-    "build": "rimraf dist && pnpm build:esm && pnpm build:cjs && pnpm build:types && node esbuild.mjs",
+    "prebuild": "rimraf dist",
+    "build": "node build.mjs",
+    "postbuild": "tsc --emitDeclarationOnly --declaration --outDir dist",
     "build:debug": "napi build --platform",
     "prepublishOnly": "napi prepublish -t npm",
     "test": "node --test __test__/*.test.*",
     "test:integration": "node --test __test__/integration/*.test.*",
     "version": "napi version",
     "fmt": "dprint fmt",
-    "lint": "oxlint"
-  },
-  "lint-staged": {
-    "js-src/*.ts": "oxlint"
+    "lint": "oxlint ."
   },
   "packageManager": "pnpm@10.10.0"
 }
