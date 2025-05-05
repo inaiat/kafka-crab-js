@@ -14,7 +14,7 @@ export type {
   RetryStrategy,
   TopicPartition,
   TopicPartitionConfig,
-} from './js-binding'
+} from '../js-binding.js'
 
 export {
   CommitMode,
@@ -24,6 +24,6 @@ export {
   KafkaProducer,
   PartitionPosition,
   SecurityProtocol,
-} from './js-binding'
-export { KafkaClient } from './kafka-client'
-export { KafkaStreamReadable } from './kafka-stream-readable'
+} from '../js-binding.js'
+export { KafkaClient } from './kafka-client.js'
+export { KafkaStreamReadable } from './kafka-stream-readable.js'

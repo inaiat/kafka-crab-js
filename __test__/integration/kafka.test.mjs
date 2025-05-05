@@ -3,7 +3,7 @@ import { equal, ok } from 'node:assert/strict'
 import { Buffer } from 'node:buffer'
 import test from 'node:test'
 import { setTimeout as sleep } from 'node:timers/promises'
-import { KafkaClient } from '../../index.js'
+import { KafkaClient } from '../../dist/index.js'
 
 // Create unique identifiers for this test run
 const TEST_ID = nanoid(6)

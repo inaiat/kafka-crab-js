@@ -1,6 +1,6 @@
 import { nanoid } from 'nanoid'
 import { Buffer } from 'node:buffer'
-import { KafkaClient } from '../index.js'
+import { KafkaClient } from '../dist/index.js'
 process.env.NAPI_RS_TOKIO_RUNTIME = '1'
 
 const kafkaClient = new KafkaClient({

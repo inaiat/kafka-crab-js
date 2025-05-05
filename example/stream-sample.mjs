@@ -1,5 +1,5 @@
 import { fakerPT_BR } from '@faker-js/faker'
-import { KafkaClient } from '../index.js'
+import { KafkaClient } from '../dist/index.js'
 
 const kafkaClient = new KafkaClient({
   brokers: 'localhost:9092',

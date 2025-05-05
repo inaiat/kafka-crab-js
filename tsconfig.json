@@ -1,18 +1,24 @@
 {
   "compilerOptions": {
     "strict": true,
-    "target": "ES2020",
+    "target": "ESNext",
     "module": "NodeNext",
     "esModuleInterop": true,
     "declaration": true,
+    "emitDeclarationOnly": true,
     "allowSyntheticDefaultImports": true,
     "allowJs": true,
     "skipLibCheck": true,
     "rootDir": "./js-src",
-    "outDir": "./dist"
+    "outDir": "./dist",
+    "paths": {
+      "src/*": [
+        "./js-src"
+      ]
+    },
   },
   "include": [
-    "**/*.ts"
+    "js-src/*.ts"
   ],
   "exclude": [
     "__test__",
