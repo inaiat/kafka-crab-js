@@ -132,7 +132,7 @@ jobs:
         if: matrix.settings.target == 'x86_64-unknown-linux-gnu'
         with:
           name: dist
-          path: 'dist/**/*''
+          path: 'dist/**/*'
           if-no-files-found: error
       - name: Upload artifact
         uses: actions/upload-artifact@v4
