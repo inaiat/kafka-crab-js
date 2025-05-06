@@ -54,7 +54,6 @@ async function execEsbuild() {
 
   await esbuild.build({
     ...commonConfig,
-    entryPoints: ['./js-src/index.ts'],
     format: 'esm',
   })
 
