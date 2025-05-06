@@ -1,12 +1,13 @@
 import { nanoid } from 'nanoid'
 import { Buffer } from 'node:buffer'
-import { CommitMode, KafkaClient, SecurityProtocol } from '../index.js'
+import { KafkaClient } from '../dist/index.js'
+process.env.NAPI_RS_TOKIO_RUNTIME = '1'
 
 const kafkaClient = new KafkaClient({
-  brokers: 'localhost:29092',
+  brokers: 'localhost:9092',
   clientId: 'my-js-group',
-  securityProtocol: SecurityProtocol.Plaintext,
-  logLevel: 'info',
+  securityProtocol: 'Plaintext',
+  logLevel: 'debug',
   brokerAddressFamily: 'v4',
 })
 const topic = `topic-${nanoid()}`
@@ -44,8 +45,16 @@ async function startConsumer() {
   while (true) {
     const message = await consumer.recv()
     const { partition, offset, headers, payload } = message
-    console.log('Message received! Partition:', partition, 'Offset:', offset, 'headers:',
-      Object.entries(headers).map(([k, v]) => ({ [k]: v.toString() })), 'Message => ', payload.toString())
+    console.log(
+      'Message received! Partition:',
+      partition,
+      'Offset:',
+      offset,
+      'headers:',
+      Object.entries(headers).map(([k, v]) => ({ [k]: v.toString() })),
+      'Message => ',
+      payload.toString(),
+    )
   }
 }
 

@@ -1,6 +1,6 @@
 use std::{collections::HashMap, time::Duration};
 
-pub const DEFAULT_FECTH_METADATA_TIMEOUT: Duration = Duration::from_millis(2000);
+pub const DEFAULT_FETCH_METADATA_TIMEOUT: Duration = Duration::from_millis(2000);
 
 #[napi(object)]
 #[derive(Clone, Debug)]
@@ -13,11 +13,11 @@ pub struct RetryStrategy {
   pub configuration: Option<HashMap<String, String>>,
 }
 
-#[napi]
+#[napi(string_enum)]
 #[derive(Debug, PartialEq)]
 pub enum CommitMode {
-  Sync = 0,
-  Async = 1,
+  Sync,
+  Async,
 }
 
 #[napi(object)]
@@ -27,11 +27,11 @@ pub struct ConsumerConfiguration {
   pub create_topic: Option<bool>,
   pub enable_auto_commit: Option<bool>,
   pub configuration: Option<HashMap<String, String>>,
-  pub fecth_metadata_timeout: Option<i64>,
+  pub fetch_metadata_timeout: Option<i64>,
 }
 
 #[napi(string_enum)]
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum PartitionPosition {
   Beginning,
   End,

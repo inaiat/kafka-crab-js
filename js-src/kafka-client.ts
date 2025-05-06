@@ -1,6 +1,6 @@
-import { ConsumerConfiguration, KafkaClientConfig, KafkaConfiguration, ProducerConfiguration } from './js-binding.js'
+import { ConsumerConfiguration, KafkaClientConfig, KafkaConfiguration, ProducerConfiguration } from '../js-binding.js'
 
-import { KafkaStreamReadable } from './kafka-stream-readable'
+import { KafkaStreamReadable } from './kafka-stream-readable.js'
 
 /**
  * KafkaClient class
@@ -44,6 +44,7 @@ export class KafkaClient {
    * @throws {Error} If the configuration is invalid
    */
   createStreamConsumer(consumerConfiguration: ConsumerConfiguration) {
-    return new KafkaStreamReadable(this.kafkaClientConfig.createConsumer(consumerConfiguration))
+    const consumer = this.kafkaClientConfig.createConsumer(consumerConfiguration)
+    return new KafkaStreamReadable(consumer)
   }
 }

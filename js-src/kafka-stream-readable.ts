@@ -1,7 +1,7 @@
 import { Readable } from 'stream'
 
-import { CommitMode } from './js-binding'
-import { KafkaConsumer, OffsetModel, TopicPartitionConfig } from './js-binding'
+import { KafkaConsumer, OffsetModel, TopicPartitionConfig } from '../js-binding.js'
+import { CommitMode } from '../js-binding.js'
 
 /**
  * KafkaStreamReadable class
@@ -16,7 +16,6 @@ export class KafkaStreamReadable extends Readable {
     if (!kafkaConsumer) {
       throw new Error('A valid KafkaConsumer instance is required.')
     }
-    this.kafkaConsumer = kafkaConsumer
   }
 
   /**
@@ -42,6 +41,13 @@ export class KafkaStreamReadable extends Readable {
    */
   unsubscribe() {
     this.kafkaConsumer.unsubscribe()
+  }
+
+  /**
+   * Disconnects the Kafka consumer
+   */
+  async disconnect() {
+    await this.kafkaConsumer.disconnect()
   }
 
   /**

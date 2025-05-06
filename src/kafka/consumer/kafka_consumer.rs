@@ -19,7 +19,7 @@ use crate::kafka::{
     assign_offset_or_use_metadata, convert_to_rdkafka_offset, try_create_topic, try_subscribe,
   },
   kafka_client_config::KafkaClientConfig,
-  kafka_util::{create_message, AnyhowToNapiError, IntoNapiError},
+  kafka_util::{create_message, IntoNapiError},
   producer::model::Message,
 };
 
@@ -30,7 +30,7 @@ use super::{
   context::{KafkaCrabContext, KafkaEvent},
   model::{
     CommitMode, ConsumerConfiguration, OffsetModel, TopicPartition, TopicPartitionConfig,
-    DEFAULT_FECTH_METADATA_TIMEOUT,
+    DEFAULT_FETCH_METADATA_TIMEOUT,
   },
 };
 
@@ -44,14 +44,14 @@ type DisconnectSignal = (watch::Sender<()>, watch::Receiver<()>);
 pub struct KafkaConsumer {
   client_config: ClientConfig,
   stream_consumer: StreamConsumer<KafkaCrabContext>,
-  fecth_metadata_timeout: Duration,
+  fetch_metadata_timeout: Duration,
   disconnect_signal: DisconnectSignal,
 }
 
 #[napi]
 impl KafkaConsumer {
   pub fn new(
-    kafka_client: KafkaClientConfig,
+    kafka_client: &KafkaClientConfig,
     consumer_configuration: &ConsumerConfiguration,
   ) -> Result<Self> {
     let client_config: &ClientConfig = kafka_client.get_client_config();
@@ -59,21 +59,25 @@ impl KafkaConsumer {
     let ConsumerConfiguration { configuration, .. } = consumer_configuration;
     let stream_consumer =
       create_stream_consumer(client_config, consumer_configuration, configuration.clone())
-        .map_err(|e| e.convert_to_napi())?;
+        .map_err(|e| e.into_napi_error("error while getting assignment"))?;
 
     Ok(KafkaConsumer {
       client_config: client_config.clone(),
       stream_consumer,
-      fecth_metadata_timeout: Duration::from_millis(
-        consumer_configuration
-          .fecth_metadata_timeout
-          .unwrap_or(DEFAULT_FECTH_METADATA_TIMEOUT.as_millis() as i64) as u64,
+      fetch_metadata_timeout: Duration::from_millis(
+        consumer_configuration.fetch_metadata_timeout.map_or_else(
+          || DEFAULT_FETCH_METADATA_TIMEOUT.as_millis() as u64,
+          |t| t as u64,
+        ),
       ),
       disconnect_signal: watch::channel(()),
     })
   }
 
-  #[napi(ts_args_type = "callback: (error: Error | undefined, event: KafkaEvent) => void")]
+  #[napi(
+    async_runtime,
+    ts_args_type = "callback: (error: Error | undefined, event: KafkaEvent) => void"
+  )]
   pub fn on_events(&self, callback: ThreadsafeFunction<KafkaEvent>) -> Result<()> {
     let mut rx = self.stream_consumer.context().event_channel.1.clone();
     let mut disconnect_signal = self.disconnect_signal.1.clone();
@@ -125,12 +129,13 @@ impl KafkaConsumer {
     try_create_topic(
       &topics_name,
       &self.client_config,
-      self.fecth_metadata_timeout,
+      self.fetch_metadata_timeout,
     )
     .await
-    .map_err(|e| e.convert_to_napi())?;
+    .map_err(|e| e.into_napi_error("error while creating topics"))?;
 
-    try_subscribe(&self.stream_consumer, &topics_name).map_err(|e| e.convert_to_napi())?;
+    try_subscribe(&self.stream_consumer, &topics_name)
+      .map_err(|e| e.into_napi_error("error while subscribing"))?;
 
     topics.iter().for_each(|item| {
       if let Some(all_offsets) = item.all_offsets.clone() {
@@ -142,9 +147,9 @@ impl KafkaConsumer {
           &all_offsets,
           &self.stream_consumer,
           &item.topic,
-          self.fecth_metadata_timeout,
+          self.fetch_metadata_timeout,
         )
-        .map_err(|e| e.convert_to_napi())
+        .map_err(|e| e.into_napi_error("error while setting offset"))
         .unwrap();
       } else if let Some(partition_offset) = item.partition_offset.clone() {
         debug!(
@@ -156,9 +161,9 @@ impl KafkaConsumer {
           Some(partition_offset),
           None,
           &self.stream_consumer,
-          self.fecth_metadata_timeout,
+          self.fetch_metadata_timeout,
         )
-        .map_err(|e| e.convert_to_napi())
+        .map_err(|e| e.into_napi_error("error while assigning offset"))
         .unwrap();
       };
     });

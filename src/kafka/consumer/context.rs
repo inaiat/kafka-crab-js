@@ -26,7 +26,7 @@ pub struct KafkaEventPayload {
 }
 
 #[napi(string_enum)]
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub enum KafkaEventName {
   PreRebalance,
   PostRebalance,

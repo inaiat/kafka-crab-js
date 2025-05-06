@@ -94,7 +94,7 @@ pub fn create_stream_consumer(
   Ok(consumer)
 }
 
-pub fn try_subscribe(consumer: &LoggingConsumer, topics: &Vec<String>) -> anyhow::Result<()> {
+pub fn try_subscribe(consumer: &LoggingConsumer, topics: &[String]) -> anyhow::Result<()> {
   let topics_ref = topics.iter().map(|x| x.as_str()).collect::<Vec<&str>>();
   consumer.subscribe(topics_ref.as_slice()).map_err(|e| {
     anyhow::Error::msg(format!(
@@ -201,14 +201,12 @@ pub fn convert_tpl_to_array_of_topic_partition(tpl: &TopicPartitionList) -> Vec<
   tpl
     .elements()
     .iter()
-    .map(|tp| {
-      return TopicPartition {
-        topic: tp.topic().to_owned(),
-        partition_offset: vec![PartitionOffset {
-          partition: tp.partition(),
-          offset: convert_to_offset_model(&tp.offset()),
-        }],
-      };
+    .map(|tp| TopicPartition {
+      topic: tp.topic().to_owned(),
+      partition_offset: vec![PartitionOffset {
+        partition: tp.partition(),
+        offset: convert_to_offset_model(&tp.offset()),
+      }],
     })
     .collect()
 }

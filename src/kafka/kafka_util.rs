@@ -8,16 +8,6 @@ use rdkafka::{
 
 use super::producer::model::Message;
 
-pub trait AnyhowToNapiError {
-  fn convert_to_napi(&self) -> napi::Error;
-}
-
-impl AnyhowToNapiError for anyhow::Error {
-  fn convert_to_napi(&self) -> napi::Error {
-    napi::Error::new(Status::GenericFailure, format!("Error: {}", self))
-  }
-}
-
 pub trait IntoNapiError {
   fn into_napi_error(self, context: &str) -> Error;
 }
@@ -41,17 +31,6 @@ pub fn hashmap_to_kafka_headers(map: &HashMap<String, Buffer>) -> OwnedHeaders {
   })
 }
 
-pub fn kakfa_headers_to_hashmap(headers: Option<&BorrowedHeaders>) -> HashMap<&str, &[u8]> {
-  match headers {
-    Some(value) => value
-      .iter()
-      .filter(|it| it.value.is_some())
-      .map(|it| (it.key, it.value.unwrap()))
-      .collect::<HashMap<&str, &[u8]>>(),
-    _ => HashMap::new(),
-  }
-}
-
 pub fn kakfa_headers_to_hashmap_buffer(
   headers: Option<&BorrowedHeaders>,
 ) -> HashMap<String, Buffer> {
@@ -62,28 +41,6 @@ pub fn kakfa_headers_to_hashmap_buffer(
       .map(|it| (it.key.to_owned(), it.value.unwrap().into()))
       .collect::<HashMap<String, Buffer>>(),
     _ => HashMap::new(),
-  }
-}
-
-pub trait ExtractValueOnKafkaHashMap<T> {
-  fn get_value(&self, key: &str) -> Option<T>;
-}
-
-impl ExtractValueOnKafkaHashMap<usize> for HashMap<&str, &[u8]> {
-  fn get_value(&self, key: &str) -> Option<usize> {
-    match self.get(key) {
-      Some(it) => {
-        let parsed = match String::from_utf8(it.to_vec()) {
-          Ok(it) => Some(it.parse::<usize>()),
-          Err(_) => None,
-        };
-        match parsed {
-          Some(value) => value.ok(),
-          _ => None,
-        }
-      }
-      None => None,
-    }
   }
 }
 
@@ -106,11 +63,9 @@ mod tests {
   use std::collections::HashMap;
 
   use napi::bindgen_prelude::Buffer;
-  use rdkafka::message::Headers;
+  use rdkafka::message::{Header, Headers};
 
-  use crate::kafka::kafka_util::{
-    hashmap_to_kafka_headers, kakfa_headers_to_hashmap, ExtractValueOnKafkaHashMap,
-  };
+  use crate::kafka::kafka_util::hashmap_to_kafka_headers;
 
   #[test]
   fn headers_test() {
@@ -121,22 +76,20 @@ mod tests {
 
     let rd_headers = hashmap_to_kafka_headers(&hash_map);
 
-    dbg!(rd_headers.get(0));
-    dbg!(rd_headers.get(1));
+    assert_eq!(
+      rd_headers.get(0),
+      Header {
+        key: "key_a",
+        value: Some("A".as_ref())
+      }
+    );
 
-    let result = kakfa_headers_to_hashmap(Some(rd_headers.as_borrowed()));
-    assert_eq!(result.len(), 2);
-  }
-
-  #[test]
-  fn extract_usize() {
-    let hash_map = HashMap::from([("key1", "32".as_bytes())]);
-    assert_eq!(hash_map.get_value("key1"), Some(32));
-  }
-
-  #[test]
-  fn extract_empty_value() {
-    let hash_map = HashMap::from([("key1", "32".as_bytes())]);
-    assert_eq!(hash_map.get_value("key2"), None);
+    assert_eq!(
+      rd_headers.get(1),
+      Header {
+        key: "key_b",
+        value: Some("B".as_ref())
+      }
+    );
   }
 }

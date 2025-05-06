@@ -1,7 +1,7 @@
-import { KafkaClient } from '../index.js'
+import { KafkaClient } from '../dist/index.js'
 
 const kafkaClient = new KafkaClient({
-  brokers: 'localhost:29092',
+  brokers: 'localhost:9092',
   clientId: 'reconnect-test',
   logLevel: 'debug',
   brokerAddressFamily: 'v4',

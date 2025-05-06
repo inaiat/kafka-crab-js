@@ -164,12 +164,12 @@ impl KafkaProducer {
     &self,
     topic: &str,
     message: &MessageProducer,
-    record_id: &String,
+    record_id: &str,
   ) -> Result<()> {
     let headers = message
       .headers
       .as_ref()
-      .map_or_else(OwnedHeaders::new, |h| hashmap_to_kafka_headers(&h));
+      .map_or_else(OwnedHeaders::new, hashmap_to_kafka_headers);
 
     let key = message
       .key
@@ -177,11 +177,11 @@ impl KafkaProducer {
       .map(ToBytes::to_bytes)
       .unwrap_or_default();
 
-    let record: BaseRecord<'_, [u8], [u8], Arc<String>> =
-      BaseRecord::with_opaque_to(topic, Arc::new(record_id.clone()))
-        .payload(message.payload.to_bytes())
-        .headers(headers)
-        .key(&key);
+    let opaque = Arc::new(record_id.to_string());
+    let record: BaseRecord<'_, [u8], [u8], Arc<String>> = BaseRecord::with_opaque_to(topic, opaque)
+      .payload(message.payload.to_bytes())
+      .headers(headers)
+      .key(key);
 
     self
       .producer
@@ -216,11 +216,10 @@ impl KafkaProducer {
       .map_err(|e| Error::new(Status::GenericFailure, e))?;
 
     let mut delivery_results = self.context.results.lock().unwrap();
-    let result: Vec<RecordMetadata> = delivery_results
+    let result = delivery_results
       .iter()
-      .filter_map(|(id, (message, error, _))| {
-        ids.contains(id).then(|| to_record_metadata(message, error))
-      })
+      .filter(|(id, _)| ids.contains(*id))
+      .map(|(_, (message, error, _))| to_record_metadata(message, error))
       .collect();
     delivery_results.retain(|key, _| !ids.contains(key));
     Ok(result)
