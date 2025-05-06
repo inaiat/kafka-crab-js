@@ -297,7 +297,7 @@ jobs:
           npm config set provenance true
           COMMIT_MSG=$(git log -1 --pretty=%B | head -n 1)
           echo "Checking commit message: '$COMMIT_MSG'"
-          if echo "$COMMIT_MSG" | grep "^v\?[0-9]\+\.[0-9]\+\.[0-9]\+$";
+          if echo "$COMMIT_MSG" | grep -o "[0-9]\+\.[0-9]\+\.[0-9]\+$";
           then
             echo "//registry.npmjs.org/:_authToken=$NPM_TOKEN" >> ~/.npmrc
             npm publish --access public
