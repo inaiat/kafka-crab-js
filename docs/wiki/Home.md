@@ -5,262 +5,431 @@ A Node.js native binding for Apache Kafka using Rust, providing high performance
 ## Installation
 
 ```bash
-npm install kafka-crab-js
+pnpm install kafka-crab-js
 ```
 
 ## Basic Usage
 
-### Consumer Example
+### Creating a Kafka Client
 
 ```typescript
-import { KafkaConsumer, KafkaClientConfig } from 'kafka-crab-js';
+import { KafkaClient } from 'kafka-crab-js';
 
-const config: KafkaClientConfig = {
-  brokers: ['localhost:9092'],
-  groupId: 'my-group',
-};
-
-async function consumeMessages() {
-  const consumer = new KafkaConsumer(config);
-  
-  // Subscribe to events before consuming
-  consumer.on_events((error, event) => {
-    if (error) {
-      console.error('Event error:', error);
-      return;
-    }
-    
-    switch (event.name) {
-      case 'PreRebalance':
-        console.log('Starting rebalance');
-        break;
-      case 'PostRebalance':
-        console.log('Finished rebalance');
-        break;
-      case 'CommitCallback':
-        console.log('Offset committed');
-        break;
-    }
-  });
-
-  try {
-    await consumer.subscribe('my-topic');
-    
-    while (true) {
-      const message = await consumer.recv();
-      if (message === null) {
-        console.log('Consumer disconnected');
-        break;
-      }
-      console.log('Received:', message);
-    }
-  } finally {
-    await consumer.disconnect();
-  }
-}
-```
-
-### Consumer Example with Manual Commit
-
-```typescript
-import { KafkaConsumer, KafkaClientConfig } from 'kafka-crab-js';
-
-const config: KafkaClientConfig = {
-  brokers: ['localhost:9092'],
-  groupId: 'my-group',
-  // Disable auto-commit when you want to commit manually
+const kafkaClient = new KafkaClient({
+  brokers: 'localhost:9092',
+  clientId: 'my-app',
+  logLevel: 'info',
+  brokerAddressFamily: 'v4',
+  // Optional additional configuration
   configuration: {
-    'enable.auto.commit': 'false'
-  }
-};
-
-async function consumeMessages() {
-  const consumer = new KafkaConsumer(config);
-  
-  try {
-    await consumer.subscribe('my-topic');
-    
-    while (true) {
-      const message = await consumer.recv();
-      if (message === null) {
-        console.log('Consumer disconnected');
-        break;
-      }
-      console.log('Received:', message);
-      
-      // Manual commit example
-      await consumer.commit(
-        message.topic,
-        message.partition,
-        message.offset,
-        'Sync' // or 'Async'
-      );
-    }
-  } finally {
-    await consumer.disconnect();
-  }
-}
+    'auto.offset.reset': 'earliest',
+  },
+});
 ```
 
 ### Producer Example
 
 ```typescript
-import { KafkaProducer, KafkaClientConfig } from 'kafka-crab-js';
-
-const config: KafkaClientConfig = {
-  brokers: ['localhost:9092']
-};
-
 async function produceMessages() {
-  const producer = new KafkaProducer(config);
-  
-  await producer.send({
+  const producer = kafkaClient.createProducer({
     topic: 'my-topic',
-    message: 'Hello World'
+    configuration: {
+      'message.timeout.ms': '5000'
+    }
   });
-  
-  await producer.flush();
+
+  try {
+    const result = await producer.send({
+      topic: 'my-topic',
+      messages: [{
+        key: Buffer.from('message-key'),
+        headers: { 'correlation-id': Buffer.from('correlation-123') },
+        payload: Buffer.from(JSON.stringify({ id: 1, name: 'Test Message' })),
+      }],
+    });
+
+    console.log('Message sent. Offset:', result);
+  } catch (error) {
+    console.error('Error sending message', error);
+  }
+}
+```
+
+### Basic Consumer Example
+
+```typescript
+async function consumeMessages() {
+  const consumer = kafkaClient.createConsumer({
+    topic: 'my-topic',
+    groupId: 'my-group-id',
+    configuration: {
+      'auto.offset.reset': 'earliest',
+    },
+  });
+
+  await consumer.subscribe('my-topic');
+
+  try {
+    while (true) {
+      const message = await consumer.recv();
+      if (!message) {
+        console.log('Consumer disconnected');
+        break;
+      }
+
+      console.log('Received message:', {
+        payload: message.payload.toString(),
+        partition: message.partition,
+        offset: message.offset,
+        headers: Object.entries(message.headers)
+          .map(([k, v]) => ({ [k]: v.toString() })),
+      });
+    }
+  } finally {
+    await consumer.disconnect();
+  }
+}
+```
+
+### Stream Consumer Example
+
+```typescript
+async function streamConsumer() {
+  const kafkaStream = kafkaClient.createStreamConsumer({
+    groupId: 'my-stream-group',
+    enableAutoCommit: true,
+    configuration: {
+      'auto.offset.reset': 'earliest',
+    },
+  });
+
+  await kafkaStream.subscribe([
+    { topic: 'my-topic' },
+    // Or for specific offsets:
+    // { topic: 'my-topic', allOffsets: { position: 'Beginning' } }
+  ]);
+
+  kafkaStream.on('data', (message) => {
+    console.log('Message received:', {
+      payload: message.payload.toString(),
+      offset: message.offset,
+      partition: message.partition,
+      topic: message.topic,
+    });
+  });
+
+  kafkaStream.on('error', (error) => {
+    console.error('Stream error:', error);
+  });
+
+  kafkaStream.on('close', () => {
+    console.log('Stream ended');
+    kafkaStream.unsubscribe();
+  });
+}
+```
+
+### Consumer with Events Handling
+
+```typescript
+function consumerWithEvents() {
+  const consumer = kafkaClient.createConsumer({
+    topic: 'my-topic',
+    groupId: 'my-group-id',
+  });
+
+  consumer.onEvents((err, event) => {
+    if (err) {
+      console.error('Event error:', err);
+      return;
+    }
+
+    switch (event.name) {
+      case 'CommitCallback': {
+        const offsetCommitted = event.payload.tpl
+          .filter(it => it.partitionOffset.find(it => it.offset.offset))
+          .flatMap(p => p.partitionOffset.map(it => ({
+            topic: p.topic,
+            partition: it.partition,
+            offset: it.offset.offset
+          })));
+        console.log('Offset committed:', offsetCommitted);
+        break;
+      }
+      default: {
+        console.log(
+          'Event:',
+          event.name,
+          event.payload.tpl.map(it =>
+            `Topic: ${it.topic}, ${it.partitionOffset.map(po =>
+              `partition: ${po.partition}`).join(',')}`
+          ),
+        );
+      }
+    }
+  });
+
+  consumer.subscribe('my-topic');
+
+  // Continue with message consumption...
+}
+```
+
+### Consumer with Retry Logic
+
+```typescript
+async function consumerWithRetry() {
+  const MAX_RETRIES = 5;
+  const RETRY_DELAY = 5000; // 5 seconds
+  let retryCount = 0;
+
+  async function createConsumer() {
+    const kafkaStream = kafkaClient.createStreamConsumer({
+      groupId: 'retry-example-group',
+      enableAutoCommit: true,
+      configuration: {
+        'auto.offset.reset': 'earliest',
+      },
+    });
+
+    await kafkaStream.subscribe([
+      { topic: 'my-topic' },
+    ]);
+
+    return kafkaStream;
+  }
+
+  async function handleRetry() {
+    if (retryCount < MAX_RETRIES) {
+      retryCount++;
+      console.log(
+        `Attempting to restart consumer (attempt ${retryCount}/${MAX_RETRIES}) in ${RETRY_DELAY / 1000} seconds...`
+      );
+      setTimeout(setupConsumerWithRetry, RETRY_DELAY);
+    } else {
+      console.error(`Maximum retry attempts (${MAX_RETRIES}) reached. Stopping consumer.`);
+      process.exit(1);
+    }
+  }
+
+  async function setupConsumerWithRetry() {
+    try {
+      const kafkaStream = await createConsumer();
+      retryCount = 0; // Reset retry count on successful connection
+
+      kafkaStream.on('data', (message) => {
+        console.log('Message received:', {
+          payload: message.payload.toString(),
+          offset: message.offset,
+          partition: message.partition,
+          topic: message.topic,
+        });
+      });
+
+      kafkaStream.on('error', (error) => {
+        console.error('Stream error:', error);
+        handleRetry();
+      });
+
+      kafkaStream.on('close', () => {
+        console.log('Stream ended');
+        try {
+          kafkaStream.unsubscribe();
+        } catch (unsubError) {
+          console.error('Error unsubscribing:', unsubError);
+        }
+      });
+    } catch (error) {
+      console.error('Error setting up consumer:', error);
+      handleRetry();
+    }
+  }
+
+  await setupConsumerWithRetry();
 }
 ```
 
 ## API Reference
 
-> For detailed API documentation, see the [Complete API Reference](API-Reference.md)
+### KafkaClient
 
-### KafkaConsumer
+Main client class that creates producers and consumers.
 
 #### Constructor
 ```typescript
-new KafkaConsumer(config: KafkaClientConfig)
+new KafkaClient(kafkaConfiguration: KafkaConfiguration)
+```
+
+#### Configuration Options
+```typescript
+interface KafkaConfiguration {
+  brokers: string;                // Comma-separated list of brokers
+  clientId?: string;              // Client identifier
+  logLevel?: 'debug' | 'info' | 'warning' | 'error';  // Default: 'info'
+  brokerAddressFamily?: 'v4' | 'v6'; // IP version, default: 'v4'
+  securityProtocol?: string;      // Default: 'Plaintext'
+  configuration?: {               // Additional librdkafka configuration
+    [key: string]: string;
+  }
+}
 ```
 
 #### Methods
 
-- **subscribe(topic: string | TopicPartitionConfig[]): Promise<void>**
-  Subscribe to topics
+- **createProducer(config: ProducerConfiguration): KafkaProducer**
+  Creates a Kafka producer
 
-- **recv(): Promise<Message | null>**
-  Receive next message
+- **createConsumer(config: ConsumerConfiguration): KafkaConsumer**
+  Creates a Kafka consumer
 
-- **on_events(callback: (error: Error | undefined, event: KafkaEvent) => void): void**
-  Subscribe to consumer events
+- **createStreamConsumer(config: ConsumerConfiguration): KafkaStreamReadable**
+  Creates a stream-based Kafka consumer that implements Node.js Readable interface
 
-- **disconnect(): Promise<void>**
-  Disconnect and cleanup consumer
+### KafkaProducer
 
-- **pause(): Promise<void>**
-  Pause consumption
+#### Configuration
+```typescript
+interface ProducerConfiguration {
+  topic?: string;             // Default topic (optional)
+  configuration?: {           // Additional producer configuration
+    [key: string]: string;
+  }
+}
+```
 
-- **resume(): Promise<void>**
-  Resume consumption
+#### Methods
 
-- **seek(topic: string, partition: number, offset: OffsetModel): Promise<void>**
-  Seek to specific offset
-
-- **commit(topic: string, partition: number, offset: number, mode: CommitMode): Promise<void>**
-  Commit offsets
-
-### Events
+- **send(record: ProducerRecord): Promise<RecordMetadata[]>**
+  Sends messages to Kafka and returns offset information
 
 ```typescript
-enum KafkaEventName {
-  PreRebalance,
-  PostRebalance,
-  CommitCallback
+interface ProducerRecord {
+  topic: string;
+  messages: Array<{
+    key?: Buffer;
+    payload: Buffer;
+    headers?: Record<string, Buffer>;
+  }>;
 }
+```
 
-interface TopicPartition {
+### KafkaConsumer
+
+#### Configuration
+```typescript
+interface ConsumerConfiguration {
+  topic?: string;             // Topic to consume (can also be set with subscribe())
+  groupId: string;            // Consumer group ID
+  enableAutoCommit?: boolean; // Whether to auto-commit offsets
+  configuration?: {           // Additional consumer configuration
+    'auto.offset.reset'?: 'earliest' | 'latest';
+    [key: string]: string;
+  }
+}
+```
+
+#### Methods
+
+- **subscribe(topics: string | TopicPartitionConfig[]): Promise<void>**
+  Subscribe to Kafka topics
+
+- **recv(): Promise<Message | null>**
+  Receive next message (returns null when disconnected)
+
+- **disconnect(): Promise<void>**
+  Disconnect the consumer
+
+- **onEvents(callback: (error?: Error, event?: KafkaEvent) => void): void**
+  Register callback for consumer events
+
+- **seek(topic: string, partition: number, offsetModel: OffsetModel, timeout?: number): void**
+  Seek to a specific offset
+
+- **commit(topic: string, partition: number, offset: number, commit: CommitMode): void**
+  Manually commit an offset
+
+### KafkaStreamReadable
+
+Extends Node.js Readable stream interface for Kafka consumption.
+
+#### Methods
+
+- **subscribe(topics: string | TopicPartitionConfig[]): Promise<void>**
+  Subscribe to Kafka topics
+
+- **seek(topic: string, partition: number, offsetModel: OffsetModel, timeout?: number): void**
+  Seek to a specific offset
+
+- **commit(topic: string, partition: number, offset: number, commit: CommitMode): void**
+  Manually commit an offset
+
+- **unsubscribe(): void**
+  Unsubscribe from topics
+
+- **disconnect(): Promise<void>**
+  Disconnect the consumer
+
+- **rawConsumer(): KafkaConsumer**
+  Get the underlying KafkaConsumer instance
+
+#### Events
+
+- **data**: Emitted for each Kafka message
+- **error**: Emitted on errors
+- **close**: Emitted when the stream ends
+
+### Message Format
+
+```typescript
+interface Message {
   topic: string;
   partition: number;
   offset: number;
-}
-
-interface KafkaEventPayload {
-  action?: string;
-  tpl: Array<TopicPartition>;
-  error?: string;
-}
-
-interface KafkaEvent {
-  name: KafkaEventName;
-  payload: KafkaEventPayload;
+  timestamp: number;
+  payload: Buffer;
+  key?: Buffer;
+  headers: Record<string, Buffer>;
 }
 ```
 
 ## Best Practices
 
 1. **Resource Management**
-   - Always call `disconnect()` when done
-   - Use try/finally blocks
-   - Handle cleanup properly
+   - Always call `disconnect()` when done with a consumer
+   - Use try/finally blocks to ensure proper cleanup
+   - Handle process signals (SIGINT, etc.) to gracefully shut down
 
-2. **Event Handling**
-   - Subscribe to events before consuming
-   - Handle all event types
-   - Check for errors in callbacks
+2. **Error Handling**
+   - Implement proper error handling and retry mechanisms
+   - For critical applications, consider using the retry pattern shown above
+   - Check for null returns from `recv()` to detect disconnections
 
-3. **Error Handling**
-   - Use try/catch blocks
-   - Implement proper error recovery
-   - Check null returns from recv()
+3. **Performance Tuning**
+   - For high-throughput applications, use the stream-based consumer
+   - Configure batch sizes and commit intervals appropriately
+   - Monitor memory usage, especially when processing large messages
 
-4. **Type Safety**
-   - Use TypeScript for better type checking
-   - Leverage provided type definitions
-   - Use enum values for event names
-
-5. **Commit Strategy**
-   - By default, auto-commit is enabled (every 5 seconds)
-   - Disable auto-commit when you need manual control
-   - Use manual commits for:
-     - At-least-once delivery guarantee
-     - Custom commit intervals
-     - Batch processing
-   - Choose commit mode based on your needs:
-     - 'Sync': Ensures commit is complete before continuing
-     - 'Async': Better performance but no immediate confirmation
-
-## Configuration Options
-
-```typescript
-interface KafkaClientConfig {
-  brokers: string[];
-  groupId?: string;
-  clientId?: string;
-  configuration?: {
-    'enable.auto.commit'?: 'true' | 'false';  // Defaults to 'true'
-    'auto.commit.interval.ms'?: string;        // Defaults to '5000'
-    // For all available configuration options, see:
-    // https://docs.confluent.io/platform/current/clients/librdkafka/html/md_CONFIGURATION.html
-  }
-}
-```
-
-> **Note**: All configuration attributes in the `configuration` object are passed directly to librdkafka. 
-> For a complete list of available options, refer to the [librdkafka Configuration Properties](https://docs.confluent.io/platform/current/clients/librdkafka/html/md_CONFIGURATION.html).
+4. **Offset Management**
+   - Use `enableAutoCommit: true` for simple use cases
+   - For more control, set to false and manually commit offsets
+   - Be careful about commit frequency - too frequent commits can impact performance
 
 ## Common Issues and Solutions
 
 1. **Connection Issues**
-   - Verify broker addresses
-   - Check network connectivity
-   - Ensure proper security settings
+   - Verify broker addresses and network connectivity
+   - Check security settings if using TLS/SSL
+   - Ensure the specified topics exist
 
-2. **Performance Tuning**
-   - Adjust batch sizes
-   - Configure appropriate timeouts
-   - Monitor memory usage
+2. **Performance Issues**
+   - Increase batch size for better throughput
+   - Adjust commit frequency
+   - Consider using stream-based consumption for higher throughput
 
-3. **Commit Issues**
-   - Remember to disable auto-commit when using manual commits
-   - Use Sync commit mode when you need confirmation
-   - Consider commit frequency impact on performance
-   - Watch for commit errors in event callbacks
+3. **Message Ordering**
+   - Remember that ordering is only guaranteed within a partition
+   - Use appropriate partition strategies when producing messages that need ordering
 
-## Contributing
-
-Contributions are welcome! Please see our [Contributing Guide](../CONTRIBUTING.md) for more details.
-
-## License
-
-This project is licensed under the MIT License - see the [LICENSE](../LICENSE) file for details.
+4. **Resource Leaks**
+   - Always disconnect consumers and producers when done
+   - Handle process termination signals properly
