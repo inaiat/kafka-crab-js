@@ -126,16 +126,18 @@ jobs:
       - name: Build
         run: ${{ matrix.settings.build }}
         shell: bash
+      - name: Upload artifact Dist
+        uses: actions/upload-artifact@v4
+        with:
+          path: 'dist/**/*'
+          if-no-files-found: error
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         if: matrix.settings.target != 'wasm32-wasip1-threads'
         with:
           name: bindings-${{ matrix.settings.target }}
-          path: |
-            *.node
-            dist/**/*
+          path: '*.node'
           if-no-files-found: error
-
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         if: matrix.settings.target == 'wasm32-wasip1-threads'
@@ -276,14 +278,10 @@ jobs:
           path: artifacts
       - name: create npm dirs
         run: pnpm napi create-npm-dirs
-      - name: List artifacts
-        run: ls -R .
-      - name: Copy artifacts
-        run: cp -R ../../dist .
       - name: Move artifacts
         run: pnpm artifacts
-      - name: List packages
-        run: ls -R ./npm
+      - name: List artifacts
+        run: ls -R .
         shell: bash
       - name: Publish
         run: |
