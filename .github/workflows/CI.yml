@@ -276,6 +276,8 @@ jobs:
           path: artifacts
       - name: create npm dirs
         run: pnpm napi create-npm-dirs
+      - name: List artifacts
+        run: ls -R .
       - name: Copy artifacts
         run: cp -R ../../dist .
       - name: Move artifacts
