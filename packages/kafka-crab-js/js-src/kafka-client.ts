@@ -27,9 +27,9 @@ const LEGACY_STREAM_SERIAL_COLLECTOR_SIZE = 1
 const LEGACY_STREAM_SERIAL_COLLECTOR_TIMEOUT = 1000
 
 type KafkaConsumerWithWebStream = KafkaConsumer & {
-  recvStream(prefetchSize?: number, prefetchTimeoutMs?: number): ReadableStream<Message>
-  recvBatchStream(size: number, timeoutMs: number): ReadableStream<Message[]>
-  recvBatchStreamCompact(size: number, timeoutMs: number): ReadableStream<CompactMessageBatch>
+  recvStream: (prefetchSize?: number, prefetchTimeoutMs?: number) => ReadableStream<Message>
+  recvBatchStream: (size: number, timeoutMs: number) => ReadableStream<Message[]>
+  recvBatchStreamCompact: (size: number, timeoutMs: number) => ReadableStream<CompactMessageBatch>
 }
 
 export interface StreamConsumerConfiguration extends ConsumerConfiguration {

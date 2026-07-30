@@ -21,7 +21,6 @@
   "files": [
     "browser.js",
     "index.d.ts",
-    "index.cjs",
     "index.js"
   ],
   "type": "module",
@@ -31,8 +30,7 @@
   "exports": {
     ".": {
       "types": "./index.d.ts",
-      "import": "./index.js",
-      "require": "./index.cjs"
+      "import": "./index.js"
     },
     "./browser": {
       "types": "./index.d.ts",

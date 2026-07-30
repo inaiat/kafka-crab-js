@@ -17,8 +17,8 @@
       "kafka-crab-js": ["../kafka-crab-js/js-src/index.ts"]
     },
     "outDir": "./dist",
-    "rootDir": "./src"
+    "rootDir": ".."
   },
-  "include": ["src/**/*", "tests/**/*"],
+  "include": ["src/**/*"],
   "exclude": ["node_modules", "dist"]
 }

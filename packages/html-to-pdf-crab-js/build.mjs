@@ -4,11 +4,6 @@ import { NapiCli } from '@napi-rs/cli'
 
 const napi = new NapiCli()
 
-const bindings = [
-  { jsBinding: 'index.js', esm: true },
-  { jsBinding: 'index.cjs', noDtsHeader: true },
-]
-
 const argValue = (name) => {
   const prefix = `${name}=`
   const inline = process.argv.find((arg) => arg.startsWith(prefix))
@@ -55,22 +50,23 @@ const useAsyncBrowserWasmInstantiation = async () => {
 }
 
 const build = async () => {
+  const target = argValue('--target')
+  const isWasi = target?.startsWith('wasm32-wasi') ?? false
   const commonOptions = {
     constEnum: false,
     crossCompile: hasFlag('-x', '--cross-compile'),
-    dts: 'index.d.ts',
+    dts: isWasi ? 'index.d.cts' : 'index.d.ts',
     platform: true,
     release: !hasFlag('--debug'),
-    target: argValue('--target'),
+    target,
   }
 
-  for (const binding of bindings) {
-    const result = await napi.build({
-      ...commonOptions,
-      ...binding,
-    })
-    await result.task
-  }
+  const result = await napi.build({
+    ...commonOptions,
+    esm: true,
+    jsBinding: 'index.js',
+  })
+  await result.task
 
   await useAsyncBrowserWasmInstantiation()
 }

@@ -99,12 +99,6 @@ const pdf = createPdf({
 writeFileSync('invoice.pdf', pdf)
 ```
 
-CommonJS is also supported:
-
-```js
-const { createPdf } = require('pdf-crab-js')
-```
-
 ## Builder API
 
 Use `PdfDocumentBuilder` when the document is produced in chunks and you do not want to build one
@@ -216,6 +210,8 @@ Run the browser WASM example:
 ```bash
 pnpm --filter pdf-crab-js-examples browser
 ```
+
+This command rebuilds the local WASI browser binding before starting Vite.
 
 Open `/wasm/` on the local Vite server. The page previews a structured `CreatePdfInput` object and
 renders it into a PDF iframe.

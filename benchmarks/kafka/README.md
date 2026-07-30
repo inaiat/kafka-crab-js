@@ -45,8 +45,9 @@ and reports throughput, lifecycle memory, and message-window GC:
 - `kafkajs-batch`
 
 KafkaJS is reported separately as serial `eachMessage`, concurrent `eachMessage`, and `eachBatch`.
-kafka-crab-js v3 scenarios are hidden by default. Set `BENCHMARK_SHOW_V3=1` or select `v3-serial` / `v3-batch` with
-`BENCHMARK_ONLY` when you want them in the comparison.
+The previous kafka-crab-js scenarios are hidden by default. Set `BENCHMARK_SHOW_PREVIOUS=1` or select
+`previous-serial` / `previous-batch` with `BENCHMARK_ONLY` when you want them in the comparison.
+Both previous and workspace scenarios use `createWebStreamConsumer()` with the same benchmark configuration.
 
 For throughput-only comparison with one child Node.js process per selected scenario:
 
@@ -105,7 +106,9 @@ The most useful knobs are:
 - `BENCHMARK_BATCH_SIZE=4096` controls batch stream size. Values above `16384` are normalized to `16384` so batch
   scenarios use a comparable effective size.
 - `BENCHMARK_BATCH_TIMEOUT_MS=2` controls kafka-crab-js batch collection timeout.
-- `BENCHMARK_SHOW_V3=1` includes kafka-crab-js v3 scenarios in default selections.
+- `BENCHMARK_SERIAL_PREFETCH_SIZE=64` controls kafka-crab-js serial Web Stream prefetching.
+- `BENCHMARK_SERIAL_PREFETCH_TIMEOUT_MS=5` controls the serial Web Stream prefetch timeout.
+- `BENCHMARK_SHOW_PREVIOUS=1` includes the installed previous kafka-crab-js scenarios in default selections.
 - `BENCHMARK_MEMORY=1` runs the isolated memory benchmark. This is the default.
 - `BENCHMARK_MEMORY=0` disables memory mode and allows the same-process or throughput-only isolated modes.
 - `BENCHMARK_ISOLATED=1` runs the throughput-only benchmark with one child Node.js process per selected scenario.
@@ -157,8 +160,8 @@ The default chart includes:
 - message-oriented APIs for kafka-crab-js v4, KafkaJS, and `@platformatic/kafka`
 - batch-oriented APIs for kafka-crab-js v4 and KafkaJS
 
-kafka-crab-js v3 rows are included only when `BENCHMARK_SHOW_V3=1` is set or when v3 scenarios are selected explicitly
-with `BENCHMARK_ONLY`.
+Previous kafka-crab-js rows are included only when `BENCHMARK_SHOW_PREVIOUS=1` is set or when previous scenarios are
+selected explicitly with `BENCHMARK_ONLY`.
 
 Libraries are included with the APIs available in this benchmark harness. A library can have more than one row when it
 has more than one relevant consumption style. A library without a batch scenario is not forced into one.
@@ -204,11 +207,12 @@ Default tuning follows the Platformatic Kafka benchmark shape:
 - KafkaJS `eachBatch` uses `partitionsConsumedConcurrently=3`.
 - KafkaJS has two `eachMessage` scenarios: serial concurrency `1`, and concurrent concurrency
   `BENCHMARK_KAFKAJS_EACH_MESSAGE_CONCURRENCY`.
-- kafka-crab-js v4 stream scenarios use `createWebStreamConsumer()` with Web `ReadableStream` reader loops.
+- Previous and workspace kafka-crab-js stream scenarios use `createWebStreamConsumer()` with identical Web
+  `ReadableStream` reader loops and tuning.
 - kafka-crab-js batch scenarios use `BENCHMARK_BATCH_SIZE=4096` and `BENCHMARK_BATCH_TIMEOUT_MS=2`.
 - Batch scenarios use a common effective batch size capped at `16384`, matching kafka-crab-js v4's native batch limit.
-  This avoids comparing v3 with a very large Node stream highWaterMark against v4 after v4 has already clamped the
-  requested batch size.
+  This avoids comparing a previous version with a very large Node stream highWaterMark against v4 after v4 has already
+  clamped the requested batch size.
 
 The root `docker-compose.yml` exposes a 3-broker benchmark cluster on `127.0.0.1:9092`, `127.0.0.1:9093`, and
 `127.0.0.1:9094`. The default benchmark bootstrap broker is `localhost:9092`, which is enough for Kafka metadata
@@ -220,4 +224,18 @@ The benchmark suite uses separate dependencies to avoid installing heavy native 
 
 - `@platformatic/kafka`: Platformatic's Kafka client
 - `kafkajs`: Pure JavaScript Kafka client
-- `kafka-crab-js-v3`: Alias for `kafka-crab-js@3.1.0`, used only by the v3 comparison scenarios
+- `kafka-crab-js-previous`: Alias for the published kafka-crab-js version used by the previous-version scenarios.
+
+The default previous version is declared in `benchmarks/kafka/package.json`. Select any published previous version with:
+
+```bash
+pnpm --filter kafka-benchmark add "kafka-crab-js-previous@npm:kafka-crab-js@<version>"
+```
+
+The selected version must expose `createWebStreamConsumer()` so the benchmark can use the same API on both sides.
+
+Then compare it explicitly:
+
+```bash
+BENCHMARK_ONLY=previous-serial,previous-batch vp run benchmark
+```

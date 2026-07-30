@@ -283,7 +283,7 @@ describe('kafka-crab-js-otel Public API Tests', () => {
 
       const extractedContext = extractTraceContext({
         TraceParent: [traceparent],
-      } as unknown as Record<string, Buffer | string | string[] | undefined>)
+      })
       const childSpan = tracer.startSpan('child-with-mixed-case-traceparent', undefined, extractedContext)
 
       assert.equal(

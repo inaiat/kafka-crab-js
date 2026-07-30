@@ -87,7 +87,9 @@ export default defineConfig({
     deps: {
       neverBundle: externalDependencies,
     },
-    dts: true,
+    dts: {
+      tsconfig: 'tsconfig.build.json',
+    },
     entry: 'src/index.ts',
     fixedExtension: false,
     format: ['esm', 'cjs'],

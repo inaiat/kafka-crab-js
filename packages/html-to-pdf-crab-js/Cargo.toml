@@ -9,13 +9,13 @@ version = "0.2.0"
 crate-type = ["cdylib"]
 
 [dependencies]
-base64 = "0.22.1"
-fulgur = "0.17.0"
-napi = "3.9.0"
-napi-derive = "3.5.6"
+base64 = "0.23"
+fulgur = "0.39"
+napi = "3.12.0"
+napi-derive = "3.6.1"
 
 [build-dependencies]
-napi-build = { version = "2.3.2" }
+napi-build = { version = "2.4.0" }
 
 [profile.release]
 lto = true
