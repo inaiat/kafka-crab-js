@@ -4,9 +4,10 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "browser": "vite --host 127.0.0.1 --port 5173 --open /wasm/",
-    "browser:build": "vite build",
+    "browser": "pnpm run build:wasm && vite --host 127.0.0.1 --port 5173 --open /wasm/",
+    "browser:build": "pnpm run build:wasm && vite build",
     "browser:preview": "vite preview --host 127.0.0.1 --port 4173 --open /wasm/",
+    "build:wasm": "pnpm --dir ../.. --filter pdf-crab-js build:wasm",
     "check": "vp check",
     "example": "tsx pdf.ts",
     "example:table": "tsx table.ts",
@@ -14,7 +15,7 @@
     "fmt:check": "vp fmt --check",
     "lint": "vp lint",
     "lint:fix": "vp lint --fix",
-    "wasm:browser": "vite --host 127.0.0.1 --port 5173 --open /wasm/"
+    "wasm:browser": "pnpm run browser"
   },
   "dependencies": {
     "@emnapi/core": "catalog:",

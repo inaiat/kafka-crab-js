@@ -379,7 +379,7 @@ void describeKafka('KafkaClient OpenTelemetry Integration', { timeout: TEST_TIME
       },
     ])
 
-    receivedMessage = (await consumer.recv()) as MessageWithEndSpan
+    receivedMessage = await consumer.recv()
     endOtelSpans(receivedMessage)
     await consumer.disconnect()
 
@@ -611,7 +611,7 @@ void describeKafka('KafkaClient OpenTelemetry Integration', { timeout: TEST_TIME
     let receivedMessage: MessageWithEndSpan | null = null
     try {
       await context.with(trace.setSpan(context.active(), ambientSpan), async () => {
-        receivedMessage = (await consumer.recv()) as MessageWithEndSpan
+        receivedMessage = await consumer.recv()
       })
     } finally {
       ambientSpan.end()
@@ -649,7 +649,7 @@ void describeKafka('KafkaClient OpenTelemetry Integration', { timeout: TEST_TIME
       messages: [
         {
           payload: Buffer.from('message-with-mixed-case-traceparent'),
-          headers: { TraceParent: Buffer.from(traceparent) } as Record<string, Buffer>,
+          headers: { TraceParent: Buffer.from(traceparent) },
         },
       ],
     })
@@ -1694,7 +1694,7 @@ void describeKafka('KafkaClient OpenTelemetry Integration', { timeout: TEST_TIME
       },
     ])
 
-    receivedMessage = (await consumer.recv()) as MessageWithEndSpan
+    receivedMessage = await consumer.recv()
     endOtelSpans(receivedMessage)
     await consumer.disconnect()
 

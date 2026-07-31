@@ -29,6 +29,9 @@ Run the browser WASM example:
 pnpm --filter pdf-crab-js-examples browser
 ```
 
+The browser command builds the local `wasm32-wasip1-threads` binding before starting Vite, so the
+aliased `pdf-crab-js-wasm32-wasi` entry and its `.wasm` file are always available.
+
 Open `/wasm/` on the dev-server URL printed by Vite. The page previews a structured
 `CreatePdfInput` object and renders it into a PDF iframe. The browser example imports
 `pdf-crab-js/browser.js`; Vite aliases the generated `pdf-crab-js-wasm32-wasi` package entry to the

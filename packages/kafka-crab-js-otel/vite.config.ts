@@ -82,12 +82,14 @@ export default defineConfig({
     },
     define: {
       __PACKAGE_NAME__: JSON.stringify('kafka-crab-js-otel'),
-      __PACKAGE_VERSION__: JSON.stringify('1.2.0'),
+      __PACKAGE_VERSION__: JSON.stringify('1.2.1'),
     },
     deps: {
       neverBundle: externalDependencies,
     },
-    dts: true,
+    dts: {
+      tsconfig: 'tsconfig.build.json',
+    },
     entry: 'src/index.ts',
     fixedExtension: false,
     format: ['esm', 'cjs'],

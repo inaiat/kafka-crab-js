@@ -17,12 +17,12 @@ import {
 
 type BenchmarkLibrary = 'crab' | 'kafkajs' | 'platformatic-kafka'
 type BenchmarkScenarioId =
-  | 'v3-serial'
+  | 'previous-serial'
   | 'v4-serial'
   | 'kafkajs-serial'
   | 'kafkajs-serial-concurrent'
   | 'platformatic-kafka'
-  | 'v3-batch'
+  | 'previous-batch'
   | 'v4-batch'
   | 'v4-direct-batch'
   | 'v4-native-batch-stream'
@@ -34,12 +34,12 @@ interface BenchmarkScenario {
   label: string
   library: BenchmarkLibrary
   diagnostic?: boolean
-  run(hooks?: RunMeasurementHooks): Promise<RunMeasurement>
+  run: (hooks?: RunMeasurementHooks) => Promise<RunMeasurement>
 }
 
 interface RunMeasurementHooks {
-  onMeasureStart?(): void
-  onMeasureFinish?(): void
+  onMeasureStart?: () => void
+  onMeasureFinish?: () => void
 }
 
 interface RunState {
@@ -71,8 +71,8 @@ interface CompactMessageBatch {
 }
 
 type CompactBatchStreamConsumer = ReturnType<KafkaClient['createConsumer']> & {
-  recvBatchStream(size: number, timeoutMs: number): ReadableStream<Message[]>
-  recvBatchStreamCompact(size: number, timeoutMs: number): ReadableStream<CompactMessageBatch>
+  recvBatchStream: (size: number, timeoutMs: number) => ReadableStream<Message[]>
+  recvBatchStreamCompact: (size: number, timeoutMs: number) => ReadableStream<CompactMessageBatch>
 }
 
 const iterations = readPositiveInteger('BENCHMARK_ITERATIONS', 100_000)
@@ -87,11 +87,13 @@ const requestedBatchSize = readPositiveInteger('BENCHMARK_BATCH_SIZE', 4096)
 const maxComparableBatchSize = 16_384
 const batchSize = Math.min(requestedBatchSize, maxComparableBatchSize)
 const batchTimeoutMs = readPositiveInteger('BENCHMARK_BATCH_TIMEOUT_MS', 2)
+const serialPrefetchSize = readPositiveInteger('BENCHMARK_SERIAL_PREFETCH_SIZE', 64)
+const serialPrefetchTimeoutMs = readPositiveInteger('BENCHMARK_SERIAL_PREFETCH_TIMEOUT_MS', 5)
 const scenarioTimeoutMs = readPositiveInteger('BENCHMARK_SCENARIO_TIMEOUT_MS', 120_000)
 const forceGcBeforeRun = readBoolean('BENCHMARK_FORCE_GC', true)
 const selectedLibraries = readSelectedLibraries()
 const selectedScenarios = readSelectedScenarios()
-const showV3Scenarios = readBoolean('BENCHMARK_SHOW_V3', false)
+const showPreviousScenarios = readBoolean('BENCHMARK_SHOW_PREVIOUS', false)
 const isolatedMode = readBoolean('BENCHMARK_ISOLATED', false)
 const memoryMode = readBoolean('BENCHMARK_MEMORY', true)
 const memoryChildMode = readBoolean('BENCHMARK_MEMORY_CHILD', false)
@@ -414,7 +416,7 @@ async function platformaticKafka(hooks?: RunMeasurementHooks): Promise<RunMeasur
 }
 
 function resolveAfterKafkaJsDisconnect(
-  consumer: { disconnect(): Promise<void> },
+  consumer: { disconnect: () => Promise<void> },
   measurement: RunMeasurement,
   resolve: (measurement: RunMeasurement) => void,
   reject: (error: unknown) => void,
@@ -424,70 +426,54 @@ function resolveAfterKafkaJsDisconnect(
   })
 }
 
-async function kafkaCrabJsV3(useBatchMode = false, hooks?: RunMeasurementHooks): Promise<RunMeasurement> {
-  const { KafkaClient: KafkaClientV3 } = await import('kafka-crab-js-v3')
-  const { promise, resolve, reject } = Promise.withResolvers<RunMeasurement>()
+async function kafkaCrabJsPrevious(useBatchMode = false, hooks?: RunMeasurementHooks): Promise<RunMeasurement> {
+  const { KafkaClient: KafkaClientPrevious } = await import('kafka-crab-js-previous')
   const state = createRunState(hooks)
 
-  const client = new KafkaClientV3({
-    brokers: brokers.join(','),
-    clientId: 'benchmarks',
-    securityProtocol: 'Plaintext',
-    logLevel: 'warn',
-    brokerAddressFamily: 'v4',
-  })
-
-  const consumer = client.createStreamConsumer({
-    groupId: randomUUID(),
-    enableAutoCommit: false,
+  const client = new KafkaClientPrevious(createKafkaCrabJsClientConfiguration())
+  const webConsumer = client.createWebStreamConsumer({
+    ...createKafkaCrabJsConsumerConfiguration(),
     batchSize: useBatchMode ? batchSize : 1,
-    configuration: {
-      'auto.offset.reset': 'earliest',
-      'enable.auto.commit': false,
-      'fetch.min.bytes': fetchMinBytes,
-      'fetch.max.bytes': fetchMaxBytes,
-      'message.max.bytes': partitionMaxBytes,
-      'fetch.message.max.bytes': partitionMaxBytes,
-      'fetch.wait.max.ms': fetchWaitMs,
-      'max.partition.fetch.bytes': partitionMaxBytes,
-    },
+    batchTimeout: batchTimeoutMs,
+    serialPrefetchSize,
+    serialPrefetchTimeout: serialPrefetchTimeoutMs,
+    enableAutoCommit: false,
   })
 
-  await consumer.subscribe([{ topic, allOffsets: { position: 'Beginning' } }])
+  await webConsumer.consumer.subscribe([{ topic, allOffsets: { position: 'Beginning' } }])
 
-  consumer.on('data', () => {
-    if (!observeMessage(state)) {
-      return
+  try {
+    if (webConsumer.mode === 'batch') {
+      return await measureReadableStream(state, webConsumer.stream, (batch) => observeBatchPayload(state, batch))
     }
 
-    consumer.removeAllListeners('data')
-    consumer.pause()
-    const measurement = finishRun(state)
-
-    disconnectV3Consumer(consumer).then(() => {
-      resolve(measurement)
-    }, reject)
-  })
-
-  consumer.on('error', reject)
-
-  return promise
+    return await measureReadableStream(state, webConsumer.stream, (message) => {
+      void message
+      return observeMessage(state)
+    })
+  } finally {
+    await disconnectKafkaCrabJsConsumer(webConsumer.consumer)
+  }
 }
 
-async function createKafkaCrabJsV4Client(): Promise<KafkaClient> {
-  const { KafkaClient } = await import('kafka-crab-js')
-
-  return new KafkaClient({
+function createKafkaCrabJsClientConfiguration() {
+  return {
     brokers: brokers.join(','),
     clientId: 'benchmarks',
     securityProtocol: 'Plaintext',
     logLevel: 'warn',
     brokerAddressFamily: 'v4',
     diagnostics: false,
-  })
+  } as const
 }
 
-function createKafkaCrabJsV4ConsumerConfiguration() {
+async function createKafkaCrabJsV4Client(): Promise<KafkaClient> {
+  const { KafkaClient } = await import('kafka-crab-js')
+
+  return new KafkaClient(createKafkaCrabJsClientConfiguration())
+}
+
+function createKafkaCrabJsConsumerConfiguration() {
   return {
     groupId: randomUUID(),
     enableAutoCommit: false,
@@ -509,11 +495,11 @@ async function kafkaCrabJsV4(useBatchMode = false, hooks?: RunMeasurementHooks):
 
   const client = await createKafkaCrabJsV4Client()
   const webConsumer = client.createWebStreamConsumer({
-    ...createKafkaCrabJsV4ConsumerConfiguration(),
+    ...createKafkaCrabJsConsumerConfiguration(),
     batchSize: useBatchMode ? batchSize : 1,
     batchTimeout: batchTimeoutMs,
-    serialPrefetchSize: 64,
-    serialPrefetchTimeout: 5,
+    serialPrefetchSize,
+    serialPrefetchTimeout: serialPrefetchTimeoutMs,
     enableAutoCommit: false,
   })
 
@@ -529,14 +515,14 @@ async function kafkaCrabJsV4(useBatchMode = false, hooks?: RunMeasurementHooks):
       return observeMessage(state)
     })
   } finally {
-    await disconnectV4Consumer(webConsumer.consumer)
+    await disconnectKafkaCrabJsConsumer(webConsumer.consumer)
   }
 }
 
 async function kafkaCrabJsV4DirectBatchCount(hooks?: RunMeasurementHooks): Promise<RunMeasurement> {
   const state = createRunState(hooks)
   const client = await createKafkaCrabJsV4Client()
-  const consumer = client.createConsumer(createKafkaCrabJsV4ConsumerConfiguration())
+  const consumer = client.createConsumer(createKafkaCrabJsConsumerConfiguration())
 
   await consumer.subscribe([{ topic, allOffsets: { position: 'Beginning' } }])
 
@@ -548,14 +534,14 @@ async function kafkaCrabJsV4DirectBatchCount(hooks?: RunMeasurementHooks): Promi
       }
     }
   } finally {
-    await disconnectV4Consumer(consumer)
+    await disconnectKafkaCrabJsConsumer(consumer)
   }
 }
 
 async function kafkaCrabJsV4NativeBatchStreamCount(hooks?: RunMeasurementHooks): Promise<RunMeasurement> {
   const state = createRunState(hooks)
   const client = await createKafkaCrabJsV4Client()
-  const consumer = client.createConsumer(createKafkaCrabJsV4ConsumerConfiguration()) as CompactBatchStreamConsumer
+  const consumer = client.createConsumer(createKafkaCrabJsConsumerConfiguration()) as CompactBatchStreamConsumer
 
   await consumer.subscribe([{ topic, allOffsets: { position: 'Beginning' } }])
 
@@ -563,7 +549,7 @@ async function kafkaCrabJsV4NativeBatchStreamCount(hooks?: RunMeasurementHooks):
     const stream = consumer.recvBatchStream(batchSize, batchTimeoutMs)
     return await measureReadableStream(state, stream, (batch) => observeMessageCount(state, batch.length))
   } finally {
-    await disconnectV4Consumer(consumer)
+    await disconnectKafkaCrabJsConsumer(consumer)
   }
 }
 
@@ -571,7 +557,7 @@ async function kafkaCrabJsV4CompactBatchCount(hooks?: RunMeasurementHooks): Prom
   const state = createRunState(hooks)
 
   const client = await createKafkaCrabJsV4Client()
-  const consumer = client.createConsumer(createKafkaCrabJsV4ConsumerConfiguration()) as CompactBatchStreamConsumer
+  const consumer = client.createConsumer(createKafkaCrabJsConsumerConfiguration()) as CompactBatchStreamConsumer
 
   await consumer.subscribe([{ topic, allOffsets: { position: 'Beginning' } }])
 
@@ -579,21 +565,11 @@ async function kafkaCrabJsV4CompactBatchCount(hooks?: RunMeasurementHooks): Prom
     const stream = consumer.recvBatchStreamCompact(batchSize, batchTimeoutMs)
     return await measureReadableStream(state, stream, (batch) => observeMessageCount(state, batch.payloads.length))
   } finally {
-    await disconnectV4Consumer(consumer)
+    await disconnectKafkaCrabJsConsumer(consumer)
   }
 }
 
-async function disconnectV3Consumer(consumer: { unsubscribe(): void; disconnect(): Promise<void> }) {
-  try {
-    consumer.unsubscribe()
-  } catch {
-    // Noop
-  }
-
-  await consumer.disconnect()
-}
-
-async function disconnectV4Consumer(consumer: { unsubscribe(): void; disconnect(): Promise<void> }) {
+async function disconnectKafkaCrabJsConsumer(consumer: { unsubscribe: () => void; disconnect: () => Promise<void> }) {
   try {
     consumer.unsubscribe()
   } catch {
@@ -609,10 +585,10 @@ async function disconnectV4Consumer(consumer: { unsubscribe(): void; disconnect(
 
 const scenarios: BenchmarkScenario[] = [
   {
-    id: 'v3-serial',
-    label: 'v3 kafka-crab-js (serial)',
+    id: 'previous-serial',
+    label: 'previous kafka-crab-js (Web Stream, serial)',
     library: 'crab',
-    run: (hooks) => kafkaCrabJsV3(false, hooks),
+    run: (hooks) => kafkaCrabJsPrevious(false, hooks),
   },
   {
     id: 'v4-serial',
@@ -639,10 +615,10 @@ const scenarios: BenchmarkScenario[] = [
     run: platformaticKafka,
   },
   {
-    id: 'v3-batch',
-    label: 'v3 kafka-crab-js (batch)',
+    id: 'previous-batch',
+    label: 'previous kafka-crab-js (Web Stream, batch)',
     library: 'crab',
-    run: (hooks) => kafkaCrabJsV3(true, hooks),
+    run: (hooks) => kafkaCrabJsPrevious(true, hooks),
   },
   {
     id: 'v4-batch',
@@ -679,30 +655,30 @@ const scenarios: BenchmarkScenario[] = [
   },
 ]
 
-function isV3Scenario(scenario: BenchmarkScenario): boolean {
-  return scenario.id === 'v3-serial' || scenario.id === 'v3-batch'
+function isPreviousScenario(scenario: BenchmarkScenario): boolean {
+  return scenario.id === 'previous-serial' || scenario.id === 'previous-batch'
 }
 
-function isV3ScenarioId(scenarioId: BenchmarkScenarioId): boolean {
-  return scenarioId === 'v3-serial' || scenarioId === 'v3-batch'
+function isPreviousScenarioId(scenarioId: BenchmarkScenarioId): boolean {
+  return scenarioId === 'previous-serial' || scenarioId === 'previous-batch'
 }
 
-function selectedV3ScenarioIds(): BenchmarkScenarioId[] {
-  return [...selectedScenarios].filter(isV3ScenarioId)
+function selectedPreviousScenarioIds(): BenchmarkScenarioId[] {
+  return [...selectedScenarios].filter(isPreviousScenarioId)
 }
 
-function shouldShowV3Scenarios(): boolean {
+function shouldShowPreviousScenarios(): boolean {
   return (
-    selectedV3ScenarioIds().length > 0 ||
-    (showV3Scenarios && (selectedLibraries.size === 0 || selectedLibraries.has('crab')))
+    selectedPreviousScenarioIds().length > 0 ||
+    (showPreviousScenarios && (selectedLibraries.size === 0 || selectedLibraries.has('crab')))
   )
 }
 
 function selectScenarios(): BenchmarkScenario[] {
-  const includeV3 = shouldShowV3Scenarios()
+  const includePrevious = shouldShowPreviousScenarios()
 
   return scenarios.filter((scenario) => {
-    if (isV3Scenario(scenario) && !includeV3) {
+    if (isPreviousScenario(scenario) && !includePrevious) {
       return false
     }
 
@@ -733,6 +709,8 @@ async function main() {
   console.log(`Benchmark KafkaJS eachMessage concurrency: ${kafkaJsEachMessageConcurrency}`)
   console.log(`Benchmark batch size: ${batchSize}`)
   console.log(`Benchmark batch timeout: ${batchTimeoutMs}ms`)
+  console.log(`Benchmark serial prefetch size: ${serialPrefetchSize}`)
+  console.log(`Benchmark serial prefetch timeout: ${serialPrefetchTimeoutMs}ms`)
   if (batchSize !== requestedBatchSize) {
     console.log(`Benchmark requested batch size: ${requestedBatchSize} (normalized for comparable batch scenarios)`)
   }
@@ -901,6 +879,8 @@ async function runIsolatedMemoryBenchmark() {
   console.log(`Benchmark KafkaJS eachMessage concurrency: ${kafkaJsEachMessageConcurrency}`)
   console.log(`Benchmark batch size: ${batchSize}`)
   console.log(`Benchmark batch timeout: ${batchTimeoutMs}ms`)
+  console.log(`Benchmark serial prefetch size: ${serialPrefetchSize}`)
+  console.log(`Benchmark serial prefetch timeout: ${serialPrefetchTimeoutMs}ms`)
   if (batchSize !== requestedBatchSize) {
     console.log(`Benchmark requested batch size: ${requestedBatchSize} (normalized for comparable batch scenarios)`)
   }
@@ -940,6 +920,8 @@ async function runIsolatedThroughputBenchmark() {
   console.log(`Benchmark KafkaJS eachMessage concurrency: ${kafkaJsEachMessageConcurrency}`)
   console.log(`Benchmark batch size: ${batchSize}`)
   console.log(`Benchmark batch timeout: ${batchTimeoutMs}ms`)
+  console.log(`Benchmark serial prefetch size: ${serialPrefetchSize}`)
+  console.log(`Benchmark serial prefetch timeout: ${serialPrefetchTimeoutMs}ms`)
   if (batchSize !== requestedBatchSize) {
     console.log(`Benchmark requested batch size: ${requestedBatchSize} (normalized for comparable batch scenarios)`)
   }

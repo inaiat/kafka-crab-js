@@ -52,7 +52,7 @@ pub(crate) fn create_pdf_from_html_bytes(input: RenderPdfFromHtmlInput) -> Resul
     builder = builder.assets(assets);
   }
 
-  builder.build().render_html(&input.html).map_err(|error| {
+  builder.build().render(&input.html).map_err(|error| {
     Error::new(
       Status::GenericFailure,
       format!("HTML renderer failed to render HTML: {error}"),

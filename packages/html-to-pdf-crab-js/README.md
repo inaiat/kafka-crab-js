@@ -80,12 +80,6 @@ const pdf = await createPdfFromHtml({
 writeFileSync('invoice.pdf', pdf)
 ```
 
-CommonJS is also supported:
-
-```js
-const { createPdfFromHtml } = require('html-to-pdf-crab-js')
-```
-
 ## API
 
 | Export                     | Description                           |
@@ -176,6 +170,8 @@ Run the browser WASM example:
 ```bash
 pnpm --filter html-to-pdf-crab-js-examples browser
 ```
+
+This command rebuilds the local WASI browser binding before starting Vite.
 
 Open `/wasm/` on the local Vite server. The page previews `report.html` and renders that same
 HTML/CSS into a PDF iframe.

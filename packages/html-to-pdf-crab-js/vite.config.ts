@@ -4,8 +4,9 @@ import { sharedFmtConfig, sharedLintConfig, sharedTestLintRules } from '../../vi
 const napiGeneratedFiles = [
   'browser.js',
   'index.js',
-  'index.cjs',
   'index.d.ts',
+  'index.d.cts',
+  '*.wasi.d.cts',
   '*.wasi.cjs',
   '*.wasi-browser.js',
   'wasi-worker*.mjs',

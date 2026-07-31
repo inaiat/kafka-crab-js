@@ -155,9 +155,9 @@ export interface TypedChannel<TEvent> {
   readonly name: string
   readonly channel: Channel
   hasSubscribers: boolean
-  publish(event: TEvent): void
-  subscribe(handler: (event: TEvent, name: string | symbol) => void): void
-  unsubscribe(handler: (event: TEvent, name: string | symbol) => void): void
+  publish: (event: TEvent) => void
+  subscribe: (handler: (event: TEvent, name: string | symbol) => void) => void
+  unsubscribe: (handler: (event: TEvent, name: string | symbol) => void) => void
 }
 
 function createTypedChannel<TEvent>(name: string): TypedChannel<TEvent> {

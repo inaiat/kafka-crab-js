@@ -1,4 +1,4 @@
-import type { Attributes, Context, Span, Tracer } from '@opentelemetry/api'
+import type { Attributes, Context, MeterOptions, Span, Tracer, TracerOptions } from '@opentelemetry/api'
 import type { Message, ProducerRecord, RecordMetadata } from 'kafka-crab-js'
 
 // InstrumentationConfig interface (simplified from @opentelemetry/instrumentation)
@@ -8,20 +8,20 @@ export interface InstrumentationConfig {
 
 // OpenTelemetry TracerProvider interface
 export interface TracerProvider {
-  getTracer(name: string, version?: string, options?: unknown): Tracer
+  getTracer: (name: string, version?: string, options?: TracerOptions) => Tracer
 }
 
 // OpenTelemetry MeterProvider interface
 export interface MeterProvider {
-  getMeter(name: string, version?: string, options?: unknown): Meter
+  getMeter: (name: string, version?: string, options?: MeterOptions) => Meter
 }
 
 // OpenTelemetry Meter interface (simplified)
 export interface Meter {
-  createCounter(name: string, options?: MetricOptions): Counter
-  createHistogram(name: string, options?: MetricOptions): Histogram
-  createUpDownCounter(name: string, options?: MetricOptions): UpDownCounter
-  createObservableGauge(name: string, options?: MetricOptions): ObservableGauge
+  createCounter: (name: string, options?: MetricOptions) => Counter
+  createHistogram: (name: string, options?: MetricOptions) => Histogram
+  createUpDownCounter: (name: string, options?: MetricOptions) => UpDownCounter
+  createObservableGauge: (name: string, options?: MetricOptions) => ObservableGauge
 }
 
 // Metric options interface
@@ -45,27 +45,27 @@ export enum ValueType {
 
 // Counter interface
 export interface Counter {
-  add(value: number, attributes?: Attributes): void
+  add: (value: number, attributes?: Attributes) => void
 }
 
 // Histogram interface
 export interface Histogram {
-  record(value: number, attributes?: Attributes): void
+  record: (value: number, attributes?: Attributes) => void
 }
 
 // UpDownCounter interface
 export interface UpDownCounter {
-  add(value: number, attributes?: Attributes): void
+  add: (value: number, attributes?: Attributes) => void
 }
 
 // ObservableGauge interface
 export interface ObservableGauge {
-  addCallback(callback: (result: ObservableResult) => void): void
+  addCallback: (callback: (result: ObservableResult) => void) => void
 }
 
 // ObservableResult interface
 export interface ObservableResult {
-  observe(value: number, attributes?: Attributes): void
+  observe: (value: number, attributes?: Attributes) => void
 }
 
 // Metrics configuration options
