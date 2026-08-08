@@ -4,6 +4,7 @@ use pdf_writer::{Content, Str};
 use super::{
   color::{black, optional_color, RgbColor},
   font::parse_builtin_font,
+  image::decode_image,
   input::{PdfElementInput, PdfPointInput},
   unit::Unit,
   validation::{invalid_arg, optional_positive_f32, required, required_f32, required_positive_f32},
@@ -16,25 +17,43 @@ pub(super) fn append_element(
   content: &mut Content,
   element: PdfElementInput,
   unit: Unit,
+  page_height: f32,
+  images: &mut Vec<PreparedImageData>,
+  next_ref: &mut i32,
   path: &str,
 ) -> Result<()> {
   match element.r#type.as_str() {
-    "text" => append_text(content, element, unit, path),
-    "line" => append_line(content, element, unit, path),
-    "rect" => append_rect(content, element, unit, path),
-    "textBox" => append_text_box(content, element, unit, path),
-    "polygon" => append_polygon(content, element, unit, path),
-    "path" => append_path(content, element, unit, path),
+    "text" => append_text(content, element, unit, page_height, path),
+    "line" => append_line(content, element, unit, page_height, path),
+    "rect" => append_rect(content, element, unit, page_height, path),
+    "textBox" => append_text_box(content, element, unit, page_height, path),
+    "polygon" => append_polygon(content, element, unit, page_height, path),
+    "path" => append_path(content, element, unit, page_height, path),
+    "image" => append_image(content, element, unit, page_height, images, next_ref, path),
     element_type => Err(invalid_arg(format!(
-      "{path}.type must be one of \"text\", \"line\", \"rect\", \"textBox\", \"polygon\", or \"path\", received \"{element_type}\""
+      "{path}.type must be one of \"text\", \"line\", \"rect\", \"textBox\", \"polygon\", \"path\", or \"image\", received \"{element_type}\""
     ))),
   }
+}
+
+pub(super) struct PreparedImageData {
+  pub(super) image_ref: pdf_writer::Ref,
+  pub(super) mask_ref: Option<pdf_writer::Ref>,
+  pub(super) name: Vec<u8>,
+  pub(super) decoded: super::image::DecodedImage,
+}
+
+fn take_ref(next_ref: &mut i32) -> pdf_writer::Ref {
+  let reference = pdf_writer::Ref::new(*next_ref);
+  *next_ref += 1;
+  reference
 }
 
 fn append_text(
   content: &mut Content,
   element: PdfElementInput,
   unit: Unit,
+  page_height: f32,
   path: &str,
 ) -> Result<()> {
   let text = element
@@ -51,7 +70,8 @@ fn append_text(
   set_fill(content, fill);
   content.begin_text();
   content.set_font(font.resource_name(), font_size);
-  content.set_text_matrix([1.0, 0.0, 0.0, 1.0, x, y]);
+  let baseline = page_height - y - font_size * 0.8;
+  content.set_text_matrix([1.0, 0.0, 0.0, 1.0, x, baseline]);
   content.show(Str(text.as_bytes()));
   content.end_text();
   content.restore_state();
@@ -63,12 +83,13 @@ fn append_line(
   content: &mut Content,
   element: PdfElementInput,
   unit: Unit,
+  page_height: f32,
   path: &str,
 ) -> Result<()> {
   let x1 = unit.coordinate(required_f32(element.x1, &format!("{path}.x1"))?);
-  let y1 = unit.coordinate(required_f32(element.y1, &format!("{path}.y1"))?);
+  let y1 = page_height - unit.coordinate(required_f32(element.y1, &format!("{path}.y1"))?);
   let x2 = unit.coordinate(required_f32(element.x2, &format!("{path}.x2"))?);
-  let y2 = unit.coordinate(required_f32(element.y2, &format!("{path}.y2"))?);
+  let y2 = page_height - unit.coordinate(required_f32(element.y2, &format!("{path}.y2"))?);
   let stroke = optional_color(element.stroke, &format!("{path}.stroke"))?.unwrap_or_else(black);
   let stroke_width = optional_positive_f32(element.stroke_width, &format!("{path}.strokeWidth"))?
     .unwrap_or(DEFAULT_STROKE_WIDTH);
@@ -88,10 +109,11 @@ fn append_rect(
   content: &mut Content,
   element: PdfElementInput,
   unit: Unit,
+  page_height: f32,
   path: &str,
 ) -> Result<()> {
   let x = unit.coordinate(required_f32(element.x, &format!("{path}.x"))?);
-  let y = unit.coordinate(required_f32(element.y, &format!("{path}.y"))?);
+  let top = unit.coordinate(required_f32(element.y, &format!("{path}.y"))?);
   let width = unit.coordinate(required_positive_f32(
     element.width,
     &format!("{path}.width"),
@@ -113,7 +135,7 @@ fn append_rect(
     set_stroke(content, stroke);
     content.set_line_width(stroke_width);
   }
-  content.rect(x, y, width, height);
+  content.rect(x, page_height - top - height, width, height);
   paint_path(
     content,
     fill.is_some(),
@@ -130,6 +152,7 @@ fn append_text_box(
   content: &mut Content,
   element: PdfElementInput,
   unit: Unit,
+  page_height: f32,
   path: &str,
 ) -> Result<()> {
   let text = element
@@ -170,7 +193,7 @@ fn append_text_box(
       TextAlign::Center => x + (width - estimate_text_width(&line, font_size)) / 2.0,
       TextAlign::Right => x + width - estimate_text_width(&line, font_size),
     };
-    let cursor_y = y - line_height * line_index as f32;
+    let cursor_y = page_height - y - font_size * 0.8 - line_height * line_index as f32;
     content.set_text_matrix([1.0, 0.0, 0.0, 1.0, adjusted_x, cursor_y]);
     content.show(Str(line.as_bytes()));
   }
@@ -185,9 +208,10 @@ fn append_polygon(
   content: &mut Content,
   element: PdfElementInput,
   unit: Unit,
+  page_height: f32,
   path: &str,
 ) -> Result<()> {
-  let points = required_points(element.points, &format!("{path}.points"), unit)?;
+  let points = required_points(element.points, &format!("{path}.points"), unit, page_height)?;
   if points.len() < 3 {
     return Err(invalid_arg(format!(
       "{path}.points must contain at least 3 points"
@@ -213,9 +237,10 @@ fn append_path(
   content: &mut Content,
   element: PdfElementInput,
   unit: Unit,
+  page_height: f32,
   path: &str,
 ) -> Result<()> {
-  let points = required_points(element.points, &format!("{path}.points"), unit)?;
+  let points = required_points(element.points, &format!("{path}.points"), unit, page_height)?;
   if points.len() < 2 {
     return Err(invalid_arg(format!(
       "{path}.points must contain at least 2 points"
@@ -240,6 +265,65 @@ fn append_path(
     winding,
   );
   content.restore_state();
+
+  Ok(())
+}
+
+fn append_image(
+  content: &mut Content,
+  element: PdfElementInput,
+  unit: Unit,
+  page_height: f32,
+  images: &mut Vec<PreparedImageData>,
+  next_ref: &mut i32,
+  path: &str,
+) -> Result<()> {
+  let image_data = element
+    .image_data
+    .ok_or_else(|| required(format!("{path}.imageData")))?;
+  let decoded = decode_image(&image_data)?;
+  let x = unit.coordinate(required_f32(element.x, &format!("{path}.x"))?);
+  let top = unit.coordinate(required_f32(element.y, &format!("{path}.y"))?);
+  let natural_width = decoded.width as f32;
+  let natural_height = decoded.height as f32;
+  let width = element
+    .width
+    .map(|value| {
+      required_positive_f32(Some(value), &format!("{path}.width"))
+        .map(|value| unit.coordinate(value))
+    })
+    .transpose()?
+    .unwrap_or(natural_width);
+  let height = element
+    .height
+    .map(|value| {
+      required_positive_f32(Some(value), &format!("{path}.height"))
+        .map(|value| unit.coordinate(value))
+    })
+    .transpose()?
+    .unwrap_or_else(|| width * natural_height / natural_width);
+
+  if width <= 0.0 || height <= 0.0 {
+    return Err(invalid_arg(format!(
+      "{path}.width and {path}.height must be greater than 0"
+    )));
+  }
+
+  let image_ref = take_ref(next_ref);
+  let mask_ref = decoded.alpha.as_ref().map(|_| take_ref(next_ref));
+  let name = format!("Im{}", images.len() + 1).into_bytes();
+
+  content.save_state();
+  content.transform([width, 0.0, 0.0, height, x, page_height - top - height]);
+  content.x_object(pdf_writer::Name(name.as_slice()));
+  content.restore_state();
+
+  images.push(PreparedImageData {
+    image_ref,
+    mask_ref,
+    name,
+    decoded,
+  });
 
   Ok(())
 }
@@ -327,6 +411,7 @@ fn required_points(
   points: Option<Vec<PdfPointInput>>,
   path: &str,
   unit: Unit,
+  page_height: f32,
 ) -> Result<Vec<PdfPoint>> {
   let points = points.ok_or_else(|| required(path))?;
   points
@@ -341,7 +426,8 @@ fn required_points(
 
       Ok(PdfPoint {
         x: unit.coordinate(required_f32(Some(point.x), &format!("{path}[{index}].x"))?),
-        y: unit.coordinate(required_f32(Some(point.y), &format!("{path}[{index}].y"))?),
+        y: page_height
+          - unit.coordinate(required_f32(Some(point.y), &format!("{path}[{index}].y"))?),
       })
     })
     .collect()

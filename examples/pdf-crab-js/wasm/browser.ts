@@ -33,8 +33,7 @@ const documentInput: CreatePdfInput = {
   unit: 'mm',
   pages: [
     {
-      height: 297,
-      width: 210,
+      size: 'A4',
       elements: [
         {
           fill: '#f8fafc',
@@ -44,7 +43,7 @@ const documentInput: CreatePdfInput = {
           type: 'rect',
           width: 174,
           x: 18,
-          y: 240,
+          y: 18,
         },
         {
           fill: '#0f172a',
@@ -53,7 +52,7 @@ const documentInput: CreatePdfInput = {
           text: 'pdf-crab-js',
           type: 'text',
           x: 26,
-          y: 260,
+          y: 27,
         },
         {
           fill: '#334155',
@@ -61,7 +60,7 @@ const documentInput: CreatePdfInput = {
           text: 'Rendered in the browser with the NAPI-RS WASI build',
           type: 'text',
           x: 26,
-          y: 250,
+          y: 39,
         },
         {
           stroke: '#2563eb',
@@ -69,8 +68,8 @@ const documentInput: CreatePdfInput = {
           type: 'line',
           x1: 18,
           x2: 192,
-          y1: 226,
-          y2: 226,
+          y1: 62,
+          y2: 62,
         },
         {
           fill: '#eff6ff',
@@ -80,7 +79,7 @@ const documentInput: CreatePdfInput = {
           type: 'rect',
           width: 72,
           x: 24,
-          y: 170,
+          y: 78,
         },
         {
           fill: '#111827',
@@ -88,7 +87,7 @@ const documentInput: CreatePdfInput = {
           text: 'Same createPdf input shape',
           type: 'text',
           x: 104,
-          y: 192,
+          y: 87,
         },
         {
           fill: '#475569',
@@ -96,7 +95,7 @@ const documentInput: CreatePdfInput = {
           text: 'The generated WASI browser entry loads pdf-crab-js.wasm32-wasi.wasm.',
           type: 'text',
           x: 104,
-          y: 182,
+          y: 98,
         },
         {
           fill: '#16a34a',
@@ -105,7 +104,7 @@ const documentInput: CreatePdfInput = {
           text: 'Browser WASM',
           type: 'text',
           x: 26,
-          y: 186,
+          y: 90,
         },
       ],
     },

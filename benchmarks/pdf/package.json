@@ -15,7 +15,11 @@
   },
   "dependencies": {
     "html-to-pdf-crab-js": "workspace:*",
-    "pdf-crab-js": "workspace:*"
+    "pdf-crab-js": "workspace:*",
+    "pdfkit": "^0.19.1"
+  },
+  "devDependencies": {
+    "@types/pdfkit": "^0.17.6"
   },
   "engines": {
     "node": "24"

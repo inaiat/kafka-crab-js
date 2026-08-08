@@ -5,12 +5,25 @@ use napi::{
 
 use super::{
   document::{create_pdf_bytes, PdfDocumentState},
+  image::image_dimensions,
   input::{
     CreatePdfInput, PdfAnnotationInput, PdfDocumentBuilderInput, PdfElementInput, PdfPageInput,
     PdfPageSetupInput,
   },
   validation::invalid_arg,
 };
+
+#[napi(object)]
+pub struct PdfImageInfo {
+  pub width: u32,
+  pub height: u32,
+}
+
+#[napi]
+pub fn get_image_dimensions(data: Buffer) -> Result<PdfImageInfo> {
+  let (width, height) = image_dimensions(&data)?;
+  Ok(PdfImageInfo { width, height })
+}
 
 #[napi]
 pub fn create_pdf(input: CreatePdfInput) -> Result<Buffer> {

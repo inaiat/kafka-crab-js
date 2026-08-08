@@ -1,46 +1,12 @@
 # pdf-crab-js
 
-Fast structured PDF generation for Node.js and WebAssembly, built with Rust, NAPI-RS, and
-`pdf-writer`.
+Structured PDF generation for Node.js and WebAssembly, built with Rust, NAPI-RS, and
+`pdf-writer`. Version 1.0 provides a fluent `PdfDocument` API with PDFKit-like ergonomics and a
+strict declarative `createPdf` API.
 
-Use this package when your application already knows the PDF structure: invoices, receipts,
-statements, labels, reports, exports, tables, and other documents that can be expressed as pages,
-coordinates, text, shapes, and links. If your source document is HTML and CSS, use
-[`html-to-pdf-crab-js`](../html-to-pdf-crab-js/README.md) instead.
-
-`pdf-crab-js` is the fast path in the Crab JS PDF stack. It avoids browser layout work and writes
-PDF objects directly from a typed document model, making it a good fit for high-volume server jobs,
-browser WASM generation, and documents where performance matters more than HTML authoring.
-
-## Why pdf-crab-js
-
-- Faster alternative for structured PDF generation when you can describe the document as pages,
-  coordinates, text, shapes, and annotations.
-- No Chromium, Puppeteer, Playwright, or Gotenberg service is required for the local native path.
-- Same package shape for Node.js native bindings and the browser/WASI build.
-- Complements `html-to-pdf-crab-js`: use `pdf-crab-js` for maximum speed, and use
-  `html-to-pdf-crab-js` when HTML/CSS is the easier source format.
-
-## Benchmark Snapshot
-
-Local 10-page benchmark, fastest to slowest by execution time:
-
-| Order | Language                | Mode       | Execution time |       Throughput |
-| ----- | ----------------------- | ---------- | -------------: | ---------------: |
-| 1     | Node + pdf-crab         | local      |       4.116 ms | 2429.253 pages/s |
-| 2     | Node + pdf-crab         | builder    |       4.232 ms | 2362.863 pages/s |
-| 3     | Node + html-to-pdf-crab | local-html |      62.327 ms |  160.443 pages/s |
-| 4     | Node + Gotenberg        | gotenberg  |     128.304 ms |   77.940 pages/s |
-
-Benchmark results are workload and machine dependent. The key takeaway is the shape: structured
-PDF generation avoids HTML layout and remote Chromium overhead, so it is the fastest path for
-documents you can model directly.
-
-## PDF Result
-
-This preview is generated from `examples/pdf-crab-js/table.ts`.
-
-![pdf-crab-js table PDF result](../../examples/pdf-crab-js/screenshots/pdf-crab-js-table-example.pdf.png)
+Use this package for invoices, receipts, statements, labels, reports, tables, exports, and other
+documents that can be expressed as pages, coordinates, text, shapes, links, and raster images. Use
+[`html-to-pdf-crab-js`](../html-to-pdf-crab-js/README.md) when HTML/CSS layout is the source format.
 
 ## Install
 
@@ -48,210 +14,138 @@ This preview is generated from `examples/pdf-crab-js/table.ts`.
 npm install pdf-crab-js
 ```
 
-Requirements:
+The native package requires Node.js `>=22`. Browser/WASM deployments require
+`SharedArrayBuffer` and cross-origin isolation.
 
-- Node.js `>=22` for the native package.
-- A browser or static host with `SharedArrayBuffer` enabled for the WASM package.
+## Fluent API
 
-## Quick Start
-
-```js
+```ts
 import { writeFileSync } from 'node:fs'
+import { PdfDocument } from 'pdf-crab-js'
+
+const document = new PdfDocument({
+  size: 'A4',
+  unit: 'mm',
+  margin: 20,
+})
+
+document
+  .font('HelveticaBold')
+  .fontSize(18)
+  .fillColor('#0f172a')
+  .text('Invoice')
+  .moveDown()
+  .font('Helvetica')
+  .fontSize(11)
+  .text('Generated with pdf-crab-js')
+  .strokeColor('#2563eb')
+  .lineWidth(1)
+  .moveTo(20, 55)
+  .lineTo(190, 55)
+  .stroke()
+
+writeFileSync('invoice.pdf', document.finish())
+```
+
+The first page is created automatically. Defaults are A4 portrait, 20 mm margins, Helvetica 12,
+black fill/stroke, and a 1 pt line width. Text without explicit coordinates uses the cursor and
+automatically starts a new page when it reaches the bottom margin.
+
+All public coordinates use a top-left origin and the configured `mm` or `pt` unit. PDF output is a
+complete `Uint8Array`; in Node.js the returned value is also a `Buffer` without an extra copy.
+Font sizes, line heights, and line widths follow PDF points, as in PDFKit; cursor movement converts
+those metrics into the configured coordinate unit.
+
+## Images
+
+PNG and JPEG images are supported in both Node.js and browser/WASM builds:
+
+```ts
+import { readFileSync, writeFileSync } from 'node:fs'
+import { PdfDocument } from 'pdf-crab-js'
+
+const document = new PdfDocument({ unit: 'mm' })
+document.image(readFileSync('logo.png'), { width: 48 })
+document.image('photo.jpg', { fit: [170, 80], align: 'center', valign: 'center' })
+writeFileSync('images.pdf', document.finish())
+```
+
+Image bytes can be `Uint8Array`, `ArrayBuffer`, or a Node.js `Buffer`. File paths are a Node.js-only
+convenience; browser callers must pass bytes. With no dimensions, images use one point per pixel.
+Supplying only one dimension preserves the aspect ratio. `fit: [width, height]` contains the image
+while preserving the aspect ratio. PNG alpha is emitted through a PDF soft mask. GIF, WebP, SVG,
+data URLs, HTTP URLs, and `Blob` inputs are not part of the 1.0 API.
+
+## Declarative API
+
+`createPdf` is useful when all pages and elements are known up front:
+
+```ts
 import { createPdf } from 'pdf-crab-js'
 
 const pdf = createPdf({
-  title: 'Invoice',
+  title: 'Report',
   unit: 'mm',
-  metadata: {
-    title: 'Invoice',
-    author: 'Finance Platform',
-    creator: 'pdf-crab-js',
-  },
   pages: [
     {
-      width: 210,
-      height: 297,
+      size: 'A4',
       elements: [
-        {
-          type: 'rect',
-          x: 18,
-          y: 240,
-          width: 174,
-          height: 34,
-          fill: '#f8fafc',
-          stroke: '#0f172a',
-          strokeWidth: 1,
-        },
-        {
-          type: 'text',
-          text: 'Hello PDF',
-          x: 26,
-          y: 260,
-          font: 'HelveticaBold',
-          fontSize: 18,
-          fill: '#0f172a',
-        },
+        { type: 'rect', x: 20, y: 20, width: 170, height: 30, fill: '#f8fafc' },
+        { type: 'text', text: 'Top-left coordinates', x: 28, y: 30, fontSize: 16 },
+        { type: 'image', source: logoBytes, x: 20, y: 70, fit: [60, 40] },
       ],
     },
   ],
 })
-
-writeFileSync('invoice.pdf', pdf)
 ```
 
-## Builder API
+`pages` is required and must contain at least one page. A page accepts `size: 'A3' | 'A4' |
+'LETTER' | [width, height]` and optional `layout: 'portrait' | 'landscape'`. Declarative elements
+are strict discriminated unions: `text`, `textBox`, `line`, `rect`, `polygon`, `path`, and `image`.
+`createPdfAsync` has the same input and returns `Promise<Uint8Array>`.
 
-Use `PdfDocumentBuilder` when the document is produced in chunks and you do not want to build one
-large `pages[].elements[]` object before crossing the NAPI boundary.
+The text engine intentionally uses approximate built-in-font metrics in 1.0. Custom fonts, tables,
+Bezier curves, transforms, forms, accessibility tags, and PDF streaming are future features.
 
-```js
-import { writeFileSync } from 'node:fs'
-import { PdfDocumentBuilder } from 'pdf-crab-js'
+## Browser/WASM
 
-const builder = new PdfDocumentBuilder({
-  title: 'Chunked PDF',
-  unit: 'mm',
+```ts
+import { createPdf } from 'pdf-crab-js/browser'
+
+const pdf = createPdf({
+  pages: [{ size: 'A4', elements: [{ type: 'text', text: 'WASM', x: 20, y: 20 }] }],
 })
-
-builder.startPage({ width: 210, height: 297 })
-builder.appendElements([{ type: 'text', text: 'Chunk 1', x: 20, y: 260 }])
-builder.appendElements([{ type: 'line', x1: 20, y1: 250, x2: 120, y2: 250 }])
-builder.endPage()
-
-writeFileSync('chunked.pdf', builder.finish())
 ```
 
-## API
+Browser imports reject image file paths with a clear error. Pass `Uint8Array` or `ArrayBuffer`
+instead. The browser example lives in `examples/pdf-crab-js/wasm/`.
 
-| Export                  | Description                                                                            |
-| ----------------------- | -------------------------------------------------------------------------------------- |
-| `createPdf(input)`      | Synchronously renders a `CreatePdfInput` into a `Buffer`.                              |
-| `createPdfAsync(input)` | Async version of `createPdf`.                                                          |
-| `PdfDocumentBuilder`    | Incremental document builder with page, element, annotation, and async finish methods. |
+## Migration from 0.x
 
-### `CreatePdfInput`
+Version 1.0 intentionally removes `PdfDocumentBuilder` and the old bottom-left coordinate model.
 
-| Field      | Description                                                                                        |
-| ---------- | -------------------------------------------------------------------------------------------------- |
-| `title`    | Optional document title.                                                                           |
-| `unit`     | Coordinate unit. Supports `mm` and `pt`; defaults to `mm`.                                         |
-| `metadata` | Optional PDF metadata: `title`, `author`, `creator`, `producer`, `subject`, `keywords`, `trapped`. |
-| `pages`    | Array of PDF pages. Each page has `width`, `height`, `elements`, and optional `annotations`.       |
+| 0.x                            | 1.0                                                  |
+| ------------------------------ | ---------------------------------------------------- |
+| `PdfDocumentBuilder`           | `new PdfDocument(options)`                           |
+| `startPage` / `appendElements` | `addPage` and fluent drawing methods                 |
+| Bottom-left `y` coordinates    | Top-left `y` coordinates                             |
+| Page `width` / `height`        | `size` and optional `layout`                         |
+| `Buffer` contract              | `Uint8Array` contract (`Buffer` still works in Node) |
+| No image element               | PNG/JPEG bytes and Node file paths                   |
 
-Coordinates use the PDF bottom-left origin. Page dimensions and coordinates use `unit`. Font sizes
-and stroke widths are points.
-
-### Elements
-
-| Element   | Main fields                                                                                           |
-| --------- | ----------------------------------------------------------------------------------------------------- |
-| `text`    | `text`, `x`, `y`, `font`, `fontSize`, `fill`.                                                         |
-| `textBox` | `text`, `x`, `y`, `width`, optional `height`, `fontSize`, `lineHeight`, `align`, `hyphenate`, `fill`. |
-| `line`    | `x1`, `y1`, `x2`, `y2`, `stroke`, `strokeWidth`.                                                      |
-| `rect`    | `x`, `y`, `width`, `height`, optional `fill`, `stroke`, `strokeWidth`.                                |
-| `polygon` | `points`, optional `fill`, `stroke`, `strokeWidth`, `winding`. Requires at least 3 points.            |
-| `path`    | `points`, optional `closed`, `fill`, `stroke`, `strokeWidth`, `winding`. Requires at least 2 points.  |
-
-Colors use `#RRGGBB`. The structured PDF path supports the built-in PDF fonts: Times, Helvetica,
-Courier, Symbol, and ZapfDingbats variants. `Helvetica` is used by default.
-
-Bezier points are currently rejected by the `path` and `polygon` implementation; use straight
-segments.
-
-### Link Annotations
-
-Pages can include link annotations:
-
-```js
-{
-  type: 'link',
-  x: 18,
-  y: 17,
-  width: 52,
-  height: 10,
-  url: 'https://github.com/flash-tecnologia/crab-js/tree/main/packages/pdf-crab-js',
-  color: '#2f6fed',
-}
-```
-
-## Browser and WASM
-
-Browser, Deno, Bun, and portable runtimes can use the NAPI-RS WebAssembly build:
-
-```js
-import { createPdf } from 'pdf-crab-js/wasm'
-```
-
-Browser deployments must enable `SharedArrayBuffer`, which requires cross-origin isolation:
-
-```text
-Cross-Origin-Embedder-Policy: require-corp
-Cross-Origin-Opener-Policy: same-origin
-```
-
-The combined Netlify browser sample lives in `examples/netlify-pdf-samples/` and demonstrates
-`pdf-crab-js` with `html-to-pdf-crab-js` using the required WASM headers.
-
-Published sample: https://pdf-crab-js.netlify.app/#pdf-crab-js
-
-## Examples
-
-Run the Node examples from the workspace root:
-
-```bash
-pnpm --filter pdf-crab-js-examples example
-pnpm --filter pdf-crab-js-examples example:table
-```
-
-Generated files are written to `examples/pdf-crab-js/output/`.
-
-Run the browser WASM example:
-
-```bash
-pnpm --filter pdf-crab-js-examples browser
-```
-
-This command rebuilds the local WASI browser binding before starting Vite.
-
-Open `/wasm/` on the local Vite server. The page previews a structured `CreatePdfInput` object and
-renders it into a PDF iframe.
+For a direct coordinate migration, use `newY = pageHeight - oldY` for points/lines and
+`newY = pageHeight - oldY - height` for rectangles, links, and images. Text should use its new top
+edge instead of its old baseline.
 
 ## Development
-
-Install dependencies from the workspace root:
-
-```bash
-pnpm install --filter pdf-crab-js
-```
-
-Build and test:
 
 ```bash
 pnpm --filter pdf-crab-js build
 pnpm --filter pdf-crab-js test
-pnpm --filter pdf-crab-js check
-pnpm --filter pdf-crab-js lint
-pnpm --filter pdf-crab-js fmt:check
-```
-
-Build and smoke-test the WebAssembly binding:
-
-```bash
-rustup target add wasm32-wasip1-threads
 pnpm --filter pdf-crab-js build:wasm
 pnpm --filter pdf-crab-js test:wasm
 ```
 
-Run the PDF table benchmark from the workspace root:
-
-```bash
-pnpm --filter pdf-benchmark benchmark
-```
-
-The benchmark defaults to a 10-page PDF with 10 table rows per page. Use `PDF_BENCHMARK_RUNS`,
-`PDF_BENCHMARK_WARMUP`, `PDF_BENCHMARK_PAGES`, and `PDF_BENCHMARK_WRITE=1` to tune the run or write
-the generated PDF to `benchmarks/pdf/output/`.
-
-## Release
-
-Native and WebAssembly package publishing is handled by `napi prepublish -t npm`.
+The structured PDF benchmark compares `createPdf`, the fluent `PdfDocument` facade, PDFKit,
+`html-to-pdf-crab-js`, and Gotenberg. It also includes a PDFKit dependency and image-capable
+workloads under `benchmarks/pdf/`.

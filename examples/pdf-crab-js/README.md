@@ -35,7 +35,7 @@ aliased `pdf-crab-js-wasm32-wasi` entry and its `.wasm` file are always availabl
 Open `/wasm/` on the dev-server URL printed by Vite. The page previews a structured
 `CreatePdfInput` object and renders it into a PDF iframe. The browser example imports
 `pdf-crab-js/browser.js`; Vite aliases the generated `pdf-crab-js-wasm32-wasi` package entry to the
-local WASI browser build during development.
+local WASI browser build during development. All example coordinates use the 1.0 top-left origin.
 
 ## Screenshot Maintenance
 

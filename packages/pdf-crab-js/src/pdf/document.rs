@@ -4,8 +4,9 @@ use pdf_writer::{Content, Finish, Pdf, Rect, Ref, Str, TextStr};
 
 use super::{
   color::optional_color,
-  elements::append_element,
+  elements::{append_element, PreparedImageData},
   font::BuiltinFont,
+  image::write_image_xobjects,
   input::{CreatePdfInput, PdfAnnotationInput, PdfElementInput, PdfMetadataInput, PdfPageInput},
   unit::Unit,
   validation::{invalid_arg, positive_f32, required, required_f32, required_positive_f32},
@@ -82,6 +83,7 @@ impl PdfDocumentState {
       height,
       content: Content::new(),
       annotations: Vec::new(),
+      images: Vec::new(),
       element_count: 0,
       annotation_count: 0,
     });
@@ -100,6 +102,9 @@ impl PdfDocumentState {
         &mut page.content,
         element,
         self.unit,
+        page.height,
+        &mut page.images,
+        &mut self.next_ref,
         &format!("{}.elements[{}]", page.path, page.element_count),
       )?;
       page.element_count += 1;
@@ -109,11 +114,16 @@ impl PdfDocumentState {
   }
 
   pub(super) fn append_annotations(&mut self, annotations: Vec<PdfAnnotationInput>) -> Result<()> {
-    let (page_ref, page_path, start_index) = {
+    let (page_ref, page_height, page_path, start_index) = {
       let page = self.open_page.as_ref().ok_or_else(|| {
         invalid_arg("appendAnnotations requires an open page; call startPage() first")
       })?;
-      (page.reference, page.path.clone(), page.annotation_count)
+      (
+        page.reference,
+        page.height,
+        page.path.clone(),
+        page.annotation_count,
+      )
     };
     let mut prepared_annotations = Vec::with_capacity(annotations.len());
 
@@ -122,6 +132,7 @@ impl PdfDocumentState {
       let annotation = prepare_annotation(
         annotation,
         self.unit,
+        page_height,
         page_ref,
         &format!("{page_path}.annotations[{}]", start_index + index),
       )?;
@@ -154,6 +165,7 @@ impl PdfDocumentState {
       height: page.height,
       content: page.content.finish().into_vec(),
       annotations: page.annotations,
+      images: page.images,
     });
 
     Ok(())
@@ -195,6 +207,7 @@ struct OpenPage {
   height: f32,
   content: Content,
   annotations: Vec<PreparedAnnotation>,
+  images: Vec<PreparedImageData>,
   element_count: usize,
   annotation_count: usize,
 }
@@ -236,6 +249,13 @@ fn write_pdf_document(
       fonts.pair(font.resource_name(), Ref::new(font.ref_number()));
     }
     fonts.finish();
+    if !page.images.is_empty() {
+      let mut x_objects = resources.x_objects();
+      for image in &page.images {
+        x_objects.pair(pdf_writer::Name(image.name.as_slice()), image.image_ref);
+      }
+      x_objects.finish();
+    }
     resources.finish();
     page_writer.finish();
 
@@ -243,6 +263,9 @@ fn write_pdf_document(
 
     for annotation in &page.annotations {
       write_annotation(&mut pdf, annotation.reference, &annotation.annotation);
+    }
+    for image in &page.images {
+      write_image_xobjects(&mut pdf, image.image_ref, image.mask_ref, &image.decoded);
     }
   }
 
@@ -312,6 +335,7 @@ struct PreparedPage {
   height: f32,
   content: Vec<u8>,
   annotations: Vec<PreparedAnnotation>,
+  images: Vec<PreparedImageData>,
 }
 
 struct PreparedAnnotation {
@@ -329,11 +353,12 @@ struct LinkAnnotation {
 fn prepare_annotation(
   annotation: PdfAnnotationInput,
   unit: Unit,
+  page_height: f32,
   page_ref: Ref,
   path: &str,
 ) -> Result<LinkAnnotation> {
   match annotation.r#type.as_str() {
-    "link" => prepare_link_annotation(annotation, unit, page_ref, path),
+    "link" => prepare_link_annotation(annotation, unit, page_height, page_ref, path),
     annotation_type => Err(invalid_arg(format!(
       "{path}.type must be \"link\", received \"{annotation_type}\""
     ))),
@@ -343,6 +368,7 @@ fn prepare_annotation(
 fn prepare_link_annotation(
   annotation: PdfAnnotationInput,
   unit: Unit,
+  page_height: f32,
   page_ref: Ref,
   path: &str,
 ) -> Result<LinkAnnotation> {
@@ -367,7 +393,7 @@ fn prepare_link_annotation(
 
   Ok(LinkAnnotation {
     page_ref,
-    rect: Rect::new(x, y, x + width, y + height),
+    rect: Rect::new(x, page_height - y - height, x + width, page_height - y),
     url,
     color,
   })

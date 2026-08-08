@@ -3,6 +3,7 @@ mod color;
 mod document;
 mod elements;
 mod font;
+mod image;
 mod input;
 mod unit;
 mod validation;

@@ -1,7 +1,8 @@
-const PACKAGE_VERSION = '0.1.2'
-const RUNTIME_URL = 'https://esm.sh/@napi-rs/wasm-runtime@1.1.4?target=es2022'
-const PDF_CRAB_WASM_URL = `https://cdn.jsdelivr.net/npm/pdf-crab-js-wasm32-wasi@${PACKAGE_VERSION}/pdf-crab-js.wasm32-wasi.wasm`
-const HTML_TO_PDF_WASM_URL = `https://cdn.jsdelivr.net/npm/html-to-pdf-crab-js-wasm32-wasi@${PACKAGE_VERSION}/html-to-pdf-crab-js.wasm32-wasi.wasm`
+const PDF_CRAB_VERSION = '1.0.0'
+const HTML_TO_PDF_VERSION = '0.3.0'
+const RUNTIME_URL = 'https://esm.sh/@napi-rs/wasm-runtime@1.2.2?target=es2022'
+const PDF_CRAB_WASM_URL = `https://cdn.jsdelivr.net/npm/pdf-crab-js-wasm32-wasi@${PDF_CRAB_VERSION}/pdf-crab-js.wasm32-wasi.wasm`
+const HTML_TO_PDF_WASM_URL = `https://cdn.jsdelivr.net/npm/html-to-pdf-crab-js-wasm32-wasi@${HTML_TO_PDF_VERSION}/html-to-pdf-crab-js.wasm32-wasi.wasm`
 const HTML_TO_PDF_FONT_URL = './assets/Tuffy.ttf'
 const HASH_BY_MODE = {
   fast: 'pdf-crab-js',
@@ -626,7 +627,7 @@ function buildFastDocumentInput() {
   const customer = readText(elements.customerName, 'Netlify Preview')
   const note = readText(elements.docNote, 'Generated in the browser with pdf-crab-js.')
   const badge = readText(elements.badgeText, 'WASM')
-  const footer = readText(elements.footerText, `npm: pdf-crab-js@${PACKAGE_VERSION}`)
+  const footer = readText(elements.footerText, `npm: pdf-crab-js@${PDF_CRAB_VERSION}`)
   const itemOneLabel = readText(elements.itemOneLabel, 'WASM setup')
   const itemTwoLabel = readText(elements.itemTwoLabel, 'PDF generation usage')
   const accent = elements.accentColor.value
@@ -640,64 +641,63 @@ function buildFastDocumentInput() {
     metadata: {
       title,
       author: 'pdf-crab-js',
-      creator: `pdf-crab-js WASM ${PACKAGE_VERSION}`,
+      creator: `pdf-crab-js WASM ${PDF_CRAB_VERSION}`,
       subject: 'Browser-generated PDF sample',
       keywords: ['pdf-crab-js', 'wasm', 'netlify'],
     },
     pages: [
       {
-        width: 210,
-        height: 297,
+        size: 'A4',
         elements: [
           { type: 'rect', x: 0, y: 0, width: 210, height: 297, fill: '#ffffff' },
-          { type: 'rect', x: 16, y: 244, width: 178, height: 34, fill: accent },
-          { type: 'text', text: title, x: 24, y: 264, fontSize: 21, fill: '#ffffff' },
-          { type: 'text', text: subtitle, x: 24, y: 253, fontSize: 9, fill: '#eef5ff' },
-          { type: 'text', text: 'Bill to', x: 18, y: 225, fontSize: 10, fill: '#64748b' },
-          { type: 'text', text: customer, x: 18, y: 214, fontSize: 17, fill: '#111827' },
-          { type: 'line', x1: 18, y1: 198, x2: 192, y2: 198, stroke: '#cbd5e1', strokeWidth: 1 },
-          { type: 'text', text: 'Item', x: 22, y: 184, fontSize: 10, fill: '#64748b' },
-          { type: 'text', text: 'Amount', x: 152, y: 184, fontSize: 10, fill: '#64748b' },
-          { type: 'text', text: itemOneLabel, x: 22, y: 170, fontSize: 12, fill: '#111827' },
-          { type: 'text', text: money(itemOneAmount), x: 152, y: 170, fontSize: 12, fill: '#111827' },
-          { type: 'text', text: itemTwoLabel, x: 22, y: 156, fontSize: 12, fill: '#111827' },
-          { type: 'text', text: money(itemTwoAmount), x: 152, y: 156, fontSize: 12, fill: '#111827' },
-          { type: 'rect', x: 118, y: 119, width: 74, height: 22, fill: '#f1f5f9' },
-          { type: 'text', text: 'Total', x: 126, y: 132, fontSize: 10, fill: '#64748b' },
-          { type: 'text', text: money(total), x: 152, y: 132, fontSize: 15, fill: '#111827' },
+          { type: 'rect', x: 16, y: 19, width: 178, height: 34, fill: accent },
+          { type: 'text', text: title, x: 24, y: 28, fontSize: 21, fill: '#ffffff' },
+          { type: 'text', text: subtitle, x: 24, y: 39, fontSize: 9, fill: '#eef5ff' },
+          { type: 'text', text: 'Bill to', x: 18, y: 61, fontSize: 10, fill: '#64748b' },
+          { type: 'text', text: customer, x: 18, y: 72, fontSize: 17, fill: '#111827' },
+          { type: 'line', x1: 18, y1: 99, x2: 192, y2: 99, stroke: '#cbd5e1', strokeWidth: 1 },
+          { type: 'text', text: 'Item', x: 22, y: 113, fontSize: 10, fill: '#64748b' },
+          { type: 'text', text: 'Amount', x: 152, y: 113, fontSize: 10, fill: '#64748b' },
+          { type: 'text', text: itemOneLabel, x: 22, y: 127, fontSize: 12, fill: '#111827' },
+          { type: 'text', text: money(itemOneAmount), x: 152, y: 127, fontSize: 12, fill: '#111827' },
+          { type: 'text', text: itemTwoLabel, x: 22, y: 141, fontSize: 12, fill: '#111827' },
+          { type: 'text', text: money(itemTwoAmount), x: 152, y: 141, fontSize: 12, fill: '#111827' },
+          { type: 'rect', x: 118, y: 156, width: 74, height: 22, fill: '#f1f5f9' },
+          { type: 'text', text: 'Total', x: 126, y: 165, fontSize: 10, fill: '#64748b' },
+          { type: 'text', text: money(total), x: 152, y: 165, fontSize: 15, fill: '#111827' },
           {
             type: 'polygon',
             points: [
-              { x: 18, y: 82 },
-              { x: 54, y: 108 },
-              { x: 90, y: 82 },
-              { x: 54, y: 56 },
+              { x: 18, y: 215 },
+              { x: 54, y: 189 },
+              { x: 90, y: 215 },
+              { x: 54, y: 241 },
             ],
             fill: '#e8f6ef',
             stroke: '#1b7f5a',
             strokeWidth: 1,
             closed: true,
           },
-          { type: 'text', text: badge, x: 39, y: 83, fontSize: 12, fill: '#126044' },
+          { type: 'text', text: badge, x: 39, y: 214, fontSize: 12, fill: '#126044' },
           {
             type: 'textBox',
             text: note,
             x: 104,
-            y: 65,
+            y: 194,
             width: 84,
             height: 38,
             fontSize: 10,
             fill: '#334155',
             lineHeight: 13,
           },
-          { type: 'line', x1: 18, y1: 34, x2: 192, y2: 34, stroke: '#cbd5e1', strokeWidth: 1 },
-          { type: 'text', text: footer, x: 18, y: 22, fontSize: 8, fill: '#64748b' },
+          { type: 'line', x1: 18, y1: 263, x2: 192, y2: 263, stroke: '#cbd5e1', strokeWidth: 1 },
+          { type: 'text', text: footer, x: 18, y: 275, fontSize: 8, fill: '#64748b' },
         ],
         annotations: [
           {
             type: 'link',
             x: 18,
-            y: 17,
+            y: 270,
             width: 52,
             height: 10,
             url: 'https://github.com/flash-tecnologia/crab-js/tree/main/packages/pdf-crab-js',

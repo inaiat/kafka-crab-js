@@ -1,12 +1,13 @@
 import { Buffer } from 'node:buffer'
 import { spawn, spawnSync } from 'node:child_process'
-import { mkdirSync, writeFileSync } from 'node:fs'
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { performance } from 'node:perf_hooks'
 import { fileURLToPath } from 'node:url'
 
 import { createPdfFromHtml } from 'html-to-pdf-crab-js'
-import { createPdf, PdfDocumentBuilder, type CreatePdfInput, type PdfElementInput } from 'pdf-crab-js'
+import { createPdf, PdfDocument, type CreatePdfInput, type PdfElementInput } from 'pdf-crab-js'
+import PDFDocument from 'pdfkit'
 
 const resultMarker = '__PDF_BENCHMARK_RESULT__'
 const columns = ['id', 'customer', 'product', 'region', 'amount', 'status', 'date', 'owner'] as const
@@ -16,10 +17,22 @@ const products = ['Pro Plan', 'Scale Plan', 'Core Plan', 'Insight Pack', 'Veloci
 const regions = ['LATAM', 'NA', 'EMEA', 'APAC'] as const
 const statuses = ['paid', 'pending', 'overdue', 'refunded'] as const
 const owners = ['team-a', 'team-b', 'team-c', 'team-d'] as const
+const benchmarkDirectory = path.dirname(fileURLToPath(import.meta.url))
+const benchmarkImage = readFileSync(
+  path.join(benchmarkDirectory, '../../examples/pdf-crab-js/screenshots/pdf-crab-js-example.pdf.png'),
+)
 
 type Column = (typeof columns)[number]
 type PdfBuffer = ReturnType<typeof createPdf>
-type ScenarioId = 'pdf-crab' | 'pdf-crab-builder' | 'html-to-pdf-crab-js' | 'gotenberg-node'
+type ScenarioId =
+  | 'pdf-crab'
+  | 'pdf-crab-document'
+  | 'pdf-crab-image'
+  | 'pdf-crab-document-image'
+  | 'pdfkit'
+  | 'pdfkit-image'
+  | 'html-to-pdf-crab-js'
+  | 'gotenberg-node'
 type ScenarioStatus = 'completed' | 'failed' | 'timeout'
 type TableRow = Record<Column, string>
 
@@ -79,17 +92,37 @@ const scenarioDefinitions: Record<ScenarioId, ScenarioDefinition> = {
     language: 'Node + pdf-crab',
     mode: 'local',
   },
-  'pdf-crab-builder': {
-    id: 'pdf-crab-builder',
+  'pdf-crab-document': {
+    id: 'pdf-crab-document',
     language: 'Node + pdf-crab',
-    mode: 'builder',
+    mode: 'document',
+  },
+  'pdf-crab-image': {
+    id: 'pdf-crab-image',
+    language: 'Node + pdf-crab',
+    mode: 'local-image',
+  },
+  'pdf-crab-document-image': {
+    id: 'pdf-crab-document-image',
+    language: 'Node + pdf-crab',
+    mode: 'document-image',
+  },
+  pdfkit: {
+    id: 'pdfkit',
+    language: 'Node + PDFKit',
+    mode: 'local',
+  },
+  'pdfkit-image': {
+    id: 'pdfkit-image',
+    language: 'Node + PDFKit',
+    mode: 'local-image',
   },
 }
 
 const pageWidth = 210
 const pageHeight = 297
 const tableX = 10
-const tableTopY = 256
+const tableTopY = 41
 const tableWidth = 190
 const headerHeight = 10
 const rowHeight = 12
@@ -170,18 +203,50 @@ function generateDataset(pages: number): Dataset {
 }
 
 function createBenchmarkInput(dataset: Dataset): CreatePdfInput {
+  const pages = Array.from({ length: dataset.pages }, (_unused, pageIndex) => ({
+    elements: createPageElements(dataset, pageIndex),
+    size: 'A4' as const,
+  }))
+  const firstPage = pages[0]
+
+  if (!firstPage) {
+    throw new Error('Benchmark dataset must contain at least one page')
+  }
+
   return {
     metadata: {
       creator: 'pdf-benchmark',
       producer: 'pdf-crab-js',
       title: `table benchmark (${dataset.pages} pages)`,
     },
-    pages: Array.from({ length: dataset.pages }, (_unused, pageIndex) => ({
-      elements: createPageElements(dataset, pageIndex),
-      height: pageHeight,
-      width: pageWidth,
-    })),
+    pages: [firstPage, ...pages.slice(1)],
     title: `table benchmark (${dataset.pages} pages)`,
+    unit: 'mm',
+  }
+}
+
+function createImageBenchmarkInput(dataset: Dataset): CreatePdfInput {
+  const pages = Array.from({ length: dataset.pages }, (_unused, pageIndex) => ({
+    elements: [
+      ...createPageElements(dataset, pageIndex),
+      { type: 'image' as const, source: benchmarkImage, x: 175, y: 260, width: 25 },
+    ],
+    size: 'A4' as const,
+  }))
+  const firstPage = pages[0]
+
+  if (!firstPage) {
+    throw new Error('Benchmark dataset must contain at least one page')
+  }
+
+  return {
+    metadata: {
+      creator: 'pdf-benchmark',
+      producer: 'pdf-crab-js',
+      title: `table image benchmark (${dataset.pages} pages)`,
+    },
+    pages: [firstPage, ...pages.slice(1)],
+    title: `table image benchmark (${dataset.pages} pages)`,
     unit: 'mm',
   }
 }
@@ -194,8 +259,8 @@ function createPageElementChunks(dataset: Dataset, pageIndex: number): PdfElemen
   const startRow = pageIndex * dataset.rowsPerPage
   const pageRows = dataset.rows.slice(startRow, startRow + dataset.rowsPerPage)
   const bodyHeight = dataset.rowsPerPage * rowHeight
-  const tableBottomY = tableTopY - headerHeight - bodyHeight
-  const headerBottomY = tableTopY - headerHeight
+  const tableBottomY = tableTopY + headerHeight + bodyHeight
+  const headerBottomY = tableTopY + headerHeight
   const headerElements: PdfElementInput[] = []
   const backgroundElements: PdfElementInput[] = []
   const gridElements: PdfElementInput[] = []
@@ -210,7 +275,7 @@ function createPageElementChunks(dataset: Dataset, pageIndex: number): PdfElemen
       text: 'Simple Revenue Table',
       type: 'text',
       x: tableX,
-      y: 277,
+      y: 15,
     },
     {
       fill: '#64748b',
@@ -218,7 +283,7 @@ function createPageElementChunks(dataset: Dataset, pageIndex: number): PdfElemen
       text: `Page ${pageIndex + 1} of ${dataset.pages}`,
       type: 'text',
       x: tableX,
-      y: 267,
+      y: 27,
     },
     {
       fill: '#e2e8f0',
@@ -226,7 +291,7 @@ function createPageElementChunks(dataset: Dataset, pageIndex: number): PdfElemen
       type: 'rect',
       width: tableWidth,
       x: tableX,
-      y: headerBottomY,
+      y: tableTopY,
     },
   )
 
@@ -237,7 +302,7 @@ function createPageElementChunks(dataset: Dataset, pageIndex: number): PdfElemen
       type: 'rect',
       width: tableWidth,
       x: tableX,
-      y: headerBottomY - (rowIndex + 1) * rowHeight,
+      y: headerBottomY + rowIndex * rowHeight,
     })
   }
 
@@ -245,7 +310,7 @@ function createPageElementChunks(dataset: Dataset, pageIndex: number): PdfElemen
   appendHeaderText(headerTextElements, headerBottomY)
 
   for (const [rowIndex, row] of pageRows.entries()) {
-    appendRowText(rowTextElements, row, headerBottomY - (rowIndex + 1) * rowHeight)
+    appendRowText(rowTextElements, row, headerBottomY + rowIndex * rowHeight)
   }
 
   return [
@@ -261,7 +326,7 @@ function createPageElementChunks(dataset: Dataset, pageIndex: number): PdfElemen
         text: `Rows ${startRow + 1}-${startRow + pageRows.length}`,
         type: 'text',
         x: tableX,
-        y: 22,
+        y: 272,
       },
     ],
   ]
@@ -269,7 +334,7 @@ function createPageElementChunks(dataset: Dataset, pageIndex: number): PdfElemen
 
 function appendGrid(elements: PdfElementInput[], tableBottomY: number): void {
   for (let lineIndex = 0; lineIndex <= rowsPerPage + 1; lineIndex += 1) {
-    const lineY = tableTopY - (lineIndex === 0 ? 0 : headerHeight + (lineIndex - 1) * rowHeight)
+    const lineY = tableTopY + (lineIndex === 0 ? 0 : headerHeight + (lineIndex - 1) * rowHeight)
 
     elements.push({
       stroke: '#cbd5e1',
@@ -308,7 +373,7 @@ function appendGrid(elements: PdfElementInput[], tableBottomY: number): void {
   })
 }
 
-function appendHeaderText(elements: PdfElementInput[], headerBottomY: number): void {
+function appendHeaderText(elements: PdfElementInput[], _headerBottomY: number): void {
   let cursorX = tableX
 
   for (const column of columns) {
@@ -319,7 +384,7 @@ function appendHeaderText(elements: PdfElementInput[], headerBottomY: number): v
       text: column.toUpperCase(),
       type: 'text',
       x: cursorX + cellPaddingX,
-      y: headerBottomY + 3.5,
+      y: tableTopY + 3.5,
     })
     cursorX += columnWidths[column]
   }
@@ -499,7 +564,7 @@ function readSelectedScenarios(): ScenarioId[] {
   const raw = process.env.PDF_BENCHMARK_ONLY?.trim()
 
   if (!raw) {
-    return ['pdf-crab', 'pdf-crab-builder', 'html-to-pdf-crab-js', 'gotenberg-node']
+    return ['pdf-crab', 'pdf-crab-document', 'pdfkit', 'html-to-pdf-crab-js', 'gotenberg-node']
   }
 
   const selected = raw
@@ -563,11 +628,13 @@ function formatThroughput(value: number): string {
 }
 
 function assertPdf(pdf: PdfBuffer): void {
-  if (!pdf.subarray(0, 5).equals(Buffer.from('%PDF-'))) {
+  const bytes = Buffer.from(pdf)
+
+  if (!bytes.subarray(0, 5).equals(Buffer.from('%PDF-'))) {
     throw new Error('Benchmark output does not start with %PDF-')
   }
 
-  if (!pdf.subarray(-16).toString('latin1').includes('%%EOF')) {
+  if (!bytes.subarray(-16).toString('latin1').includes('%%EOF')) {
     throw new Error('Benchmark output does not end with %%EOF')
   }
 }
@@ -675,12 +742,26 @@ function createScenarioRunner(
     return async () => createPdf(input)
   }
 
-  if (scenario.id === 'pdf-crab-builder') {
-    const pageChunks = Array.from({ length: dataset.pages }, (_unused, pageIndex) =>
-      createPageElementChunks(dataset, pageIndex),
-    )
+  if (scenario.id === 'pdf-crab-document') {
+    return async () => createPdfWithDocument(dataset)
+  }
 
-    return async () => createPdfWithBuilder(dataset, pageChunks)
+  if (scenario.id === 'pdf-crab-image') {
+    const input = createImageBenchmarkInput(dataset)
+
+    return async () => createPdf(input)
+  }
+
+  if (scenario.id === 'pdf-crab-document-image') {
+    return async () => createPdfWithDocument(dataset, true)
+  }
+
+  if (scenario.id === 'pdfkit') {
+    return async () => createPdfWithPdfKit(dataset)
+  }
+
+  if (scenario.id === 'pdfkit-image') {
+    return async () => createPdfWithPdfKit(dataset, true)
   }
 
   const html = createBenchmarkHtml(dataset)
@@ -699,8 +780,8 @@ function createScenarioRunner(
   return async () => createGotenbergPdf(config, html)
 }
 
-function createPdfWithBuilder(dataset: Dataset, pageChunks: PdfElementInput[][][]): PdfBuffer {
-  const builder = new PdfDocumentBuilder({
+function createPdfWithDocument(dataset: Dataset, includeImage = false): PdfBuffer {
+  const document = new PdfDocument({
     metadata: {
       creator: 'pdf-benchmark',
       producer: 'pdf-crab-js',
@@ -710,15 +791,205 @@ function createPdfWithBuilder(dataset: Dataset, pageChunks: PdfElementInput[][][
     unit: 'mm',
   })
 
-  for (const chunks of pageChunks) {
-    builder.startPage({ height: pageHeight, width: pageWidth })
-    for (const chunk of chunks) {
-      builder.appendElements(chunk)
+  for (let pageIndex = 0; pageIndex < dataset.pages; pageIndex += 1) {
+    if (pageIndex > 0) {
+      document.addPage({ size: 'A4', margin: 0 })
     }
-    builder.endPage()
+    for (const element of createPageElements(dataset, pageIndex)) {
+      appendElement(document, element)
+    }
+    if (includeImage) {
+      document.image(benchmarkImage, { x: 175, y: 260, width: 25 })
+    }
   }
 
-  return builder.finish()
+  return document.finish()
+}
+
+function appendElement(document: PdfDocument, element: PdfElementInput): void {
+  switch (element.type) {
+    case 'text': {
+      document.text(element.text, {
+        x: element.x,
+        y: element.y,
+        fill: element.fill,
+        font: element.font,
+        fontSize: element.fontSize,
+      })
+      return
+    }
+    case 'rect': {
+      document
+        .fillColor(element.fill ?? '#ffffff')
+        .strokeColor(element.stroke ?? '#000000')
+        .lineWidth(element.strokeWidth ?? 1)
+      document.rect(element.x, element.y, element.width, element.height)
+      if (element.fill && element.stroke) document.fillAndStroke()
+      else if (element.fill) document.fill()
+      else document.stroke()
+      return
+    }
+    case 'line': {
+      document
+        .strokeColor(element.stroke ?? '#000000')
+        .lineWidth(element.strokeWidth ?? 1)
+        .moveTo(element.x1, element.y1)
+        .lineTo(element.x2, element.y2)
+        .stroke()
+      return
+    }
+    default: {
+      throw new Error(`Unsupported benchmark element ${element.type}`)
+    }
+  }
+}
+
+function createPdfWithPdfKit(dataset: Dataset, includeImage = false): Promise<Buffer> {
+  const document = new PDFDocument({
+    autoFirstPage: false,
+    info: {
+      Creator: 'pdf-benchmark',
+      Producer: 'PDFKit',
+      Title: `table benchmark (${dataset.pages} pages)`,
+    },
+    margin: 0,
+  })
+  const chunks: Buffer[] = []
+
+  return new Promise((resolve, reject) => {
+    document.on('data', (chunk: Buffer) => chunks.push(chunk))
+    document.on('end', () => resolve(Buffer.concat(chunks)))
+    document.on('error', reject)
+
+    for (let pageIndex = 0; pageIndex < dataset.pages; pageIndex += 1) {
+      drawPdfKitPage(document, dataset, pageIndex, includeImage)
+    }
+
+    document.end()
+  })
+}
+
+function drawPdfKitPage(
+  document: PDFKit.PDFDocument,
+  dataset: Dataset,
+  pageIndex: number,
+  includeImage: boolean,
+): void {
+  document.addPage({ margin: 0, size: [toPoints(pageWidth), toPoints(pageHeight)] })
+
+  const startRow = pageIndex * dataset.rowsPerPage
+  const pageRows = dataset.rows.slice(startRow, startRow + dataset.rowsPerPage)
+  const tableTop = tableTopY
+  const headerBottom = tableTop + headerHeight
+  const tableBottom = headerBottom + dataset.rowsPerPage * rowHeight
+
+  document
+    .fillColor('#111827')
+    .font('Helvetica-Bold')
+    .fontSize(15)
+    .text('Simple Revenue Table', toPoints(tableX), toPoints(15), { lineBreak: false })
+  document
+    .fillColor('#64748b')
+    .font('Helvetica')
+    .fontSize(8)
+    .text(`Page ${pageIndex + 1} of ${dataset.pages}`, toPoints(tableX), toPoints(27), { lineBreak: false })
+
+  document.rect(toPoints(tableX), toPoints(tableTop), toPoints(tableWidth), toPoints(headerHeight)).fill('#e2e8f0')
+
+  for (let rowIndex = 0; rowIndex < dataset.rowsPerPage; rowIndex += 1) {
+    document
+      .rect(toPoints(tableX), toPoints(headerBottom + rowIndex * rowHeight), toPoints(tableWidth), toPoints(rowHeight))
+      .fill(rowIndex % 2 === 0 ? '#ffffff' : '#f8fafc')
+  }
+
+  drawPdfKitGrid(document, tableTop, tableBottom)
+  drawPdfKitHeader(document, tableTop)
+
+  for (const [rowIndex, row] of pageRows.entries()) {
+    drawPdfKitRow(document, row, headerBottom + rowIndex * rowHeight)
+  }
+
+  document
+    .fillColor('#64748b')
+    .font('Helvetica')
+    .fontSize(7)
+    .text(`Rows ${startRow + 1}-${startRow + pageRows.length}`, toPoints(tableX), toPoints(272), {
+      lineBreak: false,
+    })
+
+  if (includeImage) {
+    document.image(benchmarkImage, toPoints(175), toPoints(260), { width: toPoints(25) })
+  }
+}
+
+function drawPdfKitGrid(document: PDFKit.PDFDocument, tableTop: number, tableBottom: number): void {
+  for (let lineIndex = 0; lineIndex <= rowsPerPage + 1; lineIndex += 1) {
+    const lineY = tableTop + (lineIndex === 0 ? 0 : headerHeight + (lineIndex - 1) * rowHeight)
+    const borderWidth = lineIndex === 0 || lineIndex === rowsPerPage + 1 ? 0.8 : 0.4
+
+    document
+      .moveTo(toPoints(tableX), toPoints(lineY))
+      .lineTo(toPoints(tableX + tableWidth), toPoints(lineY))
+      .lineWidth(toPoints(borderWidth))
+      .strokeColor('#cbd5e1')
+      .stroke()
+  }
+
+  let cursorX = tableX
+
+  for (const column of columns) {
+    document
+      .moveTo(toPoints(cursorX), toPoints(tableTop))
+      .lineTo(toPoints(cursorX), toPoints(tableBottom))
+      .lineWidth(toPoints(0.4))
+      .strokeColor('#cbd5e1')
+      .stroke()
+    cursorX += columnWidths[column]
+  }
+
+  document
+    .moveTo(toPoints(tableX + tableWidth), toPoints(tableTop))
+    .lineTo(toPoints(tableX + tableWidth), toPoints(tableBottom))
+    .lineWidth(toPoints(0.4))
+    .strokeColor('#cbd5e1')
+    .stroke()
+}
+
+function drawPdfKitHeader(document: PDFKit.PDFDocument, tableTop: number): void {
+  let cursorX = tableX
+
+  document.fillColor('#0f172a').font('Helvetica-Bold').fontSize(6.8)
+
+  for (const column of columns) {
+    document.text(column.toUpperCase(), toPoints(cursorX + cellPaddingX), toPoints(tableTop + 3.5), {
+      lineBreak: false,
+      width: toPoints(columnWidths[column] - cellPaddingX * 2),
+    })
+    cursorX += columnWidths[column]
+  }
+}
+
+function drawPdfKitRow(document: PDFKit.PDFDocument, row: TableRow, rowTop: number): void {
+  let cursorX = tableX
+
+  document.fillColor('#111827').font('Helvetica').fontSize(6.6)
+
+  for (const column of columns) {
+    document.text(
+      truncate(row[column], columnTextLimits[column]),
+      toPoints(cursorX + cellPaddingX),
+      toPoints(rowTop + 4.5),
+      {
+        lineBreak: false,
+        width: toPoints(columnWidths[column] - cellPaddingX * 2),
+      },
+    )
+    cursorX += columnWidths[column]
+  }
+}
+
+function toPoints(millimeters: number): number {
+  return (millimeters * 72) / 25.4
 }
 
 function createFailedResult(

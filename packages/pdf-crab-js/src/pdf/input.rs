@@ -1,3 +1,4 @@
+use napi::bindgen_prelude::Buffer;
 use napi_derive::napi;
 
 #[napi(object)]
@@ -33,7 +34,7 @@ pub struct PdfPageInput {
 
 #[napi(object)]
 pub struct PdfElementInput {
-  #[napi(ts_type = "'text' | 'line' | 'rect' | 'textBox' | 'polygon' | 'path'")]
+  #[napi(ts_type = "'text' | 'line' | 'rect' | 'textBox' | 'polygon' | 'path' | 'image'")]
   pub r#type: String,
   pub text: Option<String>,
   pub x: Option<f64>,
@@ -57,6 +58,8 @@ pub struct PdfElementInput {
   pub closed: Option<bool>,
   #[napi(ts_type = "'nonZero' | 'evenOdd'")]
   pub winding: Option<String>,
+  #[napi(ts_type = "Buffer | Uint8Array")]
+  pub image_data: Option<Buffer>,
 }
 
 #[napi(object)]

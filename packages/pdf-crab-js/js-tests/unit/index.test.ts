@@ -1,385 +1,151 @@
+import { readFileSync } from 'node:fs'
 import { equal, match, ok, throws } from 'node:assert/strict'
 import { test } from 'vite-plus/test'
 
-import * as pdfCrab from '../../index.js'
-import { createPdf, createPdfAsync, PdfDocumentBuilder } from '../../index.js'
+import * as pdfCrab from '../../dist/index.js'
+import { createPdf, createPdfAsync, PdfDocument } from '../../dist/index.js'
 
-function assertPdfBuffer(pdf: Buffer): void {
-  ok(Buffer.isBuffer(pdf))
-  equal(pdf.subarray(0, 5).toString('utf8'), '%PDF-')
-  equal(pdf.toString('utf8').trimEnd().endsWith('%%EOF'), true)
+function assertPdfBuffer(pdf: Uint8Array): void {
+  ok(pdf instanceof Uint8Array)
+  const bytes = Buffer.from(pdf)
+  equal(bytes.subarray(0, 5).toString('utf8'), '%PDF-')
+  equal(bytes.toString('utf8').trimEnd().endsWith('%%EOF'), true)
 }
 
-function createPdfUnchecked(input: unknown): Buffer {
-  return createPdf(input as never)
-}
+const imagePath = new URL('../../../../examples/pdf-crab-js/screenshots/pdf-crab-js-example.pdf.png', import.meta.url)
+const imageBytes = readFileSync(imagePath)
+const tinyJpegBytes = Buffer.from(
+  '/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAYEBQYFBAYGBQYHBwYIChAKCgkJChQODwwQFxQYGBcUFhYaHSUfGhsjHBYWICwgIyYnKSopGR8tMC0oMCUoKSj/2wBDAQcHBwoIChMKChMoGhYaKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCj/wAARCAABAAEDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAf/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/8QAFQEBAQAAAAAAAAAAAAAAAAAABgj/xAAUEQEAAAAAAAAAAAAAAAAAAAAA/9oADAMBAAIRAxEAPwCdABykX//Z',
+  'base64',
+)
+const alphaPngBytes = Buffer.from(
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
+  'base64',
+)
 
-test('public API exports expose the pdf-writer phase surface', () => {
+test('public API exposes PdfDocument and declarative helpers without the legacy builder', () => {
   const publicApi = pdfCrab as Record<string, unknown>
 
   equal(typeof createPdf, 'function')
   equal(typeof createPdfAsync, 'function')
-  equal(typeof PdfDocumentBuilder, 'function')
-  equal(publicApi.createPdfFromHtml, undefined)
-  equal(publicApi.createPdfFromHtmlWithFulgur, undefined)
-  equal(publicApi.createPdfFromHtmlAsync, undefined)
-  equal(publicApi.parsePdf, undefined)
-  equal(publicApi.renderPdfPageToSvg, undefined)
-  equal(publicApi.renderPdfPageToSvgAsync, undefined)
+  equal(typeof PdfDocument, 'function')
+  equal(publicApi.PdfDocumentBuilder, undefined)
 })
 
-test('createPdf returns a PDF buffer for one page with text', () => {
-  const pdf = createPdf({
-    title: 'Hello PDF',
-    pages: [
-      {
-        width: 210,
-        height: 297,
-        elements: [
-          {
-            type: 'text',
-            text: 'Hello from pdf-crab-js',
-            x: 20,
-            y: 260,
-          },
-        ],
-      },
-    ],
-  })
+test('PdfDocument uses A4 defaults, cursor flow, styles, and Uint8Array output', () => {
+  const document = new PdfDocument()
+  document.fillColor('#111111').fontSize(14).text('Hello from pdf-crab-js').moveDown().rect(20, 50, 40, 20).fill()
+
+  const pdf = document.finish()
 
   assertPdfBuffer(pdf)
-  match(pdf.toString('latin1'), /Hello from pdf-crab-js/)
+  match(Buffer.from(pdf).toString('latin1'), /Hello from pdf-crab-js/)
+  equal(document.x, 20)
+  ok(Math.abs(document.y - 31.852) < 0.01)
 })
 
-test('createPdf maps text, line, and rectangle elements', () => {
-  const pdf = createPdf({
-    unit: 'pt',
-    pages: [
-      {
-        width: 300,
-        height: 300,
-        elements: [
-          {
-            type: 'rect',
-            x: 32,
-            y: 80,
-            width: 180,
-            height: 96,
-            fill: '#f3f4f6',
-            stroke: '#111827',
-            strokeWidth: 2,
-          },
-          {
-            type: 'line',
-            x1: 32,
-            y1: 208,
-            x2: 212,
-            y2: 208,
-            stroke: '#2563eb',
-            strokeWidth: 1.5,
-          },
-          {
-            type: 'text',
-            text: 'Mixed elements',
-            x: 40,
-            y: 132,
-            font: 'HelveticaBold',
-            fontSize: 16,
-            fill: '#111827',
-          },
-        ],
-      },
-    ],
-  })
+test('PdfDocument supports paths, links, pages, and async finish', async () => {
+  const document = new PdfDocument({ unit: 'pt', size: [200, 200], margin: 12 })
+  document
+    .moveTo(20, 20)
+    .lineTo(100, 20)
+    .lineTo(100, 80)
+    .closePath()
+    .fillAndStroke()
+    .link('https://example.com', { x: 20, y: 90, width: 40, height: 12 })
+    .addPage({ size: 'A4' })
+    .text('second page')
+
+  const pdf = await document.finishAsync()
 
   assertPdfBuffer(pdf)
-  const body = pdf.toString('latin1')
-  match(body, / re\n/)
-  match(body, / l\n/)
-  match(body, /Mixed elements/)
+  const body = Buffer.from(pdf).toString('latin1')
+  match(body, /https:\/\/example\.com/)
+  match(body, /second page/)
 })
 
-test('createPdf maps textBox, polygon, path, metadata, and link annotations', () => {
+test('PdfDocument rejects unpainted paths and invalid state transitions', () => {
+  const document = new PdfDocument({ size: [100, 100], unit: 'pt', margin: 10 })
+  document.moveTo(10, 10).lineTo(20, 20)
+
+  throws(() => document.finish(), /unpainted path/)
+  document.discardPath().finish()
+  throws(() => document.text('after finish'), /already finished/)
+})
+
+test('PdfDocument embeds PNG/JPEG-compatible image bytes, fits images, and supports Node paths', () => {
+  const document = new PdfDocument({ unit: 'mm' })
+  document
+    .text('before')
+    .image(imageBytes, { fit: [60, 40], align: 'center' })
+    .image(imagePath.pathname, { width: 20 })
+
+  const pdf = document.finish()
+  const body = Buffer.from(pdf).toString('latin1')
+
+  assertPdfBuffer(pdf)
+  match(body, /\/Subtype \/Image/)
+})
+
+test('images preserve JPEG encoding and PNG transparency through a soft mask', () => {
+  const jpegPdf = new PdfDocument({ unit: 'pt', size: [100, 100], margin: 0 }).image(tinyJpegBytes).finish()
+  const jpegBody = Buffer.from(jpegPdf).toString('latin1')
+  match(jpegBody, /\/Filter \/DCTDecode/)
+
+  const pngPdf = new PdfDocument({ unit: 'pt', size: [100, 100], margin: 0 }).image(alphaPngBytes).finish()
+  const pngBody = Buffer.from(pngPdf).toString('latin1')
+  match(pngBody, /\/SMask \d+ 0 R/)
+})
+
+test('createPdf supports strict page sizes, top-left elements, images, and metadata', () => {
   const pdf = createPdf({
     title: 'Rich PDF',
-    metadata: {
-      author: 'pdf-crab-js',
-      subject: 'feature coverage',
-      keywords: ['pdf', 'pdf-writer'],
-      trapped: false,
-    },
+    unit: 'pt',
+    metadata: { author: 'pdf-crab-js', keywords: ['pdf', 'image'] },
     pages: [
       {
-        width: 210,
-        height: 297,
-        annotations: [
-          {
-            type: 'link',
-            x: 20,
-            y: 20,
-            width: 50,
-            height: 12,
-            url: 'https://example.com',
-          },
-        ],
+        size: [300, 300],
         elements: [
-          {
-            type: 'textBox',
-            text: 'This wrapped text box proves line layout for a longer paragraph.',
-            x: 20,
-            y: 210,
-            width: 70,
-            height: 30,
-            align: 'left',
-            hyphenate: true,
-          },
-          {
-            type: 'polygon',
-            points: [
-              { x: 120, y: 220 },
-              { x: 160, y: 220 },
-              { x: 140, y: 250 },
-            ],
-            fill: '#22c55e',
-            stroke: '#14532d',
-          },
-          {
-            type: 'path',
-            points: [
-              { x: 120, y: 200 },
-              { x: 160, y: 205 },
-              { x: 140, y: 190 },
-            ],
-            closed: false,
-            stroke: '#2563eb',
-          },
+          { type: 'rect', x: 32, y: 80, width: 180, height: 96, fill: '#f3f4f6', stroke: '#111827', strokeWidth: 2 },
+          { type: 'line', x1: 32, y1: 208, x2: 212, y2: 208, stroke: '#2563eb', strokeWidth: 1.5 },
+          { type: 'text', text: 'Mixed elements', x: 40, y: 32, font: 'HelveticaBold', fontSize: 16, fill: '#111827' },
+          { type: 'image', source: imageBytes, x: 20, y: 200, fit: [60, 60], align: 'center', valign: 'center' },
         ],
       },
     ],
   })
 
   assertPdfBuffer(pdf)
-  const body = pdf.toString('latin1')
+  const body = Buffer.from(pdf).toString('latin1')
   match(body, /Rich PDF/)
-  match(body, /pdf-writer/)
-  match(body, /https:\/\/example\.com/)
-  match(body, /This wrapped text/)
+  match(body, /Mixed elements/)
+  match(body, /\/Subtype \/Image/)
 })
 
-test('createPdfAsync returns a PDF buffer', async () => {
+test('createPdfAsync returns a PDF Uint8Array', async () => {
   const pdf = await createPdfAsync({
-    pages: [
-      {
-        width: 210,
-        height: 297,
-        elements: [{ type: 'text', text: 'Async PDF', x: 20, y: 260 }],
-      },
-    ],
+    pages: [{ size: 'A4', elements: [{ type: 'text', text: 'Async PDF', x: 20, y: 20 }] }],
   })
 
   assertPdfBuffer(pdf)
-  match(pdf.toString('latin1'), /Async PDF/)
+  match(Buffer.from(pdf).toString('latin1'), /Async PDF/)
 })
 
-test('PdfDocumentBuilder builds a PDF with chunked page elements', () => {
-  const builder = new PdfDocumentBuilder({
-    title: 'Builder PDF',
-    metadata: {
-      creator: 'builder test',
-    },
-  })
-
-  builder.startPage({ width: 210, height: 297 })
-  builder.appendElements([
-    {
-      type: 'text',
-      text: 'Builder page',
-      x: 20,
-      y: 260,
-      font: 'HelveticaBold',
-    },
-  ])
-  builder.appendElements([
-    {
-      type: 'line',
-      x1: 20,
-      y1: 250,
-      x2: 120,
-      y2: 250,
-      stroke: '#2563eb',
-    },
-  ])
-  builder.appendAnnotations([
-    {
-      type: 'link',
-      x: 20,
-      y: 235,
-      width: 40,
-      height: 10,
-      url: 'https://example.com/builder',
-    },
-  ])
-  builder.endPage()
-
-  const pdf = builder.finish()
-
-  assertPdfBuffer(pdf)
-  const body = pdf.toString('latin1')
-  match(body, /Builder page/)
-  match(body, /https:\/\/example\.com\/builder/)
-})
-
-test('PdfDocumentBuilder addPage, addPages, and finishAsync work', async () => {
-  const builder = new PdfDocumentBuilder()
-
-  builder.addPage({
-    width: 210,
-    height: 297,
-    elements: [{ type: 'text', text: 'First builder page', x: 20, y: 260 }],
-  })
-  builder.addPages([
-    {
-      width: 210,
-      height: 297,
-      elements: [{ type: 'text', text: 'Second builder page', x: 20, y: 260 }],
-    },
-  ])
-
-  const pdf = await builder.finishAsync()
-
-  assertPdfBuffer(pdf)
-  const body = pdf.toString('latin1')
-  match(body, /First builder page/)
-  match(body, /Second builder page/)
-})
-
-test('PdfDocumentBuilder validates state transitions', () => {
-  const builder = new PdfDocumentBuilder()
-
-  throws(
-    () => builder.appendElements([]),
-    (error) => {
-      match((error as Error).message, /appendElements requires an open page/)
-      return true
-    },
-  )
-  throws(
-    () => builder.finish(),
-    (error) => {
-      match((error as Error).message, /pages must contain at least one page/)
-      return true
-    },
-  )
-  throws(
-    () => builder.startPage({ width: 210, height: 297 }),
-    (error) => {
-      match((error as Error).message, /already finished/)
-      return true
-    },
-  )
-})
-
-test('PdfDocumentBuilder rejects nested pages and open-page finish', () => {
-  const nestedBuilder = new PdfDocumentBuilder()
-  nestedBuilder.startPage({ width: 210, height: 297 })
-
-  throws(
-    () => nestedBuilder.startPage({ width: 210, height: 297 }),
-    (error) => {
-      match((error as Error).message, /cannot start a new page/)
-      return true
-    },
-  )
-  throws(
-    () => nestedBuilder.finish(),
-    (error) => {
-      match((error as Error).message, /cannot finish while a page is open/)
-      return true
-    },
-  )
-})
-
-test('createPdf validates missing pages', () => {
-  throws(
-    () => createPdfUnchecked({}),
-    (error) => {
-      match((error as Error).message, /pages is required/)
-      return true
-    },
-  )
-})
-
-test('createPdf validates page dimensions', () => {
-  throws(
-    () => createPdf({ pages: [{ width: 0, height: 297 }] }),
-    (error) => {
-      match((error as Error).message, /pages\[0\]\.width must be greater than 0/)
-      return true
-    },
-  )
-})
-
-test('createPdf validates unknown element types', () => {
+test('createPdf validates pages, sizes, element types, and image bytes', () => {
+  throws(() => createPdf({ pages: [] as never }), /pages must contain at least one page/)
+  throws(() => createPdf({ pages: [{ size: [0, 100] }] }), /page size width/)
   throws(
     () =>
-      createPdfUnchecked({
-        pages: [
-          {
-            width: 210,
-            height: 297,
-            elements: [{ type: 'circle' }],
-          },
-        ],
+      createPdf({
+        pages: [{ size: 'A4', elements: [{ type: 'circle' } as never] }],
       }),
-    (error) => {
-      match((error as Error).message, /pages\[0\]\.elements\[0\]\.type must be one of/)
-      return true
-    },
+    /type must be one of/,
   )
-})
-
-test('createPdf validates missing required element fields', () => {
   throws(
     () =>
-      createPdfUnchecked({
-        pages: [
-          {
-            width: 210,
-            height: 297,
-            elements: [{ type: 'text', x: 20, y: 260 }],
-          },
-        ],
+      createPdf({
+        pages: [{ size: 'A4', elements: [{ type: 'image', source: new Uint8Array([1, 2, 3]), x: 0, y: 0 } as never] }],
       }),
-    (error) => {
-      match((error as Error).message, /pages\[0\]\.elements\[0\]\.text is required/)
-      return true
-    },
-  )
-})
-
-test('createPdf rejects bezier path points in the pdf-writer phase', () => {
-  throws(
-    () =>
-      createPdfUnchecked({
-        pages: [
-          {
-            width: 210,
-            height: 297,
-            elements: [
-              {
-                type: 'path',
-                points: [
-                  { x: 10, y: 10 },
-                  { x: 20, y: 20, bezier: true },
-                ],
-              },
-            ],
-          },
-        ],
-      }),
-    (error) => {
-      match((error as Error).message, /bezier is not supported/)
-      return true
-    },
+    /unsupported image format|image format could not be detected/,
   )
 })

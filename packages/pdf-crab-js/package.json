@@ -1,6 +1,6 @@
 {
   "name": "pdf-crab-js",
-  "version": "0.3.0",
+  "version": "1.0.0",
   "keywords": [
     "N-API",
     "Rust",
@@ -19,29 +19,40 @@
     "directory": "packages/pdf-crab-js"
   },
   "files": [
+    "dist",
     "browser.js",
-    "index.d.ts",
-    "index.js"
+    "browser.d.ts",
+    "js-binding.js",
+    "js-binding.cjs",
+    "js-binding.d.ts",
+    "*.wasi-browser.js",
+    "*.wasi.cjs",
+    "*.wasi.d.cts",
+    "*.wasm",
+    "wasi-worker*.mjs"
   ],
   "type": "module",
-  "main": "index.js",
+  "main": "./dist/index.js",
   "browser": "./browser.js",
-  "types": "index.d.ts",
+  "types": "./dist/index.d.ts",
   "exports": {
     ".": {
-      "types": "./index.d.ts",
-      "import": "./index.js"
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
     },
     "./browser": {
-      "types": "./index.d.ts",
+      "types": "./browser.d.ts",
+      "import": "./browser.js",
       "default": "./browser.js"
     },
     "./browser.js": {
-      "types": "./index.d.ts",
+      "types": "./browser.d.ts",
+      "import": "./browser.js",
       "default": "./browser.js"
     },
     "./wasm": {
-      "types": "./index.d.ts",
+      "types": "./browser.d.ts",
       "import": "./browser.js",
       "default": "./browser.js"
     }
@@ -63,8 +74,8 @@
     "lint": "vp lint",
     "lint:fix": "vp lint --fix",
     "prepublishOnly": "napi prepublish -t npm",
-    "test": "vp test run js-tests/unit",
-    "test:wasm": "NAPI_RS_FORCE_WASI=error node js-tests/wasm-smoke.mjs"
+    "test": "pnpm run build && vp test run js-tests/unit",
+    "test:wasm": "pnpm run build:wasm && NAPI_RS_FORCE_WASI=error node js-tests/wasm-smoke.mjs"
   },
   "devDependencies": {
     "@emnapi/core": "catalog:",
