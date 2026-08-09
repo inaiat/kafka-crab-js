@@ -26,9 +26,9 @@ async function* outputForIteration(input: PdfDocumentInput): AsyncIterable<Uint8
   for await (const chunk of renderPdf(input)) yield chunk
 }
 
-const imagePath = new URL('../../../../examples/pdf-crab-js/screenshots/pdf-crab-js-example.pdf.png', import.meta.url)
+const imagePath = new URL('assets/test-image.png', import.meta.url)
 const imageBytes = readFileSync(imagePath)
-const fontPath = new URL('../../../../examples/html-to-pdf-crab-js/assets/Tuffy.ttf', import.meta.url)
+const fontPath = new URL('assets/Tuffy.ttf', import.meta.url)
 const fontBytes = readFileSync(fontPath)
 
 test('public API exposes the unified render contract', () => {

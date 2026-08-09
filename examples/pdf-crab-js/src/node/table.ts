@@ -4,8 +4,8 @@ import { fileURLToPath } from 'node:url'
 
 import { PdfDocument } from 'pdf-crab-js'
 
-const currentDirectory = path.dirname(fileURLToPath(import.meta.url))
-const outputDirectory = path.join(currentDirectory, 'output')
+const exampleDirectory = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..')
+const outputDirectory = path.join(exampleDirectory, 'output')
 const outputPath = path.join(outputDirectory, 'pdf-crab-js-table-example.pdf')
 
 type TableRow = {

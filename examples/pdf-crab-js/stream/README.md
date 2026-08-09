@@ -1,6 +1,9 @@
 # pdf-crab-js stream examples
 
-These examples show the portable `AsyncIterable<Uint8Array>` stream API and its Node.js adapter.
+These examples show the portable `AsyncIterable<Uint8Array>` stream API and its Node.js adapter:
+
+- [Node.js source](../src/node/stream.ts)
+- [Browser/WASM source](../src/browser/stream.ts)
 
 ## Node.js
 

@@ -4,10 +4,10 @@ import { fileURLToPath } from 'node:url'
 
 import { renderPdf } from 'pdf-crab-js'
 
-const currentDirectory = path.dirname(fileURLToPath(import.meta.url))
-const outputDirectory = path.join(currentDirectory, 'output')
-const outputPath = path.join(outputDirectory, 'pdf-crab-js-example.pdf')
-const previewImage = readFileSync(path.join(currentDirectory, 'screenshots/pdf-crab-js-example.pdf.png'))
+const exampleDirectory = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..')
+const outputDirectory = path.join(exampleDirectory, 'output')
+const outputPath = path.join(outputDirectory, 'pdf-crab-js-declarative-example.pdf')
+const previewImage = readFileSync(path.join(exampleDirectory, 'screenshots/pdf-crab-js-declarative-example.pdf.png'))
 
 const output = renderPdf({
   title: 'pdf-crab-js example',

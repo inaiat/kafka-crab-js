@@ -30,7 +30,7 @@ export default defineConfig({
         },
       },
       {
-        files: ['wasm/browser.ts', 'stream/browser.ts'],
+        files: ['src/browser/*.ts'],
         rules: {
           'unicorn/prefer-node-protocol': 'off',
         },

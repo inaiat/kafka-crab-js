@@ -20,7 +20,7 @@ const statuses = ['paid', 'pending', 'overdue', 'refunded'] as const
 const owners = ['team-a', 'team-b', 'team-c', 'team-d'] as const
 const benchmarkDirectory = path.dirname(fileURLToPath(import.meta.url))
 const benchmarkImage = readFileSync(
-  path.join(benchmarkDirectory, '../../examples/pdf-crab-js/screenshots/pdf-crab-js-example.pdf.png'),
+  path.join(benchmarkDirectory, '../../examples/pdf-crab-js/screenshots/pdf-crab-js-declarative-example.pdf.png'),
 )
 
 type Column = (typeof columns)[number]
@@ -79,13 +79,11 @@ interface ScenarioResult {
   id: ScenarioId
   language: string
   meanMs: number
-  meanTtfbMs: number | null
   mode: string
   output: ScenarioOutputMode
   pages: number
   p50Ms: number
   p95Ms: number
-  p50TtfbMs: number | null
   pdfSizeBytes: number
   peakRssBytes: number
   status: ScenarioStatus
@@ -98,7 +96,6 @@ interface ScenarioOutput {
   pdfSizeBytes?: number
   pdfSuffix?: Buffer
   outputWritten?: boolean
-  ttfbMs?: number
 }
 
 const scenarioDefinitions: Record<ScenarioId, ScenarioDefinition> = {
@@ -640,7 +637,7 @@ function readSelectedScenarios(): ScenarioId[] {
   const raw = process.env.PDF_BENCHMARK_ONLY?.trim()
 
   if (!raw) {
-    return [
+    const selected: ScenarioId[] = [
       'pdf-crab',
       'pdf-crab-document',
       'pdf-crab-stream',
@@ -649,8 +646,12 @@ function readSelectedScenarios(): ScenarioId[] {
       'pdfkit-stream',
       'pdfkit-table',
       'pdfkit-table-stream',
-      'html-to-pdf-crab-js',
     ]
+
+    if (readEnabled('PDF_BENCHMARK_ENABLE_HTML')) selected.push('html-to-pdf-crab-js')
+    if (readEnabled('PDF_BENCHMARK_ENABLE_GOTENBERG')) selected.push('gotenberg-node')
+
+    return selected
   }
 
   const selected = raw
@@ -671,6 +672,20 @@ function readSelectedScenarios(): ScenarioId[] {
   return selected as ScenarioId[]
 }
 
+function readEnabled(name: string): boolean {
+  const raw = process.env[name]?.trim()
+
+  if (!raw || raw === '0') {
+    return false
+  }
+
+  if (raw === '1') {
+    return true
+  }
+
+  throw new Error(`${name} must be 0 or 1`)
+}
+
 function collectGarbage(): void {
   const runtimeGlobal = globalThis as typeof globalThis & { gc?: () => void }
 
@@ -689,10 +704,6 @@ function percentile(values: readonly number[], quantile: number): number {
   const sorted = values.toSorted((left, right) => left - right)
   const index = Math.min(sorted.length - 1, Math.max(0, Math.ceil(sorted.length * quantile) - 1))
   return sorted[index] ?? Number.POSITIVE_INFINITY
-}
-
-function nullablePercentile(values: readonly number[], quantile: number): number | null {
-  return values.length === 0 ? null : percentile(values, quantile)
 }
 
 function formatDuration(value: number | null | undefined): string {
@@ -812,7 +823,6 @@ async function runMeasuredScenario(config: BenchmarkConfig, scenario: ScenarioDe
   const dataset = generateDataset(config.pages)
   const runner = createScenarioRunner(config, scenario, dataset)
   const durationsMs: number[] = []
-  const ttfbSamples: number[] = []
   let output: ScenarioOutput | undefined
   let peakRssBytes = process.memoryUsage().rss
   const sampleRss = (): void => {
@@ -824,7 +834,6 @@ async function runMeasuredScenario(config: BenchmarkConfig, scenario: ScenarioDe
     for (let index = 0; index < config.warmupRuns; index += 1) {
       sampleRss()
       output = await runner()
-      if (output.ttfbMs !== undefined) ttfbSamples.push(output.ttfbMs)
       sampleRss()
     }
 
@@ -834,7 +843,6 @@ async function runMeasuredScenario(config: BenchmarkConfig, scenario: ScenarioDe
       const start = performance.now()
       output = await runner()
       durationsMs.push(performance.now() - start)
-      if (output.ttfbMs !== undefined) ttfbSamples.push(output.ttfbMs)
       sampleRss()
     }
   } finally {
@@ -849,7 +857,6 @@ async function runMeasuredScenario(config: BenchmarkConfig, scenario: ScenarioDe
   maybeWriteOutput(config, scenario, output)
 
   const meanMs = average(durationsMs)
-  const measuredTtfbSamples = ttfbSamples.slice(-config.runs)
 
   return {
     durationsMs,
@@ -857,13 +864,11 @@ async function runMeasuredScenario(config: BenchmarkConfig, scenario: ScenarioDe
     id: scenario.id,
     language: scenario.language,
     meanMs,
-    meanTtfbMs: measuredTtfbSamples.length > 0 ? average(measuredTtfbSamples) : null,
     mode: scenario.mode,
     output: scenario.output,
     pages: config.pages,
     p50Ms: percentile(durationsMs, 0.5),
     p95Ms: percentile(durationsMs, 0.95),
-    p50TtfbMs: nullablePercentile(measuredTtfbSamples, 0.5),
     pdfSizeBytes: output.pdf?.length ?? output.pdfSizeBytes ?? 0,
     peakRssBytes,
     status: 'completed',
@@ -891,11 +896,11 @@ function createScenarioRunner(
   if (scenario.id === 'pdf-crab-stream') {
     const input = createBenchmarkInput(dataset)
 
-    return async () => collectPdfStream(() => renderPdf(input), streamedOutputPath, performance.now())
+    return async () => collectPdfStream(() => renderPdf(input), streamedOutputPath)
   }
 
   if (scenario.id === 'pdf-crab-document-stream') {
-    return async () => createPdfWithDocumentStream(dataset, streamedOutputPath, performance.now())
+    return async () => createPdfWithDocumentStream(dataset, streamedOutputPath)
   }
 
   if (scenario.id === 'pdf-crab-image') {
@@ -949,12 +954,8 @@ async function createPdfWithDocument(dataset: Dataset, includeImage = false): Pr
   return buildPdfDocument(dataset, includeImage).render().bytes()
 }
 
-async function createPdfWithDocumentStream(
-  dataset: Dataset,
-  outputPath?: string,
-  startedAt = performance.now(),
-): Promise<ScenarioOutput> {
-  return collectPdfStream(() => buildPdfDocument(dataset).render(), outputPath, startedAt)
+async function createPdfWithDocumentStream(dataset: Dataset, outputPath?: string): Promise<ScenarioOutput> {
+  return collectPdfStream(() => buildPdfDocument(dataset).render(), outputPath)
 }
 
 function buildPdfDocument(dataset: Dataset, includeImage = false): PdfDocument {
@@ -1006,9 +1007,7 @@ function createTableColumns(): PdfTableColumn<TableRow>[] {
 async function collectPdfStream(
   createOutput: () => AsyncIterable<Uint8Array>,
   outputPath?: string,
-  startedAt = performance.now(),
 ): Promise<ScenarioOutput> {
-  let ttfbMs: number | undefined
   let prefix = Buffer.alloc(0)
   let suffix = Buffer.alloc(0)
   let totalBytes = 0
@@ -1019,7 +1018,6 @@ async function collectPdfStream(
       if (!(chunk instanceof Uint8Array) || chunk.byteLength === 0) {
         throw new Error('PDF stream yielded an invalid chunk')
       }
-      ttfbMs ??= performance.now() - startedAt
       if (file !== undefined) await file.write(chunk)
       const chunkBuffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk)
       if (prefix.length < 5) prefix = Buffer.concat([prefix, chunkBuffer]).subarray(0, 5)
@@ -1035,7 +1033,6 @@ async function collectPdfStream(
     pdfPrefix: prefix,
     pdfSizeBytes: totalBytes,
     pdfSuffix: suffix,
-    ttfbMs,
   }
 }
 
@@ -1129,14 +1126,7 @@ function createPdfKitStream(
     },
     margin: 0,
   })
-  const startedAt = performance.now()
-  let ttfbMs: number | undefined
-
-  document.on('data', () => {
-    ttfbMs ??= performance.now() - startedAt
-  })
-
-  const output = collectPdfKitStream(document, outputPath, () => ttfbMs)
+  const output = collectPdfKitStream(document, outputPath)
 
   setImmediate(() => {
     try {
@@ -1156,7 +1146,6 @@ function createPdfKitStream(
 async function collectPdfKitStream(
   document: PDFKit.PDFDocument,
   outputPath: string | undefined,
-  getTtfb: () => number | undefined,
 ): Promise<ScenarioOutput> {
   let prefix = Buffer.alloc(0)
   let suffix = Buffer.alloc(0)
@@ -1182,7 +1171,6 @@ async function collectPdfKitStream(
     pdfPrefix: prefix,
     pdfSizeBytes: totalBytes,
     pdfSuffix: suffix,
-    ttfbMs: getTtfb(),
   }
 }
 
@@ -1378,13 +1366,11 @@ function createFailedResult(
     id: scenario.id,
     language: scenario.language,
     meanMs: Number.POSITIVE_INFINITY,
-    meanTtfbMs: null,
     mode: scenario.mode,
     output: scenario.output,
     pages: config.pages,
     p50Ms: Number.POSITIVE_INFINITY,
     p95Ms: Number.POSITIVE_INFINITY,
-    p50TtfbMs: null,
     pdfSizeBytes: 0,
     peakRssBytes: 0,
     status,
@@ -1560,13 +1546,12 @@ function printResults(config: BenchmarkConfig, results: readonly ScenarioResult[
             'Mode',
             'p50',
             'p95',
-            'TTFB p50',
             'Throughput (p50)',
             'Peak RAM',
             'PDF size',
             'Status',
           ],
-          rightAlignedColumns: new Set([0, 3, 4, 5, 6, 7, 8]),
+          rightAlignedColumns: new Set([0, 3, 4, 5, 6, 7]),
           rows: groupResults.map((result, index) => formatResultRow(result, index, config.colors)),
         },
         config.colors,
@@ -1595,7 +1580,6 @@ function formatResultRow(result: ScenarioResult, index: number, useColors: boole
     result.mode,
     formatDuration(result.p50Ms),
     formatDuration(result.p95Ms),
-    formatDuration(result.p50TtfbMs),
     formatThroughput(result.throughputPagesPerSecond),
     formatBytes(result.peakRssBytes),
     formatBytes(result.pdfSizeBytes),

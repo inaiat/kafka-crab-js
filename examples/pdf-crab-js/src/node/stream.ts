@@ -6,8 +6,8 @@ import { Readable } from 'node:stream'
 
 import { PdfDocument, renderPdf, type PdfDocumentInput } from 'pdf-crab-js'
 
-const currentDirectory = path.dirname(fileURLToPath(import.meta.url))
-const outputDirectory = path.join(currentDirectory, '..', 'output')
+const exampleDirectory = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..')
+const outputDirectory = path.join(exampleDirectory, 'output')
 
 const input: PdfDocumentInput = {
   title: 'pdf-crab-js stream example',

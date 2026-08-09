@@ -1,6 +1,6 @@
 import { renderPdf, type PdfDocumentInput } from 'pdf-crab-js/browser.js'
 import { Buffer as BrowserBuffer } from 'buffer'
-import '../wasm/browser.css'
+import './styles.css'
 
 type ElementConstructor<T extends Element> = new (...args: never[]) => T
 
