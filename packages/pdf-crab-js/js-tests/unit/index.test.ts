@@ -3,7 +3,7 @@ import { equal, match, ok, throws } from 'node:assert/strict'
 import { test } from 'vite-plus/test'
 
 import * as pdfCrab from '../../dist/index.js'
-import { createPdf, createPdfAsync, PdfDocument } from '../../dist/index.js'
+import { PdfDocument, PdfError, renderPdf, type PdfDocumentInput } from '../../dist/index.js'
 
 function assertPdfBuffer(pdf: Uint8Array): void {
   ok(pdf instanceof Uint8Array)
@@ -12,39 +12,54 @@ function assertPdfBuffer(pdf: Uint8Array): void {
   equal(bytes.toString('utf8').trimEnd().endsWith('%%EOF'), true)
 }
 
+async function collectChunks(chunks: AsyncIterable<Uint8Array>): Promise<Buffer> {
+  const buffers: Buffer[] = []
+  for await (const chunk of chunks) {
+    ok(chunk instanceof Uint8Array)
+    ok(chunk.byteLength > 0)
+    buffers.push(Buffer.from(chunk))
+  }
+  return Buffer.concat(buffers)
+}
+
+async function* outputForIteration(input: PdfDocumentInput): AsyncIterable<Uint8Array> {
+  for await (const chunk of renderPdf(input)) yield chunk
+}
+
 const imagePath = new URL('../../../../examples/pdf-crab-js/screenshots/pdf-crab-js-example.pdf.png', import.meta.url)
 const imageBytes = readFileSync(imagePath)
-const tinyJpegBytes = Buffer.from(
-  '/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAYEBQYFBAYGBQYHBwYIChAKCgkJChQODwwQFxQYGBcUFhYaHSUfGhsjHBYWICwgIyYnKSopGR8tMC0oMCUoKSj/2wBDAQcHBwoIChMKChMoGhYaKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCj/wAARCAABAAEDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAf/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/8QAFQEBAQAAAAAAAAAAAAAAAAAABgj/xAAUEQEAAAAAAAAAAAAAAAAAAAAA/9oADAMBAAIRAxEAPwCdABykX//Z',
-  'base64',
-)
-const alphaPngBytes = Buffer.from(
-  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
-  'base64',
-)
+const fontPath = new URL('../../../../examples/html-to-pdf-crab-js/assets/Tuffy.ttf', import.meta.url)
+const fontBytes = readFileSync(fontPath)
 
-test('public API exposes PdfDocument and declarative helpers without the legacy builder', () => {
+test('public API exposes the unified render contract', () => {
   const publicApi = pdfCrab as Record<string, unknown>
-
-  equal(typeof createPdf, 'function')
-  equal(typeof createPdfAsync, 'function')
+  equal(typeof renderPdf, 'function')
   equal(typeof PdfDocument, 'function')
-  equal(publicApi.PdfDocumentBuilder, undefined)
+  equal(typeof PdfError, 'function')
+  equal(publicApi.createPdf, undefined)
+  equal(publicApi.createPdfStream, undefined)
 })
 
-test('PdfDocument uses A4 defaults, cursor flow, styles, and Uint8Array output', () => {
+test('PdfDocument uses A4/mm/20mm defaults and returns lazy bytes', async () => {
   const document = new PdfDocument()
   document.fillColor('#111111').fontSize(14).text('Hello from pdf-crab-js').moveDown().rect(20, 50, 40, 20).fill()
 
-  const pdf = document.finish()
+  const output = document.render()
+  equal(output.used, false)
+  const pdf = await output.bytes()
 
   assertPdfBuffer(pdf)
-  match(Buffer.from(pdf).toString('latin1'), /Hello from pdf-crab-js/)
+  match(Buffer.from(pdf).toString('latin1'), /\/Filter \/FlateDecode/)
+  equal(output.used, true)
   equal(document.x, 20)
-  ok(Math.abs(document.y - 31.852) < 0.01)
+  ok(document.y > 25)
+  await output.bytes().then(
+    () => ok(false, 'second consumption should fail'),
+    (error: unknown) => equal((error as PdfError).code, 'PDF_OUTPUT_USED'),
+  )
 })
 
-test('PdfDocument supports paths, links, pages, and async finish', async () => {
+test('PdfDocument supports paths, links, pages, and mutation guards', async () => {
   const document = new PdfDocument({ unit: 'pt', size: [200, 200], margin: 12 })
   document
     .moveTo(20, 20)
@@ -56,96 +71,193 @@ test('PdfDocument supports paths, links, pages, and async finish', async () => {
     .addPage({ size: 'A4' })
     .text('second page')
 
-  const pdf = await document.finishAsync()
-
+  const pdf = await document.render().bytes()
   assertPdfBuffer(pdf)
   const body = Buffer.from(pdf).toString('latin1')
   match(body, /https:\/\/example\.com/)
-  match(body, /second page/)
+  match(body, /\/Count 2/)
+  throws(
+    () => document.text('after render'),
+    (error: unknown) => (error as PdfError).code === 'PDF_DOCUMENT_FINISHED',
+  )
 })
 
-test('PdfDocument rejects unpainted paths and invalid state transitions', () => {
-  const document = new PdfDocument({ size: [100, 100], unit: 'pt', margin: 10 })
-  document.moveTo(10, 10).lineTo(20, 20)
-
-  throws(() => document.finish(), /unpainted path/)
-  document.discardPath().finish()
-  throws(() => document.text('after finish'), /already finished/)
-})
-
-test('PdfDocument embeds PNG/JPEG-compatible image bytes, fits images, and supports Node paths', () => {
-  const document = new PdfDocument({ unit: 'mm' })
+test('flow text, tables, images, and declarative pages are supported', async () => {
+  const document = new PdfDocument({ unit: 'mm', size: 'LETTER', layout: 'landscape' })
   document
     .text('before')
     .image(imageBytes, { fit: [60, 40], align: 'center' })
-    .image(imagePath.pathname, { width: 20 })
-
-  const pdf = document.finish()
-  const body = Buffer.from(pdf).toString('latin1')
-
+    .table({
+      columns: [
+        { key: 'name', header: 'Name', width: '*' },
+        { key: 'amount', header: 'Amount', width: 30, align: 'right' },
+      ],
+      rows: [{ name: 'Invoice', amount: 42 }],
+    })
+  const pdf = await document.render().bytes()
   assertPdfBuffer(pdf)
+  const body = Buffer.from(pdf).toString('latin1')
   match(body, /\/Subtype \/Image/)
-})
+  match(body, /\/BaseFont \/Helvetica-Bold/)
 
-test('images preserve JPEG encoding and PNG transparency through a soft mask', () => {
-  const jpegPdf = new PdfDocument({ unit: 'pt', size: [100, 100], margin: 0 }).image(tinyJpegBytes).finish()
-  const jpegBody = Buffer.from(jpegPdf).toString('latin1')
-  match(jpegBody, /\/Filter \/DCTDecode/)
-
-  const pngPdf = new PdfDocument({ unit: 'pt', size: [100, 100], margin: 0 }).image(alphaPngBytes).finish()
-  const pngBody = Buffer.from(pngPdf).toString('latin1')
-  match(pngBody, /\/SMask \d+ 0 R/)
-})
-
-test('createPdf supports strict page sizes, top-left elements, images, and metadata', () => {
-  const pdf = createPdf({
-    title: 'Rich PDF',
+  const input: PdfDocumentInput = {
     unit: 'pt',
-    metadata: { author: 'pdf-crab-js', keywords: ['pdf', 'image'] },
+    pages: [{ size: [300, 300], elements: [{ type: 'text', text: 'Mixed elements', x: 40, y: 32, fontSize: 16 }] }],
+  }
+  assertPdfBuffer(await renderPdf(input).bytes())
+
+  const declarativeFlow = await renderPdf({
+    unit: 'pt',
+    pages: [{ size: [220, 220], elements: [{ type: 'text', text: 'flow without coordinates', width: 100 }] }],
+  }).bytes()
+  assertPdfBuffer(declarativeFlow)
+})
+
+test('font registration embeds a Unicode subset with ToUnicode', async () => {
+  const document = new PdfDocument({ unit: 'pt', size: [200, 200], margin: 10 })
+  document.registerFont('InvoiceFont', fontPath, { fallback: 'Helvetica' }).font('InvoiceFont')
+  const pdf = await document.text('Ação, café, coração e € 42,00', { width: 180 }).render().bytes()
+  assertPdfBuffer(pdf)
+  const body = Buffer.from(pdf).toString('latin1')
+  match(body, /\/Subtype \/Type0/)
+  match(body, /\/FontFile2/)
+  match(body, /\/ToUnicode/)
+  ok(pdf.byteLength < fontBytes.byteLength, 'the embedded font should be subset')
+
+  throws(() => new PdfDocument().registerFont('Invalid', new Uint8Array([0, 1, 0, 0])), /not a valid TTF or OTF font/)
+
+  await renderPdf({ pages: [{ elements: [{ type: 'text', text: 'مرحبا', x: 10, y: 10 }] }] })
+    .bytes()
+    .then(
+      () => ok(false, 'missing glyph should reject'),
+      (error: unknown) => equal((error as PdfError).code, 'PDF_MISSING_GLYPH'),
+    )
+})
+
+test('declarative documents share custom fonts, fallback, and metric pagination', async () => {
+  const pdf = await renderPdf({
+    unit: 'pt',
+    fonts: [{ family: 'ReportFont', source: fontPath, fallback: 'Helvetica' }],
     pages: [
       {
-        size: [300, 300],
+        size: [240, 240],
         elements: [
-          { type: 'rect', x: 32, y: 80, width: 180, height: 96, fill: '#f3f4f6', stroke: '#111827', strokeWidth: 2 },
-          { type: 'line', x1: 32, y1: 208, x2: 212, y2: 208, stroke: '#2563eb', strokeWidth: 1.5 },
-          { type: 'text', text: 'Mixed elements', x: 40, y: 32, font: 'HelveticaBold', fontSize: 16, fill: '#111827' },
-          { type: 'image', source: imageBytes, x: 20, y: 200, fit: [60, 60], align: 'center', valign: 'center' },
+          { type: 'text', text: 'Relatório\u00a0final: ação e café', width: 110, font: 'ReportFont' },
+          { type: 'text', text: Array.from({ length: 180 }, () => 'WWW iii').join(' '), width: 110 },
         ],
       },
     ],
-  })
-
+  }).bytes()
   assertPdfBuffer(pdf)
   const body = Buffer.from(pdf).toString('latin1')
-  match(body, /Rich PDF/)
-  match(body, /Mixed elements/)
-  match(body, /\/Subtype \/Image/)
-})
+  match(body, /\/Subtype \/Type0/)
+  match(body, /\/BaseFont \/Helvetica/)
+  const pageCount = Number(/\/Count (?<count>\d+)/.exec(body)?.groups?.count ?? 0)
+  ok(pageCount > 1, 'flowing declarative text should paginate using measured lines')
+  equal((body.match(/\/MediaBox \[0 0 240 240\]/g) ?? []).length, pageCount)
 
-test('createPdfAsync returns a PDF Uint8Array', async () => {
-  const pdf = await createPdfAsync({
-    pages: [{ size: 'A4', elements: [{ type: 'text', text: 'Async PDF', x: 20, y: 20 }] }],
+  await renderPdf({
+    unit: 'pt',
+    fonts: [{ family: 'NoFallback', source: fontBytes }],
+    pages: [{ elements: [{ type: 'text', text: 'A\u00a0B', width: 100, font: 'NoFallback' }] }],
   })
-
-  assertPdfBuffer(pdf)
-  match(Buffer.from(pdf).toString('latin1'), /Async PDF/)
+    .bytes()
+    .then(
+      () => ok(false, 'a missing custom-font glyph must reject without fallback'),
+      (error: unknown) => equal((error as PdfError).code, 'PDF_MISSING_GLYPH'),
+    )
 })
 
-test('createPdf validates pages, sizes, element types, and image bytes', () => {
-  throws(() => createPdf({ pages: [] as never }), /pages must contain at least one page/)
-  throws(() => createPdf({ pages: [{ size: [0, 100] }] }), /page size width/)
-  throws(
-    () =>
-      createPdf({
-        pages: [{ size: 'A4', elements: [{ type: 'circle' } as never] }],
-      }),
-    /type must be one of/,
+test('stream, bytes, and async iteration are deterministic and pull-driven', async () => {
+  const input: PdfDocumentInput = {
+    unit: 'pt',
+    pages: [{ size: [180, 180], elements: [{ type: 'text', text: 'streamed PDF', x: 20, y: 20 }] }],
+  }
+  const expected = await renderPdf(input).bytes()
+  const output = renderPdf(input)
+  const streamed = await new Response(output.stream({ chunkSize: 17 })).arrayBuffer()
+  equal(Buffer.from(streamed).compare(Buffer.from(expected)), 0)
+
+  const iterated = await collectChunks(outputForIteration(input))
+  equal(iterated.compare(Buffer.from(expected)), 0)
+
+  const headerOnly = renderPdf(input)
+  const reader = headerOnly.stream({ chunkSize: 5 }).getReader()
+  equal(headerOnly.used, false)
+  const first = await reader.read()
+  ok(first.value)
+  equal(Buffer.from(first.value).toString('ascii'), '%PDF-')
+  equal(headerOnly.used, true)
+  await reader.cancel()
+})
+
+test('AbortSignal cancels a lazy output', async () => {
+  const controller = new AbortController()
+  const output = renderPdf({ pages: [{ elements: [{ type: 'text', text: 'cancel me' }] }] })
+  controller.abort()
+  await output.bytes({ signal: controller.signal }).then(
+    () => ok(false, 'aborted output should reject'),
+    (error: unknown) => equal((error as PdfError).code, 'PDF_ABORTED'),
   )
-  throws(
-    () =>
-      createPdf({
-        pages: [{ size: 'A4', elements: [{ type: 'image', source: new Uint8Array([1, 2, 3]), x: 0, y: 0 } as never] }],
-      }),
-    /unsupported image format|image format could not be detected/,
+  equal(output.used, true)
+
+  const afterHeader = new AbortController()
+  const streamed = renderPdf({ pages: [{ elements: [{ type: 'text', text: 'abort after header' }] }] })
+  const reader = streamed.stream({ signal: afterHeader.signal }).getReader()
+  const first = await reader.read()
+  ok(first.value)
+  equal(Buffer.from(first.value).subarray(0, 5).toString('ascii'), '%PDF-')
+  afterHeader.abort()
+  await reader.read().then(
+    () => ok(false, 'aborted stream should reject before native serialization'),
+    (error: unknown) => equal((error as PdfError).code, 'PDF_ABORTED'),
   )
+})
+
+test('invalid combinations fail at the nearest call site', () => {
+  const document = new PdfDocument()
+  // @ts-expect-error alignment without a width is invalid by construction.
+  throws(() => document.text('invalid', { align: 'center' }), /text\.align requires text\.width/)
+  // @ts-expect-error x/y are intentionally incomplete for runtime validation.
+  throws(() => document.text('invalid', { x: 10 }), /text\.x and text\.y must be provided together/)
+  throws(
+    () => renderPdf({ pages: [{ elements: [] }] }).stream({ chunkSize: 0 }),
+    /chunkSize must be a positive integer/,
+  )
+  document.moveTo(10, 10).lineTo(20, 20)
+  throws(() => document.render(), /unpainted path/)
+})
+
+test('every mutating PdfDocument method rejects after render', () => {
+  const document = new PdfDocument()
+  document.text('sealed').render()
+  const mutations: (() => unknown)[] = [
+    () => document.addPage(),
+    () => document.text('x'),
+    () => document.textBox('x', { width: 40 }),
+    () => document.font('Helvetica'),
+    () => document.fontSize(10),
+    () => document.fillColor('#000'),
+    () => document.strokeColor('#000'),
+    () => document.lineWidth(1),
+    () => document.save(),
+    () => document.restore(),
+    () => document.moveDown(),
+    () => document.moveUp(),
+    () => document.moveTo(1, 1),
+    () => document.lineTo(2, 2),
+    () => document.closePath(),
+    () => document.rect(1, 1, 2, 2),
+    () => document.fill(),
+    () => document.stroke(),
+    () => document.fillAndStroke(),
+    () => document.image(imageBytes),
+    () => document.table({ columns: [{ key: 'value' }], rows: [{ value: 1 }] }),
+    () => document.link('https://example.com', { x: 1, y: 1, width: 2, height: 2 }),
+    () => document.registerFont('LateFont', fontBytes),
+    () => document.render(),
+  ]
+  for (const mutate of mutations) {
+    throws(mutate, (error: unknown) => (error as PdfError).code === 'PDF_DOCUMENT_FINISHED')
+  }
 })

@@ -31,8 +31,8 @@ const removeIfPresent = async (fileName) => {
   }
 }
 
-const useAsyncBrowserWasmInstantiation = async () => {
-  const path = new URL('./pdf-crab-js.wasi-browser.js', import.meta.url)
+const useAsyncBrowserWasmInstantiation = async (fileName) => {
+  const path = new URL(`./${fileName}`, import.meta.url)
   let content
 
   try {
@@ -63,12 +63,12 @@ const useAsyncBrowserWasmInstantiation = async () => {
   await writeFile(path, rewritten)
 }
 
-const writeBrowserEntrypoint = async (isWasi) => {
-  const content = isWasi
-    ? "export * from './dist/browser.js'\n"
-    : `import * as binding from './pdf-crab-js.wasi-browser.js'
+const browserEntrypoint = (bindingFile) => `import { Buffer as BrowserBuffer } from 'buffer'
 
-import { configurePdfRuntime, createPdf, createPdfAsync, PdfDocument } from './dist/api.js'
+import { configurePdfRuntime } from './dist/api.js'
+
+globalThis.Buffer ??= BrowserBuffer
+const binding = await import('./${bindingFile}')
 
 configurePdfRuntime({
   binding,
@@ -81,53 +81,62 @@ configurePdfRuntime({
   },
 })
 
-export { PdfDocument, createPdf, createPdfAsync }
+export { PdfDocument, PdfError, renderPdf } from './dist/api.js'
 `
-  await writeFile(new URL('./browser.js', import.meta.url), content)
+
+const writeBrowserEntrypoints = async () => {
+  await Promise.all([
+    writeFile(new URL('./browser.js', import.meta.url), browserEntrypoint('pdf-crab-js.wasip1-browser.js')),
+    writeFile(new URL('./browser-threaded.js', import.meta.url), browserEntrypoint('pdf-crab-js.wasi-browser.js')),
+  ])
 }
 
 const build = async () => {
   const target = argValue('--target')
   const isWasi = target?.startsWith('wasm32-wasi') ?? false
+  const isThreadedWasi = target?.endsWith('-threads') ?? false
+  const buildNative = !hasFlag('--js-only')
 
-  if (isWasi) {
-    const result = await napi.build({
-      constEnum: false,
-      crossCompile: hasFlag('-x', '--cross-compile'),
-      dts: 'index.d.cts',
-      esm: true,
-      platform: true,
-      release: !hasFlag('--debug'),
-      target,
-      jsBinding: 'index.js',
-    })
-    await result.task
-  } else {
-    await removeIfPresent('index.js')
-    await removeIfPresent('index.d.cts')
-
-    const commonOptions = {
-      constEnum: false,
-      crossCompile: hasFlag('-x', '--cross-compile'),
-      dts: 'js-binding.d.ts',
-      platform: true,
-      release: !hasFlag('--debug'),
-      target,
-    }
-
-    let esmBinding
-    for (const binding of [
-      { jsBinding: 'js-binding.js', esm: true },
-      { jsBinding: 'js-binding.cjs', noDtsHeader: true },
-    ]) {
-      const result = await napi.build({ ...commonOptions, ...binding })
+  if (buildNative) {
+    if (isWasi) {
+      const result = await napi.build({
+        constEnum: false,
+        crossCompile: hasFlag('-x', '--cross-compile'),
+        dts: 'index.d.cts',
+        esm: true,
+        platform: true,
+        release: !hasFlag('--debug'),
+        target,
+        jsBinding: 'index.js',
+      })
       await result.task
-      if (binding.esm) {
-        esmBinding = await readFile(new URL('./js-binding.js', import.meta.url), 'utf8')
+    } else {
+      await removeIfPresent('index.js')
+      await removeIfPresent('index.d.cts')
+
+      const commonOptions = {
+        constEnum: false,
+        crossCompile: hasFlag('-x', '--cross-compile'),
+        dts: 'js-binding.d.ts',
+        platform: true,
+        release: !hasFlag('--debug'),
+        target,
       }
-    }
-    if (esmBinding) {
-      await writeFile(new URL('./js-binding.js', import.meta.url), esmBinding)
+
+      let esmBinding
+      for (const binding of [
+        { jsBinding: 'js-binding.js', esm: true },
+        { jsBinding: 'js-binding.cjs', noDtsHeader: true },
+      ]) {
+        const result = await napi.build({ ...commonOptions, ...binding })
+        await result.task
+        if (binding.esm) {
+          esmBinding = await readFile(new URL('./js-binding.js', import.meta.url), 'utf8')
+        }
+      }
+      if (esmBinding) {
+        await writeFile(new URL('./js-binding.js', import.meta.url), esmBinding)
+      }
     }
   }
 
@@ -145,8 +154,16 @@ const build = async () => {
     target: isWasi ? 'esnext' : 'node24',
   })
 
-  await useAsyncBrowserWasmInstantiation()
-  await writeBrowserEntrypoint(isWasi)
+  if (isWasi) {
+    await useAsyncBrowserWasmInstantiation(
+      isThreadedWasi ? 'pdf-crab-js.wasi-browser.js' : 'pdf-crab-js.wasip1-browser.js',
+    )
+  }
+  await Promise.all([
+    removeIfPresent('pdf-crab-js.wasip1-deferred.d.ts'),
+    removeIfPresent('pdf-crab-js.wasip1-deferred.js'),
+  ])
+  await writeBrowserEntrypoints()
 }
 
 build().catch((error) => {

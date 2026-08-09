@@ -2,14 +2,14 @@ import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-import { createPdf } from 'pdf-crab-js'
+import { renderPdf } from 'pdf-crab-js'
 
 const currentDirectory = path.dirname(fileURLToPath(import.meta.url))
 const outputDirectory = path.join(currentDirectory, 'output')
 const outputPath = path.join(outputDirectory, 'pdf-crab-js-example.pdf')
 const previewImage = readFileSync(path.join(currentDirectory, 'screenshots/pdf-crab-js-example.pdf.png'))
 
-const pdf = createPdf({
+const output = renderPdf({
   title: 'pdf-crab-js example',
   unit: 'mm',
   pages: [
@@ -92,6 +92,7 @@ const pdf = createPdf({
 })
 
 mkdirSync(outputDirectory, { recursive: true })
+const pdf = await output.bytes()
 writeFileSync(outputPath, pdf)
 
 console.log(`Generated ${outputPath}`)

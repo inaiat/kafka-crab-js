@@ -1,12 +1,7 @@
 # pdf-crab-js
 
-Structured PDF generation for Node.js and WebAssembly, built with Rust, NAPI-RS, and
-`pdf-writer`. Version 1.0 provides a fluent `PdfDocument` API with PDFKit-like ergonomics and a
-strict declarative `createPdf` API.
-
-Use this package for invoices, receipts, statements, labels, reports, tables, exports, and other
-documents that can be expressed as pages, coordinates, text, shapes, links, and raster images. Use
-[`html-to-pdf-crab-js`](../html-to-pdf-crab-js/README.md) when HTML/CSS layout is the source format.
+Structured PDF generation for Node.js and browser/WASM. The 1.0 API is deliberately small and
+typed for invoices, reports, tables, images, and other structured documents.
 
 ## Install
 
@@ -14,138 +9,123 @@ documents that can be expressed as pages, coordinates, text, shapes, links, and 
 npm install pdf-crab-js
 ```
 
-The native package requires Node.js `>=22`. Browser/WASM deployments require
-`SharedArrayBuffer` and cross-origin isolation.
+## One output contract
 
-## Fluent API
+`renderPdf` and `PdfDocument.render()` return a lazy, one-shot `PdfOutput`. It is shared by Node
+and browser, and its native serializer is pull-driven:
 
 ```ts
-import { writeFileSync } from 'node:fs'
-import { PdfDocument } from 'pdf-crab-js'
+import { writeFile } from 'node:fs/promises'
+import { renderPdf } from 'pdf-crab-js'
 
-const document = new PdfDocument({
-  size: 'A4',
+const output = renderPdf({
+  title: 'Invoice',
   unit: 'mm',
-  margin: 20,
+  pages: [{ elements: [{ type: 'text', text: 'Invoice #42' }] }],
 })
 
+await writeFile('invoice.pdf', await output.bytes())
+```
+
+`bytes()` and `blob()` are asynchronous. `stream({ chunkSize, signal })` returns a Web
+`ReadableStream`; `for await (const chunk of output)` is available in both runtimes. An output can
+only be consumed once. Reuse fails with `PdfError` code `PDF_OUTPUT_USED`; cancellation releases
+the native serializer. A stream emits the PDF header on its first pull, before layout starts, and
+does not start native work until the next pull. Page content streams and embedded font programs are
+Flate-compressed; the serializer releases a page buffer after emitting it instead of retaining a
+second full-PDF buffer. The native boundary is deliberately pull-driven (`nextChunk()`), rather
+than retaining a JavaScript callback; this follows the NAPI-RS callback lifetime guidance in
+[Functions and Callbacks](https://napi.rs/blog/function-and-callbacks) and keeps backpressure
+identical in Node and WASM.
+
+## Fluent documents
+
+```ts
+import { PdfDocument } from 'pdf-crab-js'
+
+const document = new PdfDocument({ size: 'A4', unit: 'mm', margin: 20 })
 document
   .font('HelveticaBold')
   .fontSize(18)
-  .fillColor('#0f172a')
   .text('Invoice')
-  .moveDown()
   .font('Helvetica')
   .fontSize(11)
   .text('Generated with pdf-crab-js')
-  .strokeColor('#2563eb')
-  .lineWidth(1)
-  .moveTo(20, 55)
-  .lineTo(190, 55)
-  .stroke()
+  .table({
+    columns: [
+      { key: 'item', header: 'Item', width: '*' },
+      { key: 'total', header: 'Total', width: 30, align: 'right' },
+    ],
+    rows: [{ item: 'Subscription', total: 42 }],
+  })
 
-writeFileSync('invoice.pdf', document.finish())
+const output = document.render()
 ```
 
-The first page is created automatically. Defaults are A4 portrait, 20 mm margins, Helvetica 12,
-black fill/stroke, and a 1 pt line width. Text without explicit coordinates uses the cursor and
-automatically starts a new page when it reaches the bottom margin.
+The first page is A4 portrait, uses `mm`, and has physical 20 mm margins by default. `addPage()`
+inherits the document defaults; automatic page breaks inherit the effective size, orientation, and
+margins of the current page. Coordinates use a top-left origin. Font sizes, line heights, and
+stroke widths remain PDF points. Every mutating method fails with `PDF_DOCUMENT_FINISHED` after
+`render()`.
 
-All public coordinates use a top-left origin and the configured `mm` or `pt` unit. PDF output is a
-complete `Uint8Array`; in Node.js the returned value is also a `Buffer` without an extra copy.
-Font sizes, line heights, and line widths follow PDF points, as in PDFKit; cursor movement converts
-those metrics into the configured coordinate unit.
+Text without `x`/`y` flows from the cursor, wraps to the useful width, preserves paragraphs, and
+automatically paginates. Absolute placement requires both coordinates; alignment and a height
+require a width. Use `overflow: 'clip' | 'ellipsis' | 'paginate'` for bounded text boxes.
+Wrapping, alignment, justification, auto table widths, and ellipsis use font metrics rather than
+character-count estimates.
 
-## Images
-
-PNG and JPEG images are supported in both Node.js and browser/WASM builds:
-
-```ts
-import { readFileSync, writeFileSync } from 'node:fs'
-import { PdfDocument } from 'pdf-crab-js'
-
-const document = new PdfDocument({ unit: 'mm' })
-document.image(readFileSync('logo.png'), { width: 48 })
-document.image('photo.jpg', { fit: [170, 80], align: 'center', valign: 'center' })
-writeFileSync('images.pdf', document.finish())
-```
-
-Image bytes can be `Uint8Array`, `ArrayBuffer`, or a Node.js `Buffer`. File paths are a Node.js-only
-convenience; browser callers must pass bytes. With no dimensions, images use one point per pixel.
-Supplying only one dimension preserves the aspect ratio. `fit: [width, height]` contains the image
-while preserving the aspect ratio. PNG alpha is emitted through a PDF soft mask. GIF, WebP, SVG,
-data URLs, HTTP URLs, and `Blob` inputs are not part of the 1.0 API.
-
-## Declarative API
-
-`createPdf` is useful when all pages and elements are known up front:
+## Fonts and Unicode
 
 ```ts
-import { createPdf } from 'pdf-crab-js'
+const document = new PdfDocument()
+document
+  .registerFont('Invoice', new URL('./Invoice.ttf', import.meta.url), { fallback: 'Helvetica' })
+  .font('Invoice')
+  .text('Ação, café e coração')
 
-const pdf = createPdf({
-  title: 'Report',
-  unit: 'mm',
-  pages: [
-    {
-      size: 'A4',
-      elements: [
-        { type: 'rect', x: 20, y: 20, width: 170, height: 30, fill: '#f8fafc' },
-        { type: 'text', text: 'Top-left coordinates', x: 28, y: 30, fontSize: 16 },
-        { type: 'image', source: logoBytes, x: 20, y: 70, fit: [60, 40] },
-      ],
-    },
-  ],
+const declarative = renderPdf({
+  fonts: [{ family: 'Invoice', source: fontBytes, fallback: 'Helvetica' }],
+  pages: [{ elements: [{ type: 'text', text: 'Relatório final', font: 'Invoice' }] }],
 })
 ```
 
-`pages` is required and must contain at least one page. A page accepts `size: 'A3' | 'A4' |
-'LETTER' | [width, height]` and optional `layout: 'portrait' | 'landscape'`. Declarative elements
-are strict discriminated unions: `text`, `textBox`, `line`, `rect`, `polygon`, `path`, and `image`.
-`createPdfAsync` has the same input and returns `Promise<Uint8Array>`.
+`registerFont(family, source, { weight, style, fallback })` validates TTF/OTF inputs. Node accepts
+bytes, paths, and file URLs; browsers accept `Uint8Array`/`ArrayBuffer`. Custom fonts are shaped,
+subset, embedded as CID fonts, and receive a `ToUnicode` map for reliable extraction. Standard
+Latin fonts use AFM/WinAnsi metrics and encoding. Fallback is explicit and applied only to missing
+glyph runs; otherwise rendering fails with `PDF_MISSING_GLYPH` instead of corrupting text.
 
-The text engine intentionally uses approximate built-in-font metrics in 1.0. Custom fonts, tables,
-Bezier curves, transforms, forms, accessibility tags, and PDF streaming are future features.
+The 1.0 release covers Latin text, including Portuguese accents. Arabic/RTL and other bidi-heavy
+scripts remain intentionally outside this delivery until end-to-end shaping, ordering, extraction,
+and visual fixtures can be guaranteed together.
 
-## Browser/WASM
+## Tables
+
+`table<Row>()` accepts typed keys or value functions, fixed/`auto`/`*` widths, formatters,
+alignment, cell styles, padding, borders, backgrounds, stripes, repeated headers,
+and `rowSplit: 'avoid' | 'split'`. The cursor advances after the table, so another paragraph or
+table continues naturally.
+
+## Browser
 
 ```ts
-import { createPdf } from 'pdf-crab-js/browser'
+import { renderPdf } from 'pdf-crab-js/browser'
 
-const pdf = createPdf({
-  pages: [{ size: 'A4', elements: [{ type: 'text', text: 'WASM', x: 20, y: 20 }] }],
-})
+const blob = await renderPdf({ pages: [{ elements: [{ type: 'text', text: 'WASM' }] }] }).blob()
 ```
 
-Browser imports reject image file paths with a clear error. Pass `Uint8Array` or `ArrayBuffer`
-instead. The browser example lives in `examples/pdf-crab-js/wasm/`.
+The default browser build is single-threaded and needs no `SharedArrayBuffer`, COOP, or COEP.
+Node-only image paths are rejected in the browser; pass `Uint8Array` or `ArrayBuffer`. A threaded
+WASM build is available as `pdf-crab-js/browser/threaded` for isolated deployments while keeping
+the same API; that optional subpath requires the usual cross-origin isolation setup.
 
-## Migration from 0.x
+## Errors and scope
 
-Version 1.0 intentionally removes `PdfDocumentBuilder` and the old bottom-left coordinate model.
+Failures use `PdfError { code, path, cause }`. Invalid arguments are rejected at the nearest API
+call. 1.0 focuses on structured PDFs; forms, encryption, PDF/A, accessibility tags, outlines,
+SVG paths, color fonts, and a PDFKit compatibility adapter are outside this contract.
 
-| 0.x                            | 1.0                                                  |
-| ------------------------------ | ---------------------------------------------------- |
-| `PdfDocumentBuilder`           | `new PdfDocument(options)`                           |
-| `startPage` / `appendElements` | `addPage` and fluent drawing methods                 |
-| Bottom-left `y` coordinates    | Top-left `y` coordinates                             |
-| Page `width` / `height`        | `size` and optional `layout`                         |
-| `Buffer` contract              | `Uint8Array` contract (`Buffer` still works in Node) |
-| No image element               | PNG/JPEG bytes and Node file paths                   |
+## Migration
 
-For a direct coordinate migration, use `newY = pageHeight - oldY` for points/lines and
-`newY = pageHeight - oldY - height` for rectangles, links, and images. Text should use its new top
-edge instead of its old baseline.
-
-## Development
-
-```bash
-pnpm --filter pdf-crab-js build
-pnpm --filter pdf-crab-js test
-pnpm --filter pdf-crab-js build:wasm
-pnpm --filter pdf-crab-js test:wasm
-```
-
-The structured PDF benchmark compares `createPdf`, the fluent `PdfDocument` facade, PDFKit,
-`html-to-pdf-crab-js`, and Gotenberg. It also includes a PDFKit dependency and image-capable
-workloads under `benchmarks/pdf/`.
+See [MIGRATION.md](./MIGRATION.md) for the breaking 0.3/draft migration. There are no legacy
+`createPdf*`, `finish*`, or provisional stream aliases in the public core.

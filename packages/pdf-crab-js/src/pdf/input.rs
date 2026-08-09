@@ -1,3 +1,5 @@
+#![cfg_attr(test, allow(dead_code))]
+
 use napi::bindgen_prelude::Buffer;
 use napi_derive::napi;
 
@@ -22,6 +24,17 @@ pub struct PdfDocumentBuilderInput {
 pub struct PdfPageSetupInput {
   pub width: f64,
   pub height: f64,
+}
+
+#[napi(object)]
+pub struct PdfFontRegistrationInput {
+  pub family: String,
+  #[napi(ts_type = "Buffer | Uint8Array")]
+  pub data: Buffer,
+  pub fallback: Option<String>,
+  pub weight: Option<u16>,
+  #[napi(ts_type = "'normal' | 'italic' | 'oblique'")]
+  pub style: Option<String>,
 }
 
 #[napi(object)]
@@ -52,14 +65,23 @@ pub struct PdfElementInput {
   pub stroke_width: Option<f64>,
   #[napi(ts_type = "'left' | 'center' | 'right' | 'justify'")]
   pub align: Option<String>,
+  #[napi(ts_type = "'visible' | 'clip' | 'ellipsis' | 'paginate'")]
+  pub overflow: Option<String>,
   pub line_height: Option<f64>,
   pub hyphenate: Option<bool>,
+  pub layout_lines: Option<Vec<PdfTextLineInput>>,
   pub points: Option<Vec<PdfPointInput>>,
   pub closed: Option<bool>,
   #[napi(ts_type = "'nonZero' | 'evenOdd'")]
   pub winding: Option<String>,
   #[napi(ts_type = "Buffer | Uint8Array")]
   pub image_data: Option<Buffer>,
+}
+
+#[napi(object)]
+pub struct PdfTextLineInput {
+  pub text: String,
+  pub paragraph_end: bool,
 }
 
 #[napi(object)]
@@ -70,6 +92,7 @@ pub struct PdfPointInput {
 }
 
 #[napi(object)]
+#[derive(Clone)]
 pub struct PdfMetadataInput {
   pub title: Option<String>,
   pub author: Option<String>,

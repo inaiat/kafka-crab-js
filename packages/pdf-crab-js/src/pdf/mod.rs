@@ -3,6 +3,7 @@ mod color;
 mod document;
 mod elements;
 mod font;
+mod font_metrics;
 mod image;
 mod input;
 mod unit;

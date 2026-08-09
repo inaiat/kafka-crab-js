@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs'
 
 import * as binding from '../js-binding.js'
-import { configurePdfRuntime, createPdf, createPdfAsync, PdfDocument } from './api.js'
+import { configurePdfRuntime } from './api.js'
 
 configurePdfRuntime({
   binding: binding as never,
@@ -10,13 +10,13 @@ configurePdfRuntime({
       if (source instanceof ArrayBuffer) return new Uint8Array(source)
       return new Uint8Array(source.buffer, source.byteOffset, source.byteLength)
     }
-    return readFileSync(source)
+    return readFileSync(source.startsWith('file:') ? new URL(source) : source)
   },
 })
 
-export { PdfDocument, createPdf, createPdfAsync }
+export { PdfDocument, PdfError, renderPdf } from './api.js'
 export type {
-  CreatePdfInput,
+  PdfDocumentInput,
   PdfAnnotationInput,
   PdfDocumentOptions,
   PdfElementInput,
@@ -34,14 +34,28 @@ export type {
   PdfPageInput,
   PdfPageOptions,
   PdfPageSize,
-  PdfPathElement,
+  PdfPolylineElement,
   PdfPolygonElement,
   PdfRectElement,
-  PdfStyleOptions,
+  PdfStrokeStyleOptions,
+  PdfFillStyleOptions,
+  PdfFontRegistrationOptions,
+  PdfFontInput,
+  PdfFontSource,
+  PdfTextStyleOptions,
+  PdfTableCellStyle,
+  PdfTableCellValue,
+  PdfTableColumn,
+  PdfTableColumnWidth,
+  PdfTableOptions,
+  PdfOutput,
+  PdfOutputOptions,
+  PdfErrorCode,
+  PdfStreamOptions,
   PdfTextAlign,
-  PdfTextBoxElement,
   PdfTextBoxOptions,
   PdfTextElement,
   PdfTextOptions,
+  PdfTextOverflow,
   PdfUnit,
 } from './api.js'

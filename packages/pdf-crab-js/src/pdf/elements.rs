@@ -1,9 +1,11 @@
+use std::collections::BTreeSet;
+
 use napi::Result;
-use pdf_writer::{Content, Str};
+use pdf_writer::{Content, Name, Str};
 
 use super::{
   color::{black, optional_color, RgbColor},
-  font::parse_builtin_font,
+  font::{FontRegistry, FontResource, ShapedRun},
   image::decode_image,
   input::{PdfElementInput, PdfPointInput},
   unit::Unit,
@@ -13,23 +15,53 @@ use super::{
 const DEFAULT_FONT_SIZE: f32 = 12.0;
 const DEFAULT_STROKE_WIDTH: f32 = 1.0;
 
+pub(super) struct AppendElementContext<'a> {
+  pub(super) unit: Unit,
+  pub(super) page_height: f32,
+  pub(super) images: &'a mut Vec<PreparedImageData>,
+  pub(super) fonts: &'a mut FontRegistry,
+  pub(super) used_fonts: &'a mut BTreeSet<FontResource>,
+  pub(super) next_ref: &'a mut i32,
+}
+
 pub(super) fn append_element(
   content: &mut Content,
   element: PdfElementInput,
-  unit: Unit,
-  page_height: f32,
-  images: &mut Vec<PreparedImageData>,
-  next_ref: &mut i32,
+  context: &mut AppendElementContext<'_>,
   path: &str,
 ) -> Result<()> {
   match element.r#type.as_str() {
-    "text" => append_text(content, element, unit, page_height, path),
-    "line" => append_line(content, element, unit, page_height, path),
-    "rect" => append_rect(content, element, unit, page_height, path),
-    "textBox" => append_text_box(content, element, unit, page_height, path),
-    "polygon" => append_polygon(content, element, unit, page_height, path),
-    "path" => append_path(content, element, unit, page_height, path),
-    "image" => append_image(content, element, unit, page_height, images, next_ref, path),
+    "text" => append_text(
+      content,
+      element,
+      context.unit,
+      context.page_height,
+      context.fonts,
+      context.used_fonts,
+      path,
+    ),
+    "line" => append_line(content, element, context.unit, context.page_height, path),
+    "rect" => append_rect(content, element, context.unit, context.page_height, path),
+    "textBox" => append_text_box(
+      content,
+      element,
+      context.unit,
+      context.page_height,
+      context.fonts,
+      context.used_fonts,
+      path,
+    ),
+    "polygon" => append_polygon(content, element, context.unit, context.page_height, path),
+    "path" => append_path(content, element, context.unit, context.page_height, path),
+    "image" => append_image(
+      content,
+      element,
+      context.unit,
+      context.page_height,
+      context.images,
+      context.next_ref,
+      path,
+    ),
     element_type => Err(invalid_arg(format!(
       "{path}.type must be one of \"text\", \"line\", \"rect\", \"textBox\", \"polygon\", \"path\", or \"image\", received \"{element_type}\""
     ))),
@@ -54,6 +86,8 @@ fn append_text(
   element: PdfElementInput,
   unit: Unit,
   page_height: f32,
+  fonts: &mut FontRegistry,
+  used_fonts: &mut BTreeSet<FontResource>,
   path: &str,
 ) -> Result<()> {
   let text = element
@@ -61,18 +95,19 @@ fn append_text(
     .ok_or_else(|| required(format!("{path}.text")))?;
   let x = unit.coordinate(required_f32(element.x, &format!("{path}.x"))?);
   let y = unit.coordinate(required_f32(element.y, &format!("{path}.y"))?);
-  let font = parse_builtin_font(element.font, &format!("{path}.font"))?;
+  let font = element.font.unwrap_or_else(|| "Helvetica".to_string());
   let font_size = optional_positive_f32(element.font_size, &format!("{path}.fontSize"))?
     .unwrap_or(DEFAULT_FONT_SIZE);
   let fill = optional_color(element.fill, &format!("{path}.fill"))?.unwrap_or_else(black);
+  let runs = fonts.shape_text(&font, &text, font_size, &format!("{path}.text"))?;
+  used_fonts.extend(runs.iter().map(ShapedRun::resource));
 
   content.save_state();
   set_fill(content, fill);
   content.begin_text();
-  content.set_font(font.resource_name(), font_size);
   let baseline = page_height - y - font_size * 0.8;
   content.set_text_matrix([1.0, 0.0, 0.0, 1.0, x, baseline]);
-  content.show(Str(text.as_bytes()));
+  show_runs(content, &runs, font_size, 0.0);
   content.end_text();
   content.restore_state();
 
@@ -153,6 +188,8 @@ fn append_text_box(
   element: PdfElementInput,
   unit: Unit,
   page_height: f32,
+  fonts: &mut FontRegistry,
+  used_fonts: &mut BTreeSet<FontResource>,
   path: &str,
 ) -> Result<()> {
   let text = element
@@ -169,33 +206,78 @@ fn append_text_box(
     .map(|height| required_positive_f32(Some(height), &format!("{path}.height")))
     .transpose()?
     .map(|height| unit.coordinate(height));
-  let font = parse_builtin_font(element.font, &format!("{path}.font"))?;
+  let font = element.font.unwrap_or_else(|| "Helvetica".to_string());
   let font_size = optional_positive_f32(element.font_size, &format!("{path}.fontSize"))?
     .unwrap_or(DEFAULT_FONT_SIZE);
   let line_height = optional_positive_f32(element.line_height, &format!("{path}.lineHeight"))?
     .unwrap_or(font_size * 1.2);
   let fill = optional_color(element.fill, &format!("{path}.fill"))?.unwrap_or_else(black);
   let align = parse_align(element.align.as_deref(), &format!("{path}.align"))?;
-  let max_lines = height
-    .map(|height| (height / line_height).floor().max(1.0) as usize)
-    .unwrap_or(usize::MAX);
-  let lines = wrap_text(&text, width, font_size, element.hyphenate.unwrap_or(false));
+  let overflow = parse_overflow(element.overflow.as_deref(), &format!("{path}.overflow"))?;
+  let max_lines = match (height, overflow) {
+    (Some(height), TextOverflow::Clip | TextOverflow::Ellipsis | TextOverflow::Paginate) => {
+      (height / line_height).floor().max(1.0) as usize
+    }
+    _ => usize::MAX,
+  };
+  let mut lines = match element.layout_lines {
+    Some(lines) => lines,
+    None => fonts.wrap_text(
+      &font,
+      &text,
+      width,
+      font_size,
+      element.hyphenate.unwrap_or(false),
+      &format!("{path}.text"),
+    )?,
+  };
+  if matches!(overflow, TextOverflow::Ellipsis) && lines.len() > max_lines {
+    lines.truncate(max_lines);
+    if let Some(last) = lines.last_mut() {
+      last.text = truncate_with_ellipsis(fonts, &font, &last.text, width, font_size, path)?;
+      last.paragraph_end = true;
+    }
+  }
 
   content.save_state();
   set_fill(content, fill);
+  if let Some(height) = height {
+    if matches!(
+      overflow,
+      TextOverflow::Clip | TextOverflow::Ellipsis | TextOverflow::Paginate
+    ) {
+      content
+        .rect(x, page_height - y - height, width, height)
+        .clip_nonzero()
+        .end_path();
+    }
+  }
   content.begin_text();
-  content.set_font(font.resource_name(), font_size);
   content.set_leading(line_height);
 
   for (line_index, line) in lines.into_iter().take(max_lines).enumerate() {
+    let runs = fonts.shape_text(&font, &line.text, font_size, &format!("{path}.text"))?;
+    used_fonts.extend(runs.iter().map(ShapedRun::resource));
+    let line_width = runs.iter().map(ShapedRun::width).sum::<f32>();
     let adjusted_x = match align {
       TextAlign::Left | TextAlign::Justify => x,
-      TextAlign::Center => x + (width - estimate_text_width(&line, font_size)) / 2.0,
-      TextAlign::Right => x + width - estimate_text_width(&line, font_size),
+      TextAlign::Center => x + (width - line_width) / 2.0,
+      TextAlign::Right => x + width - line_width,
     };
     let cursor_y = page_height - y - font_size * 0.8 - line_height * line_index as f32;
     content.set_text_matrix([1.0, 0.0, 0.0, 1.0, adjusted_x, cursor_y]);
-    content.show(Str(line.as_bytes()));
+    let spaces = line
+      .text
+      .chars()
+      .filter(|character| *character == ' ')
+      .count();
+    let extra_word_spacing =
+      if matches!(align, TextAlign::Justify) && !line.paragraph_end && spaces > 0 {
+        (width - line_width).max(0.0) / spaces as f32
+      } else {
+        0.0
+      };
+    show_runs(content, &runs, font_size, extra_word_spacing);
   }
 
   content.end_text();
@@ -457,6 +539,14 @@ enum TextAlign {
   Justify,
 }
 
+#[derive(Clone, Copy)]
+enum TextOverflow {
+  Visible,
+  Clip,
+  Ellipsis,
+  Paginate,
+}
+
 fn parse_align(value: Option<&str>, path: &str) -> Result<TextAlign> {
   match value.unwrap_or("left") {
     "left" => Ok(TextAlign::Left),
@@ -469,60 +559,70 @@ fn parse_align(value: Option<&str>, path: &str) -> Result<TextAlign> {
   }
 }
 
-fn wrap_text(text: &str, max_width_pt: f32, font_size: f32, hyphenate: bool) -> Vec<String> {
-  let max_chars = (max_width_pt / (font_size * 0.5)).floor().max(1.0) as usize;
-  let mut lines = Vec::new();
-
-  for paragraph in text.split('\n') {
-    let mut line = String::new();
-    for word in paragraph.split_whitespace() {
-      for part in split_word(word, max_chars, hyphenate) {
-        let candidate_len = if line.is_empty() {
-          part.chars().count()
-        } else {
-          line.chars().count() + 1 + part.chars().count()
-        };
-
-        if candidate_len > max_chars && !line.is_empty() {
-          lines.push(line);
-          line = String::new();
-        }
-
-        if !line.is_empty() {
-          line.push(' ');
-        }
-        line.push_str(&part);
-      }
-    }
-
-    if !line.is_empty() {
-      lines.push(line);
-    }
+fn parse_overflow(value: Option<&str>, path: &str) -> Result<TextOverflow> {
+  match value.unwrap_or("visible") {
+    "visible" => Ok(TextOverflow::Visible),
+    "clip" => Ok(TextOverflow::Clip),
+    "ellipsis" => Ok(TextOverflow::Ellipsis),
+    "paginate" => Ok(TextOverflow::Paginate),
+    value => Err(invalid_arg(format!(
+      "{path} must be one of \"visible\", \"clip\", \"ellipsis\", or \"paginate\", received \"{value}\""
+    ))),
   }
-
-  lines
 }
 
-fn split_word(word: &str, max_chars: usize, hyphenate: bool) -> Vec<String> {
-  if !hyphenate || word.chars().count() <= max_chars {
-    return vec![word.to_string()];
+fn truncate_with_ellipsis(
+  fonts: &mut FontRegistry,
+  font: &str,
+  line: &str,
+  max_width: f32,
+  font_size: f32,
+  path: &str,
+) -> Result<String> {
+  const ELLIPSIS: &str = "…";
+  let mut value = line.to_string();
+  loop {
+    let candidate = format!("{value}{ELLIPSIS}");
+    if fonts.measure_text(font, &candidate, font_size, &format!("{path}.text"))? <= max_width {
+      return Ok(candidate);
+    }
+    if value.pop().is_none() {
+      return Ok(ELLIPSIS.to_string());
+    }
   }
-
-  let chunk_size = max_chars.saturating_sub(1).max(1);
-  let chars = word.chars().collect::<Vec<_>>();
-  chars
-    .chunks(chunk_size)
-    .enumerate()
-    .map(|(index, chunk)| {
-      let mut part = chunk.iter().collect::<String>();
-      if index < chars.len().div_ceil(chunk_size) - 1 {
-        part.push('-');
-      }
-      part
-    })
-    .collect()
 }
 
-fn estimate_text_width(text: &str, font_size: f32) -> f32 {
-  text.chars().count() as f32 * font_size * 0.5
+fn show_runs(content: &mut Content, runs: &[ShapedRun], font_size: f32, extra_word_spacing: f32) {
+  for run in runs {
+    let resource = run.resource();
+    content.set_font(Name(resource.name.as_slice()), font_size);
+    match run {
+      ShapedRun::Builtin { bytes, .. } => {
+        if extra_word_spacing > 0.0 {
+          content.set_word_spacing(extra_word_spacing);
+        }
+        content.show(Str(bytes));
+        if extra_word_spacing > 0.0 {
+          content.set_word_spacing(0.0);
+        }
+      }
+      ShapedRun::Embedded { glyphs, .. } => {
+        let mut positioned = content.show_positioned();
+        let mut items = positioned.items();
+        for glyph in glyphs {
+          let bytes = glyph.cid.to_be_bytes();
+          items.show(Str(&bytes));
+          let extra = if glyph.is_space {
+            extra_word_spacing / font_size * 1000.0
+          } else {
+            0.0
+          };
+          let adjustment = glyph.adjustment - extra;
+          if adjustment.abs() > 0.001 {
+            items.adjust(adjustment);
+          }
+        }
+      }
+    }
+  }
 }

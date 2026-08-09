@@ -3,7 +3,7 @@ import { Buffer as BrowserBuffer } from 'buffer'
 import { configurePdfRuntime } from './dist/api.js'
 
 globalThis.Buffer ??= BrowserBuffer
-const binding = await import('./pdf-crab-js.wasip1-browser.js')
+const binding = await import('./pdf-crab-js.wasi-browser.js')
 
 configurePdfRuntime({
   binding,

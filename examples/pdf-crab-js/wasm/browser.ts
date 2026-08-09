@@ -1,29 +1,12 @@
-import type { CreatePdfInput } from 'pdf-crab-js/browser.js'
+import { renderPdf, type PdfDocumentInput } from 'pdf-crab-js/browser.js'
 import { Buffer as BrowserBuffer } from 'buffer'
 import './browser.css'
 
-type CreatePdfWasi = (input: CreatePdfInput) => Promise<Uint8Array> | Uint8Array
 type ElementConstructor<T extends Element> = new (...args: never[]) => T
 
 globalThis.Buffer ??= BrowserBuffer
 
-const { createPdf: createPdfWasi } = await import('pdf-crab-js/browser.js')
-
-function isCreatePdfWasi(value: unknown): value is CreatePdfWasi {
-  return typeof value === 'function'
-}
-
-function getCreatePdfBinding(): CreatePdfWasi {
-  if (!isCreatePdfWasi(createPdfWasi)) {
-    throw new TypeError('WASI browser binding is missing createPdf')
-  }
-
-  return createPdfWasi
-}
-
-const createPdfBinding = getCreatePdfBinding()
-
-const documentInput: CreatePdfInput = {
+const documentInput: PdfDocumentInput = {
   metadata: {
     creator: 'pdf-crab-js WASM browser example',
     producer: 'pdf-crab-js',
@@ -84,7 +67,7 @@ const documentInput: CreatePdfInput = {
         {
           fill: '#111827',
           fontSize: 12,
-          text: 'Same createPdf input shape',
+          text: 'Same PdfDocumentInput shape',
           type: 'text',
           x: 104,
           y: 87,
@@ -92,7 +75,7 @@ const documentInput: CreatePdfInput = {
         {
           fill: '#475569',
           fontSize: 9,
-          text: 'The generated WASI browser entry loads pdf-crab-js.wasm32-wasi.wasm.',
+          text: 'The zero-config browser entry loads the single-thread WASI module.',
           type: 'text',
           x: 104,
           y: 98,
@@ -148,22 +131,12 @@ function createPdfBlob(pdf: Uint8Array): Blob {
   return new Blob([arrayBuffer], { type: 'application/pdf' })
 }
 
-async function createPdf(input: CreatePdfInput): Promise<Uint8Array> {
-  const pdf = await createPdfBinding(input)
-
-  if (!(pdf instanceof Uint8Array)) {
-    throw new TypeError('WASI browser binding returned a non-binary result')
-  }
-
-  return pdf
-}
-
-async function renderPdf(): Promise<void> {
+async function renderDocument(): Promise<void> {
   renderButton.disabled = true
   setStatus('Rendering structured PDF input with the WASM package...')
 
   try {
-    const pdf = await createPdf(documentInput)
+    const pdf = await renderPdf(documentInput).bytes()
 
     if (currentPdfUrl) {
       URL.revokeObjectURL(currentPdfUrl)
@@ -173,7 +146,12 @@ async function renderPdf(): Promise<void> {
     pdfPreview.src = currentPdfUrl
     pdfSize.textContent = `${pdf.byteLength.toLocaleString()} bytes`
     setDownloadUrl(currentPdfUrl)
-    setStatus('Rendered with pdf-crab-js/wasm.')
+    status.dataset.crossOriginIsolated = String(globalThis.crossOriginIsolated)
+    setStatus(
+      globalThis.crossOriginIsolated
+        ? 'Rendered with pdf-crab-js/browser.'
+        : 'Rendered with pdf-crab-js/browser without cross-origin isolation.',
+    )
   } catch (error) {
     setStatus(error instanceof Error ? error.message : 'Failed to render PDF')
   } finally {
@@ -185,15 +163,11 @@ const formattedInput = JSON.stringify(documentInput, null, 2)
 inputSource.textContent = formattedInput
 inputSize.textContent = `${new TextEncoder().encode(formattedInput).byteLength.toLocaleString()} bytes`
 
-if (!globalThis.crossOriginIsolated) {
-  setStatus('This browser example requires COOP/COEP headers for SharedArrayBuffer. Use the package browser script.')
-} else {
-  renderButton.addEventListener('click', () => {
-    renderPdf().catch((error: unknown) => {
-      setStatus(error instanceof Error ? error.message : 'Failed to render PDF')
-    })
-  })
-  renderPdf().catch((error: unknown) => {
+renderButton.addEventListener('click', () => {
+  renderDocument().catch((error: unknown) => {
     setStatus(error instanceof Error ? error.message : 'Failed to render PDF')
   })
-}
+})
+renderDocument().catch((error: unknown) => {
+  setStatus(error instanceof Error ? error.message : 'Failed to render PDF')
+})

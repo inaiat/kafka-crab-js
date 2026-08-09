@@ -1,9 +1,11 @@
+#![cfg_attr(test, allow(dead_code))]
+
 use std::io::Cursor;
 
 use image::{ColorType, ImageFormat, ImageReader};
 use miniz_oxide::deflate::{compress_to_vec_zlib, CompressionLevel};
 use napi::Result;
-use pdf_writer::{Filter, Finish, Pdf, Ref};
+use pdf_writer::{Chunk, Filter, Finish, Ref};
 
 use super::validation::invalid_arg;
 
@@ -95,8 +97,8 @@ pub(super) fn decode_image(data: &[u8]) -> Result<DecodedImage> {
   })
 }
 
-pub(super) fn write_image_xobjects(
-  pdf: &mut Pdf,
+pub(super) fn write_image_xobject(
+  pdf: &mut Chunk,
   image_ref: Ref,
   mask_ref: Option<Ref>,
   decoded: &DecodedImage,
@@ -111,14 +113,4 @@ pub(super) fn write_image_xobjects(
     image.s_mask(mask_ref);
   }
   image.finish();
-
-  if let (Some(mask_ref), Some(alpha)) = (mask_ref, decoded.alpha.as_ref()) {
-    let mut mask = pdf.image_xobject(mask_ref, alpha);
-    mask.filter(Filter::FlateDecode);
-    mask.width(decoded.width as i32);
-    mask.height(decoded.height as i32);
-    mask.color_space().device_gray();
-    mask.bits_per_component(8);
-    mask.finish();
-  }
 }

@@ -1,16 +1,21 @@
 import type {
-  CreatePdfInput as NodeCreatePdfInput,
-  PdfElementInput as NodePdfElementInput,
+  PdfDocument as NodePdfDocument,
+  PdfDocumentInput as NodePdfDocumentInput,
   PdfImageBytes,
   PdfImageElement as NodePdfImageElement,
+  PdfImageOptions,
+  PdfFontRegistrationOptions,
+  PdfFontInput as NodePdfFontInput,
+  PdfElementInput as NodePdfElementInput,
   PdfPageInput as NodePdfPageInput,
-  PdfDocument as NodePdfDocument,
 } from './dist/api.js'
 
-export { createPdf, createPdfAsync } from './dist/api.js'
+export { PdfError, renderPdf } from './dist/api.js'
 export type {
   PdfAnnotationInput,
   PdfDocumentOptions,
+  PdfFillStyleOptions,
+  PdfFontRegistrationOptions,
   PdfImageAlign,
   PdfImageBytes,
   PdfImageOptions,
@@ -20,33 +25,50 @@ export type {
   PdfLinkOptions,
   PdfMargins,
   PdfMetadata,
+  PdfOutput,
+  PdfOutputOptions,
   PdfPageOptions,
   PdfPageSize,
-  PdfPathElement,
+  PdfPolylineElement,
   PdfPolygonElement,
   PdfRectElement,
-  PdfStyleOptions,
+  PdfStreamOptions,
+  PdfStrokeStyleOptions,
+  PdfTableCellStyle,
+  PdfTableCellValue,
+  PdfTableColumn,
+  PdfTableColumnWidth,
+  PdfTableOptions,
   PdfTextAlign,
-  PdfTextBoxElement,
   PdfTextBoxOptions,
   PdfTextElement,
   PdfTextOptions,
+  PdfTextOverflow,
+  PdfTextStyleOptions,
   PdfUnit,
 } from './dist/api.js'
 
 export type PdfImageSource = PdfImageBytes
+export type PdfFontSource = PdfImageBytes
+
+export interface PdfFontInput extends Omit<NodePdfFontInput, 'source'> {
+  source: PdfFontSource
+}
 
 export declare class PdfDocument extends NodePdfDocument {
   image(source: PdfImageBytes, options?: PdfImageOptions): this
+  registerFont(family: string, source: PdfImageBytes, options?: PdfFontRegistrationOptions): this
 }
 
 export interface PdfImageElement extends Omit<NodePdfImageElement, 'source'> {
   source: PdfImageSource
 }
+
 export type PdfElementInput = Exclude<NodePdfElementInput, NodePdfImageElement> | PdfImageElement
 export interface PdfPageInput extends Omit<NodePdfPageInput, 'elements'> {
-  elements?: PdfElementInput[]
+  elements?: readonly PdfElementInput[]
 }
-export interface CreatePdfInput extends Omit<NodeCreatePdfInput, 'pages'> {
-  pages: [PdfPageInput, ...PdfPageInput[]]
+export interface PdfDocumentInput extends Omit<NodePdfDocumentInput, 'fonts' | 'pages'> {
+  fonts?: readonly PdfFontInput[]
+  pages: readonly PdfPageInput[]
 }

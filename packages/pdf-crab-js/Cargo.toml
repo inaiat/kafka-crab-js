@@ -14,6 +14,10 @@ miniz_oxide = "0.8"
 napi = "3.12.0"
 napi-derive = "3.6.1"
 pdf-writer = "0.15.0"
+rustybuzz = "0.20.1"
+subsetter = "0.2.6"
+ttf-parser = "0.25.1"
+unicode-linebreak = "0.1.5"
 
 [build-dependencies]
 napi-build = { version = "2.4.0" }

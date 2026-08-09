@@ -10,6 +10,7 @@
     "build:wasm": "pnpm --dir ../.. --filter pdf-crab-js build:wasm",
     "check": "vp check",
     "example": "tsx pdf.ts",
+    "example:stream": "tsx stream/node.ts",
     "example:table": "tsx table.ts",
     "fmt": "vp fmt",
     "fmt:check": "vp fmt --check",

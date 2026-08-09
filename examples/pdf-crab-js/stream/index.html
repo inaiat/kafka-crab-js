@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>pdf-crab-js stream example</title>
+    <script type="module" src="./browser.ts"></script>
+  </head>
+  <body>
+    <main class="app-shell">
+      <header class="app-header">
+        <div>
+          <p class="eyebrow">WASM stream example</p>
+          <h1>pdf-crab-js</h1>
+        </div>
+        <div class="actions">
+          <button id="render-pdf" type="button">Render PDF</button>
+          <a id="download-pdf" aria-disabled="true">Download</a>
+        </div>
+      </header>
+
+      <p id="status" class="status">Loading WASM stream renderer...</p>
+
+      <section class="panes" aria-label="PDF input and streamed output comparison">
+        <article class="pane">
+          <div class="pane-header">
+            <h2>PDF input</h2>
+            <span id="input-size">Waiting</span>
+          </div>
+          <pre id="input-source"></pre>
+        </article>
+
+        <article class="pane">
+          <div class="pane-header">
+            <h2>Streamed PDF</h2>
+            <span id="pdf-size">Waiting</span>
+          </div>
+          <iframe id="pdf-preview" title="Streamed PDF preview"></iframe>
+        </article>
+      </section>
+    </main>
+  </body>
+</html>
