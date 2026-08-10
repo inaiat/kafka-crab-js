@@ -178,6 +178,7 @@ jobs:
           name: bindings-wasm
           path: |
             packages/pdf-crab-js/${{ env.APP_NAME }}.*
+            packages/pdf-crab-js/browser*.js
             packages/pdf-crab-js/wasi-worker*.mjs
           if-no-files-found: error
 

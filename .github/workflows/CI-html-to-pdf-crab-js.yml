@@ -184,6 +184,7 @@ jobs:
             packages/html-to-pdf-crab-js/${{ env.APP_NAME }}.*.js
             packages/html-to-pdf-crab-js/${{ env.APP_NAME }}.*.d.cts
             packages/html-to-pdf-crab-js/${{ env.APP_NAME }}.*.d.ts
+            packages/html-to-pdf-crab-js/browser*.js
             packages/html-to-pdf-crab-js/wasi-worker*.mjs
           if-no-files-found: error
 
