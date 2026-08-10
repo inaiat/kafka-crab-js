@@ -1,4 +1,3 @@
-import { copyFileSync, mkdirSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -37,36 +36,22 @@ export default defineConfig({
     exclude: [
       'html-to-pdf-crab-js',
       'html-to-pdf-crab-js/browser.js',
-      'html-to-pdf-crab-js-wasm32-wasi',
+      'html-to-pdf-crab-js-wasm32-wasip1',
       'pdf-crab-js',
       'pdf-crab-js/browser.js',
     ],
   },
-  plugins: [
-    {
-      closeBundle() {
-        const outputDirectory = path.resolve(currentDirectory, 'dist')
-        mkdirSync(outputDirectory, { recursive: true })
-        copyFileSync(path.resolve(currentDirectory, '_headers'), path.join(outputDirectory, '_headers'))
-      },
-      name: 'copy-netlify-headers',
-    },
-  ],
   resolve: {
     alias: {
-      'html-to-pdf-crab-js-wasm32-wasi': path.resolve(
+      'html-to-pdf-crab-js-wasm32-wasip1': path.resolve(
         currentDirectory,
-        '../../packages/html-to-pdf-crab-js/html-to-pdf-crab-js.wasi-browser.js',
+        '../../packages/html-to-pdf-crab-js/html-to-pdf-crab-js.wasip1-browser.js',
       ),
     },
   },
   server: {
     fs: {
       allow: [workspaceRoot],
-    },
-    headers: {
-      'Cross-Origin-Embedder-Policy': 'require-corp',
-      'Cross-Origin-Opener-Policy': 'same-origin',
     },
     open: true,
   },

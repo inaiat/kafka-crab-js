@@ -1,6 +1,6 @@
 {
   "name": "html-to-pdf-crab-js",
-  "version": "0.3.2",
+  "version": "0.4.0",
   "keywords": [
     "N-API",
     "Rust",
@@ -22,8 +22,21 @@
   },
   "files": [
     "browser.js",
+    "browser-threaded.js",
     "index.d.ts",
-    "index.js"
+    "index.d.cts",
+    "index.js",
+    "*.wasi-browser.js",
+    "*.wasi.cjs",
+    "*.wasi.d.cts",
+    "wasi-worker*.mjs",
+    "*.wasip1-browser.js",
+    "*.wasip1.cjs",
+    "*.wasip1.d.cts",
+    "*.wasip1-deferred.js",
+    "*.wasip1-deferred.d.ts",
+    "html-to-pdf-crab-js.wasm32-wasi.wasm",
+    "html-to-pdf-crab-js.wasm32-wasip1.wasm"
   ],
   "type": "module",
   "main": "index.js",
@@ -42,10 +55,9 @@
       "types": "./index.d.ts",
       "default": "./browser.js"
     },
-    "./wasm": {
+    "./browser/threaded": {
       "types": "./index.d.ts",
-      "import": "./browser.js",
-      "default": "./browser.js"
+      "default": "./browser-threaded.js"
     }
   },
   "publishConfig": {
@@ -57,7 +69,8 @@
     "check": "vp check",
     "build": "node build.mjs",
     "build:debug": "node build.mjs --debug",
-    "build:wasm": "node build.mjs --target wasm32-wasip1-threads",
+    "build:wasm": "node build.mjs --target wasm32-wasip1",
+    "build:wasm-threaded": "node build.mjs --target wasm32-wasip1-threads",
     "example": "pnpm --dir ../.. --filter html-to-pdf-crab-js-examples invoice",
     "example:browser": "pnpm --dir ../.. --filter html-to-pdf-crab-js-examples browser",
     "example:invoice": "pnpm --dir ../.. --filter html-to-pdf-crab-js-examples invoice",
@@ -69,7 +82,9 @@
     "lint:fix": "vp lint --fix",
     "prepublishOnly": "napi prepublish -t npm",
     "test": "vp test run js-tests/unit",
-    "test:wasm": "NAPI_RS_FORCE_WASI=error node js-tests/wasm-smoke.mjs"
+    "test:wasm": "pnpm run build:wasm && NAPI_RS_WASI_FLAVOR=wasm32-wasip1 node js-tests/wasm-smoke.mjs",
+    "test:wasm-threaded": "pnpm run build:wasm-threaded && NAPI_RS_WASI_FLAVOR=wasm32-wasi node js-tests/wasm-smoke.mjs",
+    "test:workerd": "pnpm run build:wasm && node js-tests/workerd-smoke.mjs"
   },
   "devDependencies": {
     "@emnapi/core": "catalog:",
@@ -79,6 +94,7 @@
   },
   "napi": {
     "binaryName": "html-to-pdf-crab-js",
+    "rootPublisher": "npm",
     "targets": [
       "x86_64-pc-windows-msvc",
       "x86_64-apple-darwin",
@@ -87,10 +103,14 @@
       "aarch64-unknown-linux-gnu",
       "aarch64-apple-darwin",
       "aarch64-unknown-linux-musl",
+      "wasm32-wasip1",
       "wasm32-wasip1-threads"
-    ]
+    ],
+    "wasm": {
+      "optionalDependency": false
+    }
   },
   "engines": {
-    "node": ">=22"
+    "node": "24"
   }
 }

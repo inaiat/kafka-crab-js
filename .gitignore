@@ -201,9 +201,15 @@ packages/kafka-crab-js/target
 
 *.node
 *.wasm32-wasi*.wasm
+*.wasm32-wasip1*.wasm
 *.wasi-browser.js
 *.wasi.cjs
 *.wasi.d.cts
+*.wasip1-browser.js
+*.wasip1.cjs
+*.wasip1.d.cts
+*.wasip1-deferred.js
+*.wasip1-deferred.d.ts
 packages/*/index.d.cts
 wasi-worker-browser.mjs
 wasi-worker.mjs

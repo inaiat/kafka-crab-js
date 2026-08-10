@@ -35,16 +35,16 @@ Run the browser WASM example:
 pnpm --filter html-to-pdf-crab-js-examples browser
 ```
 
-The browser command builds the local `wasm32-wasip1-threads` binding before starting Vite, so the
-aliased `html-to-pdf-crab-js-wasm32-wasi` entry is always available.
+The browser command builds the local threadless `wasm32-wasip1` binding before starting Vite, so
+the aliased `html-to-pdf-crab-js-wasm32-wasip1` entry is always available.
 
 Open `/wasm/` on the dev-server URL printed by Vite. The page previews `report.html` and renders
 that same HTML/CSS into a PDF iframe. The browser example imports `html-to-pdf-crab-js/browser.js`;
-Vite aliases the generated `html-to-pdf-crab-js-wasm32-wasi` package entry to the local WASI browser
-build during development.
+Vite aliases the generated `html-to-pdf-crab-js-wasm32-wasip1` package entry to the local threadless
+WASI browser build during development, so no COOP/COEP headers are required.
 
 If you rebuild `html-to-pdf-crab-js` while the Vite dev server is running, restart the dev server
-before checking the page again. The package build regenerates `*.wasi-browser.js` and rewrites it to
+before checking the page again. The package build regenerates `*.wasip1-browser.js` and rewrites it to
 use async WASM instantiation; stale hot-reload state can still point at the previous generated file.
 
 Preview the source HTML in a browser:

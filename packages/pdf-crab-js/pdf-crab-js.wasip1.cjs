@@ -1,4 +1,4 @@
-// napi-rs-artifact-metadata:{"version":2,"rootEntry":"index.js","exports":["PdfDocumentBuilder","PdfOutput","createPdf","createPdfAsync","createPdfStream","getImageDimensions"],"managedRootEntries":["browser.js","index.js","pdf-crab-js.wasm","pdf-crab-js.debug.wasm"]}
+// napi-rs-artifact-metadata:{"version":2,"rootEntry":"index.js","managedRootEntries":["browser.js","index.js","pdf-crab-js.wasm","pdf-crab-js.debug.wasm"]}
 /* eslint-disable */
 /* prettier-ignore */
 

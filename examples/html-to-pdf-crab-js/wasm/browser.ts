@@ -165,7 +165,7 @@ async function renderPdf(): Promise<void> {
     pdfPreview.src = currentPdfUrl
     pdfSize.textContent = `${pdf.byteLength.toLocaleString()} bytes`
     setDownloadUrl(currentPdfUrl)
-    setStatus('Rendered with html-to-pdf-crab-js/wasm.')
+    setStatus('Rendered with html-to-pdf-crab-js/browser.')
   } catch (error) {
     setStatus(error instanceof Error ? error.message : 'Failed to render PDF')
   } finally {
@@ -173,15 +173,11 @@ async function renderPdf(): Promise<void> {
   }
 }
 
-if (!globalThis.crossOriginIsolated) {
-  setStatus('This browser example requires COOP/COEP headers for SharedArrayBuffer. Use the package browser script.')
-} else {
-  renderButton.addEventListener('click', () => {
-    renderPdf().catch((error: unknown) => {
-      setStatus(error instanceof Error ? error.message : 'Failed to render PDF')
-    })
-  })
+renderButton.addEventListener('click', () => {
   renderPdf().catch((error: unknown) => {
     setStatus(error instanceof Error ? error.message : 'Failed to render PDF')
   })
-}
+})
+renderPdf().catch((error: unknown) => {
+  setStatus(error instanceof Error ? error.message : 'Failed to render PDF')
+})

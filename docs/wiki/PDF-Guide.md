@@ -8,7 +8,7 @@ Use `html-to-pdf-crab-js` instead when HTML and CSS are the source of truth.
 
 ## Installation
 
-The native entrypoint requires Node.js 22 or newer.
+The native entrypoint requires Node.js 24.
 
 ```bash
 npm install pdf-crab-js

@@ -103,7 +103,7 @@ const defaultHtml = `<article class="report">
       <tbody>
         <tr><td>Structured</td><td>Typed objects</td><td>Incremental</td><td>Invoices and tables</td></tr>
         <tr><td>Document</td><td>Fluent API</td><td>Lazy output</td><td>Programmatic reports</td></tr>
-        <tr><td>HTML</td><td>HTML + CSS</td><td>Threaded WASM</td><td>Existing templates</td></tr>
+        <tr><td>HTML</td><td>HTML + CSS</td><td>Threadless WASM</td><td>Existing templates</td></tr>
       </tbody>
     </table>
   </section>
@@ -252,26 +252,23 @@ function setStatus(message: string, error = false): void {
 }
 
 function htmlRuntimeReady(): boolean {
-  return globalThis.crossOriginIsolated && typeof SharedArrayBuffer === 'function'
+  return true
 }
 
 function setBusy(busy: boolean): void {
   for (const action of elements.generateActions) {
-    action.disabled = action.closest('[data-panel="html"]') && !htmlRuntimeReady() ? true : busy
+    action.disabled = busy
   }
 }
 
 function refreshRuntimeState(): void {
   const htmlReady = htmlRuntimeReady()
-  elements.runtimeBadge.textContent = htmlReady ? 'both renderers ready' : 'pdf-crab-js: zero-config'
-  elements.runtimeBadge.classList.toggle('is-partial', !htmlReady)
-  elements.runtimeDetail.textContent = htmlReady
-    ? 'COOP/COEP is active, so structured and HTML examples are available.'
-    : 'The structured API works without SharedArrayBuffer; HTML rendering needs COOP/COEP.'
-  elements.htmlRuntimeNotice.textContent = htmlReady
-    ? 'The threaded runtime is ready. HTML, CSS, and font data stay in this browser.'
-    : 'This renderer still uses threaded WASM. Start the Vite server or publish the COOP/COEP headers.'
-  elements.htmlRuntimeNotice.classList.toggle('is-ready', htmlReady)
+  elements.runtimeBadge.textContent = 'both renderers ready'
+  elements.runtimeBadge.classList.remove('is-partial')
+  elements.runtimeDetail.textContent = 'Both renderers use threadless WASM and run without cross-origin isolation.'
+  elements.htmlRuntimeNotice.textContent =
+    'The threadless runtime is ready. HTML, CSS, and font data stay in this browser.'
+  elements.htmlRuntimeNotice.classList.add('is-ready')
   const htmlButton = elements.htmlForm.querySelector<HTMLButtonElement>('.generate-action')
   if (htmlButton) {
     htmlButton.disabled = !htmlReady
@@ -445,14 +442,9 @@ function selectedHtmlPageSize(): 'A3' | 'A4' | 'LETTER' {
 }
 
 async function generateHtmlPdf(): Promise<void> {
-  if (!htmlRuntimeReady()) {
-    setStatus('HTML rendering needs COOP/COEP headers. Use this example through its Vite server.', true)
-    return
-  }
-
   setBusy(true)
   const startedAt = performance.now()
-  setStatus('Rendering HTML, CSS, and the TTF font in threaded WASM...')
+  setStatus('Rendering HTML, CSS, and the TTF font in threadless WASM...')
 
   try {
     const [binding, font] = await Promise.all([loadHtmlBinding(), loadFont()])
@@ -535,8 +527,8 @@ function switchMode(mode: ModeName, updateHash = false): void {
       : mode === 'structured'
         ? 'The structured API is ready. Its single-thread WASM build needs no cross-origin isolation.'
         : htmlRuntimeReady()
-          ? 'Edit the live HTML or CSS, then render it with the threaded WASM engine.'
-          : "HTML rendering needs COOP/COEP; this example's Vite server already sends those headers.",
+          ? 'Edit the live HTML or CSS, then render it with the threadless WASM engine.'
+          : 'The HTML renderer is ready without cross-origin isolation.',
     mode === 'html' && !htmlRuntimeReady(),
   )
 }

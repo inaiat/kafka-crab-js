@@ -63,6 +63,30 @@ const useAsyncBrowserWasmInstantiation = async (fileName) => {
   await writeFile(path, rewritten)
 }
 
+const preserveHighLevelBrowserEntry = async (fileName) => {
+  // NAPI-RS uses the metadata export list to replace browser.js with a raw flavor re-export.
+  // Keep this package's high-level browser facade instead.
+  const path = new URL(`./${fileName}`, import.meta.url)
+  let content
+
+  try {
+    content = await readFile(path, 'utf8')
+  } catch (error) {
+    if (error && typeof error === 'object' && 'code' in error && error.code === 'ENOENT') return
+    throw error
+  }
+
+  const lineEnd = content.indexOf('\n')
+  const metadataPrefix = '// napi-rs-artifact-metadata:'
+  if (lineEnd === -1 || !content.startsWith(metadataPrefix)) return
+
+  const metadata = JSON.parse(content.slice(metadataPrefix.length, lineEnd))
+  if (!Array.isArray(metadata.exports)) return
+
+  delete metadata.exports
+  await writeFile(path, `${metadataPrefix}${JSON.stringify(metadata)}\n${content.slice(lineEnd + 1)}`)
+}
+
 const browserEntrypoint = (bindingFile) => `import { Buffer as BrowserBuffer } from 'buffer'
 
 import { configurePdfRuntime } from './dist/api.js'
@@ -155,6 +179,7 @@ const build = async () => {
   })
 
   if (isWasi) {
+    await preserveHighLevelBrowserEntry(isThreadedWasi ? 'pdf-crab-js.wasi.cjs' : 'pdf-crab-js.wasip1.cjs')
     await useAsyncBrowserWasmInstantiation(
       isThreadedWasi ? 'pdf-crab-js.wasi-browser.js' : 'pdf-crab-js.wasip1-browser.js',
     )
