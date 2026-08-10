@@ -1,6 +1,7 @@
 {
   "name": "pdf-crab-js",
-  "version": "0.3.0",
+  "version": "1.0.0",
+  "description": "Fast, typed PDF generation for Node.js and browser/WASM, powered by Rust.",
   "keywords": [
     "N-API",
     "Rust",
@@ -19,31 +20,48 @@
     "directory": "packages/pdf-crab-js"
   },
   "files": [
+    "dist",
     "browser.js",
-    "index.d.ts",
-    "index.js"
+    "browser-threaded.js",
+    "browser.d.ts",
+    "js-binding.js",
+    "js-binding.cjs",
+    "js-binding.d.ts",
+    "MIGRATION.md",
+    "*.wasi-browser.js",
+    "*.wasi.cjs",
+    "*.wasi.d.cts",
+    "*.wasip1-browser.js",
+    "*.wasip1.cjs",
+    "*.wasip1.d.cts",
+    "pdf-crab-js.wasm32-wasi.wasm",
+    "pdf-crab-js.wasm32-wasip1.wasm",
+    "wasi-worker*.mjs"
   ],
   "type": "module",
-  "main": "index.js",
+  "main": "./dist/index.js",
   "browser": "./browser.js",
-  "types": "index.d.ts",
+  "types": "./dist/index.d.ts",
   "exports": {
     ".": {
-      "types": "./index.d.ts",
-      "import": "./index.js"
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
     },
     "./browser": {
-      "types": "./index.d.ts",
+      "types": "./browser.d.ts",
+      "import": "./browser.js",
       "default": "./browser.js"
     },
     "./browser.js": {
-      "types": "./index.d.ts",
-      "default": "./browser.js"
-    },
-    "./wasm": {
-      "types": "./index.d.ts",
+      "types": "./browser.d.ts",
       "import": "./browser.js",
       "default": "./browser.js"
+    },
+    "./browser/threaded": {
+      "types": "./browser.d.ts",
+      "import": "./browser-threaded.js",
+      "default": "./browser-threaded.js"
     }
   },
   "publishConfig": {
@@ -54,17 +72,26 @@
     "artifacts": "napi artifacts",
     "check": "vp check",
     "build": "node build.mjs",
+    "build:js": "node build.mjs --js-only",
     "build:debug": "node build.mjs --debug",
-    "build:wasm": "node build.mjs --target wasm32-wasip1-threads",
+    "build:wasm": "node build.mjs --target wasm32-wasip1",
+    "build:wasm-threaded": "node build.mjs --target wasm32-wasip1-threads",
     "example": "pnpm --dir ../.. --filter pdf-crab-js-examples example",
     "example:table": "pnpm --dir ../.. --filter pdf-crab-js-examples example:table",
     "fmt": "vp fmt",
     "fmt:check": "vp fmt --check",
     "lint": "vp lint",
     "lint:fix": "vp lint --fix",
+    "prepack": "node build.mjs --js-only",
     "prepublishOnly": "napi prepublish -t npm",
-    "test": "vp test run js-tests/unit",
-    "test:wasm": "NAPI_RS_FORCE_WASI=error node js-tests/wasm-smoke.mjs"
+    "test": "pnpm run build && pnpm run test:unit",
+    "test:wasm": "pnpm run build:wasm && NAPI_RS_FORCE_WASI=error node js-tests/wasm-smoke.mjs",
+    "test:wasm-threaded": "pnpm run build:wasm-threaded && NAPI_RS_FORCE_WASI=error PDF_CRAB_WASM_THREADED=1 node js-tests/wasm-smoke.mjs",
+    "test:unit": "npm run typecheck && vp test run js-tests/unit",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "buffer": "^6.0.3"
   },
   "devDependencies": {
     "@emnapi/core": "catalog:",
@@ -82,6 +109,7 @@
       "aarch64-unknown-linux-gnu",
       "aarch64-apple-darwin",
       "aarch64-unknown-linux-musl",
+      "wasm32-wasip1",
       "wasm32-wasip1-threads"
     ]
   },

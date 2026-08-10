@@ -1,15 +1,27 @@
 # Crab JS Documentation
 
-Documentation for the Crab JS native Node.js packages. This wiki currently focuses on `kafka-crab-js`, the Kafka
-binding built with Rust for high performance and type safety.
+Documentation for the Crab JS packages built with Rust for native Node.js performance and typed JavaScript APIs.
 
-## Installation
+## Package guides
+
+| Package               | Purpose                                           | Documentation                                                              |
+| --------------------- | ------------------------------------------------- | -------------------------------------------------------------------------- |
+| `pdf-crab-js`         | Structured PDF generation for Node.js and browser | [PDF 1.0 guide](./PDF-Guide.md)                                            |
+| `html-to-pdf-crab-js` | HTML/CSS to PDF for Node.js and browser           | [Package README](../../packages/html-to-pdf-crab-js/README.md)             |
+| `kafka-crab-js`       | Kafka producer, consumer, and streams             | [Kafka API reference](./API-Reference.md)                                  |
+| `kafka-crab-js-otel`  | Optional OpenTelemetry instrumentation            | [Kafka API reference](./API-Reference.md#opentelemetry-kafka-crab-js-otel) |
+
+For `pdf-crab-js` 1.0 migration details, see the
+[migration guide](../../packages/pdf-crab-js/MIGRATION.md). The interactive
+[WASM sample studio](../../examples/wasm-samples/README.md) runs the browser build locally with Vite.
+
+## Kafka installation
 
 ```bash
 pnpm install kafka-crab-js
 ```
 
-## What's New in Version 3.0.0
+## What's new in kafka-crab-js 3.0.0
 
 ### Breaking Changes
 
@@ -57,15 +69,7 @@ const message = await consumer.recv()
 endSpan(message)
 ```
 
-### Package Structure
-
-| Package              | Description                                      |
-| -------------------- | ------------------------------------------------ |
-| `kafka-crab-js`      | Core Kafka client (producer, consumer, streams)  |
-| `pdf-crab-js`        | Native PDF generation and rendering helpers      |
-| `kafka-crab-js-otel` | OpenTelemetry instrumentation (separate install) |
-
-## Basic Usage
+## Kafka basic usage
 
 ### Creating a Kafka Client
 
@@ -382,7 +386,7 @@ async function consumerWithRetry() {
 }
 ```
 
-## API Reference
+## Kafka API summary
 
 ### KafkaClient
 
@@ -544,7 +548,7 @@ interface Message {
 }
 ```
 
-## Performance Benchmarks
+## Kafka performance benchmarks
 
 _Benchmarks run on macOS with Apple M1 chip processing 50,000 messages (December 2024)_
 
@@ -563,7 +567,7 @@ Performance characteristics:
 - Lock-free data structures minimize memory overhead
 - Zero-contention concurrent operations
 
-## Best Practices
+## Kafka best practices
 
 1. **Resource Management**
    - Always use `destroy()` when done with a stream consumer

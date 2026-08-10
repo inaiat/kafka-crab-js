@@ -9,7 +9,10 @@ const workspaceRoot = path.resolve(currentDirectory, '../..')
 export default defineConfig({
   build: {
     rollupOptions: {
-      input: path.resolve(currentDirectory, 'wasm/index.html'),
+      input: {
+        stream: path.resolve(currentDirectory, 'stream/index.html'),
+        wasm: path.resolve(currentDirectory, 'wasm/index.html'),
+      },
     },
     target: 'esnext',
   },
@@ -27,7 +30,7 @@ export default defineConfig({
         },
       },
       {
-        files: ['wasm/browser.ts'],
+        files: ['src/browser/*.ts'],
         rules: {
           'unicorn/prefer-node-protocol': 'off',
         },
@@ -35,23 +38,11 @@ export default defineConfig({
     ],
   },
   optimizeDeps: {
-    exclude: ['pdf-crab-js', 'pdf-crab-js/browser.js', 'pdf-crab-js-wasm32-wasi'],
-  },
-  resolve: {
-    alias: {
-      'pdf-crab-js-wasm32-wasi': path.resolve(
-        currentDirectory,
-        '../../packages/pdf-crab-js/pdf-crab-js.wasi-browser.js',
-      ),
-    },
+    exclude: ['pdf-crab-js', 'pdf-crab-js/browser.js'],
   },
   server: {
     fs: {
       allow: [workspaceRoot],
-    },
-    headers: {
-      'Cross-Origin-Embedder-Policy': 'require-corp',
-      'Cross-Origin-Opener-Policy': 'same-origin',
     },
     open: '/wasm/',
   },

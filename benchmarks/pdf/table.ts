@@ -1,12 +1,14 @@
 import { Buffer } from 'node:buffer'
 import { spawn, spawnSync } from 'node:child_process'
-import { mkdirSync, writeFileSync } from 'node:fs'
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { open } from 'node:fs/promises'
 import path from 'node:path'
 import { performance } from 'node:perf_hooks'
 import { fileURLToPath } from 'node:url'
 
 import { createPdfFromHtml } from 'html-to-pdf-crab-js'
-import { createPdf, PdfDocumentBuilder, type CreatePdfInput, type PdfElementInput } from 'pdf-crab-js'
+import { PdfDocument, renderPdf, type PdfDocumentInput, type PdfElementInput, type PdfTableColumn } from 'pdf-crab-js'
+import PDFDocument from 'pdfkit'
 
 const resultMarker = '__PDF_BENCHMARK_RESULT__'
 const columns = ['id', 'customer', 'product', 'region', 'amount', 'status', 'date', 'owner'] as const
@@ -16,11 +18,30 @@ const products = ['Pro Plan', 'Scale Plan', 'Core Plan', 'Insight Pack', 'Veloci
 const regions = ['LATAM', 'NA', 'EMEA', 'APAC'] as const
 const statuses = ['paid', 'pending', 'overdue', 'refunded'] as const
 const owners = ['team-a', 'team-b', 'team-c', 'team-d'] as const
+const benchmarkDirectory = path.dirname(fileURLToPath(import.meta.url))
+const benchmarkImage = readFileSync(
+  path.join(benchmarkDirectory, '../../examples/pdf-crab-js/screenshots/pdf-crab-js-declarative-example.pdf.png'),
+)
 
 type Column = (typeof columns)[number]
-type PdfBuffer = ReturnType<typeof createPdf>
-type ScenarioId = 'pdf-crab' | 'pdf-crab-builder' | 'html-to-pdf-crab-js' | 'gotenberg-node'
+type PdfBuffer = Uint8Array
+type ScenarioId =
+  | 'pdf-crab'
+  | 'pdf-crab-document'
+  | 'pdf-crab-stream'
+  | 'pdf-crab-document-stream'
+  | 'pdf-crab-image'
+  | 'pdf-crab-document-image'
+  | 'pdfkit'
+  | 'pdfkit-stream'
+  | 'pdfkit-table'
+  | 'pdfkit-table-stream'
+  | 'pdfkit-image'
+  | 'html-to-pdf-crab-js'
+  | 'gotenberg-node'
 type ScenarioStatus = 'completed' | 'failed' | 'timeout'
+type ScenarioGroup = 'declarative' | 'fluent-table' | 'image' | 'html-css' | 'remote-html'
+type ScenarioOutputMode = 'buffered' | 'stream'
 type TableRow = Record<Column, string>
 
 interface Dataset {
@@ -44,52 +65,137 @@ interface BenchmarkConfig {
 }
 
 interface ScenarioDefinition {
+  group: ScenarioGroup
   id: ScenarioId
   language: string
   mode: string
+  output: ScenarioOutputMode
 }
 
 interface ScenarioResult {
   durationsMs: number[]
   error?: string
+  group: ScenarioGroup
   id: ScenarioId
   language: string
   meanMs: number
   mode: string
+  output: ScenarioOutputMode
   pages: number
+  p50Ms: number
+  p95Ms: number
   pdfSizeBytes: number
   peakRssBytes: number
   status: ScenarioStatus
   throughputPagesPerSecond: number
 }
 
+interface ScenarioOutput {
+  pdf?: PdfBuffer
+  pdfPrefix?: Buffer
+  pdfSizeBytes?: number
+  pdfSuffix?: Buffer
+  outputWritten?: boolean
+}
+
 const scenarioDefinitions: Record<ScenarioId, ScenarioDefinition> = {
   'gotenberg-node': {
+    group: 'remote-html',
     id: 'gotenberg-node',
     language: 'Node + Gotenberg',
-    mode: 'gotenberg',
+    mode: 'remote-html',
+    output: 'buffered',
   },
   'html-to-pdf-crab-js': {
+    group: 'html-css',
     id: 'html-to-pdf-crab-js',
     language: 'Node + html-to-pdf-crab',
-    mode: 'local-html',
+    mode: 'html-buffered',
+    output: 'buffered',
   },
   'pdf-crab': {
+    group: 'declarative',
     id: 'pdf-crab',
     language: 'Node + pdf-crab',
-    mode: 'local',
+    mode: 'declarative-buffered',
+    output: 'buffered',
   },
-  'pdf-crab-builder': {
-    id: 'pdf-crab-builder',
+  'pdf-crab-document': {
+    group: 'fluent-table',
+    id: 'pdf-crab-document',
     language: 'Node + pdf-crab',
-    mode: 'builder',
+    mode: 'fluent-table-buffered',
+    output: 'buffered',
+  },
+  'pdf-crab-stream': {
+    group: 'declarative',
+    id: 'pdf-crab-stream',
+    language: 'Node + pdf-crab',
+    mode: 'declarative-stream',
+    output: 'stream',
+  },
+  'pdf-crab-document-stream': {
+    group: 'fluent-table',
+    id: 'pdf-crab-document-stream',
+    language: 'Node + pdf-crab',
+    mode: 'fluent-table-stream',
+    output: 'stream',
+  },
+  'pdf-crab-image': {
+    group: 'image',
+    id: 'pdf-crab-image',
+    language: 'Node + pdf-crab',
+    mode: 'declarative-image-buffered',
+    output: 'buffered',
+  },
+  'pdf-crab-document-image': {
+    group: 'image',
+    id: 'pdf-crab-document-image',
+    language: 'Node + pdf-crab',
+    mode: 'fluent-image-buffered',
+    output: 'buffered',
+  },
+  pdfkit: {
+    group: 'declarative',
+    id: 'pdfkit',
+    language: 'Node + PDFKit',
+    mode: 'manual-buffered',
+    output: 'buffered',
+  },
+  'pdfkit-stream': {
+    group: 'declarative',
+    id: 'pdfkit-stream',
+    language: 'Node + PDFKit',
+    mode: 'manual-stream',
+    output: 'stream',
+  },
+  'pdfkit-table': {
+    group: 'fluent-table',
+    id: 'pdfkit-table',
+    language: 'Node + PDFKit',
+    mode: 'table-buffered',
+    output: 'buffered',
+  },
+  'pdfkit-table-stream': {
+    group: 'fluent-table',
+    id: 'pdfkit-table-stream',
+    language: 'Node + PDFKit',
+    mode: 'table-stream',
+    output: 'stream',
+  },
+  'pdfkit-image': {
+    group: 'image',
+    id: 'pdfkit-image',
+    language: 'Node + PDFKit',
+    mode: 'manual-image-buffered',
+    output: 'buffered',
   },
 }
 
 const pageWidth = 210
 const pageHeight = 297
 const tableX = 10
-const tableTopY = 256
+const tableTopY = 41
 const tableWidth = 190
 const headerHeight = 10
 const rowHeight = 12
@@ -169,19 +275,51 @@ function generateDataset(pages: number): Dataset {
   return { columns, pages, rows, rowsPerPage }
 }
 
-function createBenchmarkInput(dataset: Dataset): CreatePdfInput {
+function createBenchmarkInput(dataset: Dataset): PdfDocumentInput {
+  const pages = Array.from({ length: dataset.pages }, (_unused, pageIndex) => ({
+    elements: createPageElements(dataset, pageIndex),
+    size: 'A4' as const,
+  }))
+  const firstPage = pages[0]
+
+  if (!firstPage) {
+    throw new Error('Benchmark dataset must contain at least one page')
+  }
+
   return {
     metadata: {
       creator: 'pdf-benchmark',
       producer: 'pdf-crab-js',
       title: `table benchmark (${dataset.pages} pages)`,
     },
-    pages: Array.from({ length: dataset.pages }, (_unused, pageIndex) => ({
-      elements: createPageElements(dataset, pageIndex),
-      height: pageHeight,
-      width: pageWidth,
-    })),
+    pages: [firstPage, ...pages.slice(1)],
     title: `table benchmark (${dataset.pages} pages)`,
+    unit: 'mm',
+  }
+}
+
+function createImageBenchmarkInput(dataset: Dataset): PdfDocumentInput {
+  const pages = Array.from({ length: dataset.pages }, (_unused, pageIndex) => ({
+    elements: [
+      ...createPageElements(dataset, pageIndex),
+      { type: 'image' as const, source: benchmarkImage, x: 175, y: 260, width: 25 },
+    ],
+    size: 'A4' as const,
+  }))
+  const firstPage = pages[0]
+
+  if (!firstPage) {
+    throw new Error('Benchmark dataset must contain at least one page')
+  }
+
+  return {
+    metadata: {
+      creator: 'pdf-benchmark',
+      producer: 'pdf-crab-js',
+      title: `table image benchmark (${dataset.pages} pages)`,
+    },
+    pages: [firstPage, ...pages.slice(1)],
+    title: `table image benchmark (${dataset.pages} pages)`,
     unit: 'mm',
   }
 }
@@ -194,8 +332,8 @@ function createPageElementChunks(dataset: Dataset, pageIndex: number): PdfElemen
   const startRow = pageIndex * dataset.rowsPerPage
   const pageRows = dataset.rows.slice(startRow, startRow + dataset.rowsPerPage)
   const bodyHeight = dataset.rowsPerPage * rowHeight
-  const tableBottomY = tableTopY - headerHeight - bodyHeight
-  const headerBottomY = tableTopY - headerHeight
+  const tableBottomY = tableTopY + headerHeight + bodyHeight
+  const headerBottomY = tableTopY + headerHeight
   const headerElements: PdfElementInput[] = []
   const backgroundElements: PdfElementInput[] = []
   const gridElements: PdfElementInput[] = []
@@ -210,7 +348,7 @@ function createPageElementChunks(dataset: Dataset, pageIndex: number): PdfElemen
       text: 'Simple Revenue Table',
       type: 'text',
       x: tableX,
-      y: 277,
+      y: 15,
     },
     {
       fill: '#64748b',
@@ -218,7 +356,7 @@ function createPageElementChunks(dataset: Dataset, pageIndex: number): PdfElemen
       text: `Page ${pageIndex + 1} of ${dataset.pages}`,
       type: 'text',
       x: tableX,
-      y: 267,
+      y: 27,
     },
     {
       fill: '#e2e8f0',
@@ -226,7 +364,7 @@ function createPageElementChunks(dataset: Dataset, pageIndex: number): PdfElemen
       type: 'rect',
       width: tableWidth,
       x: tableX,
-      y: headerBottomY,
+      y: tableTopY,
     },
   )
 
@@ -237,7 +375,7 @@ function createPageElementChunks(dataset: Dataset, pageIndex: number): PdfElemen
       type: 'rect',
       width: tableWidth,
       x: tableX,
-      y: headerBottomY - (rowIndex + 1) * rowHeight,
+      y: headerBottomY + rowIndex * rowHeight,
     })
   }
 
@@ -245,7 +383,7 @@ function createPageElementChunks(dataset: Dataset, pageIndex: number): PdfElemen
   appendHeaderText(headerTextElements, headerBottomY)
 
   for (const [rowIndex, row] of pageRows.entries()) {
-    appendRowText(rowTextElements, row, headerBottomY - (rowIndex + 1) * rowHeight)
+    appendRowText(rowTextElements, row, headerBottomY + rowIndex * rowHeight)
   }
 
   return [
@@ -261,7 +399,7 @@ function createPageElementChunks(dataset: Dataset, pageIndex: number): PdfElemen
         text: `Rows ${startRow + 1}-${startRow + pageRows.length}`,
         type: 'text',
         x: tableX,
-        y: 22,
+        y: 272,
       },
     ],
   ]
@@ -269,7 +407,7 @@ function createPageElementChunks(dataset: Dataset, pageIndex: number): PdfElemen
 
 function appendGrid(elements: PdfElementInput[], tableBottomY: number): void {
   for (let lineIndex = 0; lineIndex <= rowsPerPage + 1; lineIndex += 1) {
-    const lineY = tableTopY - (lineIndex === 0 ? 0 : headerHeight + (lineIndex - 1) * rowHeight)
+    const lineY = tableTopY + (lineIndex === 0 ? 0 : headerHeight + (lineIndex - 1) * rowHeight)
 
     elements.push({
       stroke: '#cbd5e1',
@@ -308,7 +446,7 @@ function appendGrid(elements: PdfElementInput[], tableBottomY: number): void {
   })
 }
 
-function appendHeaderText(elements: PdfElementInput[], headerBottomY: number): void {
+function appendHeaderText(elements: PdfElementInput[], _headerBottomY: number): void {
   let cursorX = tableX
 
   for (const column of columns) {
@@ -319,7 +457,7 @@ function appendHeaderText(elements: PdfElementInput[], headerBottomY: number): v
       text: column.toUpperCase(),
       type: 'text',
       x: cursorX + cellPaddingX,
-      y: headerBottomY + 3.5,
+      y: tableTopY + 3.5,
     })
     cursorX += columnWidths[column]
   }
@@ -499,7 +637,21 @@ function readSelectedScenarios(): ScenarioId[] {
   const raw = process.env.PDF_BENCHMARK_ONLY?.trim()
 
   if (!raw) {
-    return ['pdf-crab', 'pdf-crab-builder', 'html-to-pdf-crab-js', 'gotenberg-node']
+    const selected: ScenarioId[] = [
+      'pdf-crab',
+      'pdf-crab-document',
+      'pdf-crab-stream',
+      'pdf-crab-document-stream',
+      'pdfkit',
+      'pdfkit-stream',
+      'pdfkit-table',
+      'pdfkit-table-stream',
+    ]
+
+    if (readEnabled('PDF_BENCHMARK_ENABLE_HTML')) selected.push('html-to-pdf-crab-js')
+    if (readEnabled('PDF_BENCHMARK_ENABLE_GOTENBERG')) selected.push('gotenberg-node')
+
+    return selected
   }
 
   const selected = raw
@@ -520,6 +672,20 @@ function readSelectedScenarios(): ScenarioId[] {
   return selected as ScenarioId[]
 }
 
+function readEnabled(name: string): boolean {
+  const raw = process.env[name]?.trim()
+
+  if (!raw || raw === '0') {
+    return false
+  }
+
+  if (raw === '1') {
+    return true
+  }
+
+  throw new Error(`${name} must be 0 or 1`)
+}
+
 function collectGarbage(): void {
   const runtimeGlobal = globalThis as typeof globalThis & { gc?: () => void }
 
@@ -530,8 +696,18 @@ function average(values: readonly number[]): number {
   return values.reduce((total, value) => total + value, 0) / values.length
 }
 
-function formatDuration(value: number): string {
-  if (!Number.isFinite(value)) {
+function percentile(values: readonly number[], quantile: number): number {
+  if (values.length === 0) {
+    return Number.POSITIVE_INFINITY
+  }
+
+  const sorted = values.toSorted((left, right) => left - right)
+  const index = Math.min(sorted.length - 1, Math.max(0, Math.ceil(sorted.length * quantile) - 1))
+  return sorted[index] ?? Number.POSITIVE_INFINITY
+}
+
+function formatDuration(value: number | null | undefined): string {
+  if (value === null || value === undefined || !Number.isFinite(value)) {
     return '-'
   }
 
@@ -563,25 +739,44 @@ function formatThroughput(value: number): string {
 }
 
 function assertPdf(pdf: PdfBuffer): void {
-  if (!pdf.subarray(0, 5).equals(Buffer.from('%PDF-'))) {
+  const bytes = Buffer.from(pdf)
+
+  if (!bytes.subarray(0, 5).equals(Buffer.from('%PDF-'))) {
     throw new Error('Benchmark output does not start with %PDF-')
   }
 
-  if (!pdf.subarray(-16).toString('latin1').includes('%%EOF')) {
+  if (!bytes.subarray(-16).toString('latin1').includes('%%EOF')) {
     throw new Error('Benchmark output does not end with %%EOF')
   }
 }
 
-function maybeWriteOutput(config: BenchmarkConfig, scenario: ScenarioDefinition, pdf: PdfBuffer): void {
-  if (!config.writeOutput) {
+function assertScenarioOutput(output: ScenarioOutput): void {
+  if (output.pdf !== undefined) {
+    assertPdf(output.pdf)
     return
   }
 
-  const outputDirectory = path.join(path.dirname(fileURLToPath(import.meta.url)), 'output')
-  const outputPath = path.join(outputDirectory, `table-${scenario.id}-${config.pages}-pages.pdf`)
+  if (!output.pdfPrefix?.equals(Buffer.from('%PDF-'))) {
+    throw new Error('Benchmark stream does not start with %PDF-')
+  }
 
+  if (!output.pdfSuffix?.toString('latin1').includes('%%EOF')) {
+    throw new Error('Benchmark stream does not end with %%EOF')
+  }
+}
+
+function benchmarkOutputPath(config: BenchmarkConfig, scenario: ScenarioDefinition): string {
+  const outputDirectory = path.join(path.dirname(fileURLToPath(import.meta.url)), 'output')
   mkdirSync(outputDirectory, { recursive: true })
-  writeFileSync(outputPath, pdf)
+  return path.join(outputDirectory, `table-${scenario.id}-${config.pages}-pages.pdf`)
+}
+
+function maybeWriteOutput(config: BenchmarkConfig, scenario: ScenarioDefinition, output: ScenarioOutput): void {
+  if (!config.writeOutput || output.outputWritten || output.pdf === undefined) {
+    return
+  }
+
+  writeFileSync(benchmarkOutputPath(config, scenario), output.pdf)
 }
 
 async function createGotenbergPdf(config: BenchmarkConfig, html: string): Promise<Buffer> {
@@ -628,39 +823,56 @@ async function runMeasuredScenario(config: BenchmarkConfig, scenario: ScenarioDe
   const dataset = generateDataset(config.pages)
   const runner = createScenarioRunner(config, scenario, dataset)
   const durationsMs: number[] = []
-  let pdf: PdfBuffer | undefined
+  let output: ScenarioOutput | undefined
+  let peakRssBytes = process.memoryUsage().rss
+  const sampleRss = (): void => {
+    peakRssBytes = Math.max(peakRssBytes, process.memoryUsage().rss)
+  }
+  const rssSampler = setInterval(sampleRss, config.memorySampleMs)
 
-  for (let index = 0; index < config.warmupRuns; index += 1) {
-    pdf = await runner()
+  try {
+    for (let index = 0; index < config.warmupRuns; index += 1) {
+      sampleRss()
+      output = await runner()
+      sampleRss()
+    }
+
+    for (let index = 0; index < config.runs; index += 1) {
+      collectGarbage()
+      sampleRss()
+      const start = performance.now()
+      output = await runner()
+      durationsMs.push(performance.now() - start)
+      sampleRss()
+    }
+  } finally {
+    clearInterval(rssSampler)
   }
 
-  for (let index = 0; index < config.runs; index += 1) {
-    collectGarbage()
-    const start = performance.now()
-    pdf = await runner()
-    durationsMs.push(performance.now() - start)
-  }
-
-  if (pdf === undefined) {
+  if (output === undefined) {
     throw new Error('Benchmark produced no PDF output')
   }
 
-  assertPdf(pdf)
-  maybeWriteOutput(config, scenario, pdf)
+  assertScenarioOutput(output)
+  maybeWriteOutput(config, scenario, output)
 
   const meanMs = average(durationsMs)
 
   return {
     durationsMs,
+    group: scenario.group,
     id: scenario.id,
     language: scenario.language,
     meanMs,
     mode: scenario.mode,
+    output: scenario.output,
     pages: config.pages,
-    pdfSizeBytes: pdf.length,
-    peakRssBytes: process.memoryUsage().rss,
+    p50Ms: percentile(durationsMs, 0.5),
+    p95Ms: percentile(durationsMs, 0.95),
+    pdfSizeBytes: output.pdf?.length ?? output.pdfSizeBytes ?? 0,
+    peakRssBytes,
     status: 'completed',
-    throughputPagesPerSecond: config.pages / (meanMs / 1000),
+    throughputPagesPerSecond: config.pages / (percentile(durationsMs, 0.5) / 1000),
   }
 }
 
@@ -668,39 +880,86 @@ function createScenarioRunner(
   config: BenchmarkConfig,
   scenario: ScenarioDefinition,
   dataset: Dataset,
-): () => Promise<PdfBuffer> {
+): () => Promise<ScenarioOutput> {
+  const streamedOutputPath = config.writeOutput ? benchmarkOutputPath(config, scenario) : undefined
+
   if (scenario.id === 'pdf-crab') {
     const input = createBenchmarkInput(dataset)
 
-    return async () => createPdf(input)
+    return async () => ({ pdf: await renderPdf(input).bytes() })
   }
 
-  if (scenario.id === 'pdf-crab-builder') {
-    const pageChunks = Array.from({ length: dataset.pages }, (_unused, pageIndex) =>
-      createPageElementChunks(dataset, pageIndex),
-    )
+  if (scenario.id === 'pdf-crab-document') {
+    return async () => ({ pdf: await createPdfWithDocument(dataset) })
+  }
 
-    return async () => createPdfWithBuilder(dataset, pageChunks)
+  if (scenario.id === 'pdf-crab-stream') {
+    const input = createBenchmarkInput(dataset)
+
+    return async () => collectPdfStream(() => renderPdf(input), streamedOutputPath)
+  }
+
+  if (scenario.id === 'pdf-crab-document-stream') {
+    return async () => createPdfWithDocumentStream(dataset, streamedOutputPath)
+  }
+
+  if (scenario.id === 'pdf-crab-image') {
+    const input = createImageBenchmarkInput(dataset)
+
+    return async () => ({ pdf: await renderPdf(input).bytes() })
+  }
+
+  if (scenario.id === 'pdf-crab-document-image') {
+    return async () => ({ pdf: await createPdfWithDocument(dataset, true) })
+  }
+
+  if (scenario.id === 'pdfkit') {
+    return async () => createPdfWithPdfKit(dataset)
+  }
+
+  if (scenario.id === 'pdfkit-stream') {
+    return async () => createPdfWithPdfKitStream(dataset, false, streamedOutputPath)
+  }
+
+  if (scenario.id === 'pdfkit-table') {
+    return async () => createPdfWithPdfKitTable(dataset)
+  }
+
+  if (scenario.id === 'pdfkit-table-stream') {
+    return async () => createPdfWithPdfKitTableStream(dataset, streamedOutputPath)
+  }
+
+  if (scenario.id === 'pdfkit-image') {
+    return async () => createPdfWithPdfKit(dataset, true)
   }
 
   const html = createBenchmarkHtml(dataset)
 
   if (scenario.id === 'html-to-pdf-crab-js') {
-    return async () =>
-      createPdfFromHtml({
+    return async () => ({
+      pdf: await createPdfFromHtml({
         html,
         page: {
           size: 'A4',
         },
         title: `table benchmark (${dataset.pages} pages)`,
-      })
+      }),
+    })
   }
 
-  return async () => createGotenbergPdf(config, html)
+  return async () => ({ pdf: await createGotenbergPdf(config, html) })
 }
 
-function createPdfWithBuilder(dataset: Dataset, pageChunks: PdfElementInput[][][]): PdfBuffer {
-  const builder = new PdfDocumentBuilder({
+async function createPdfWithDocument(dataset: Dataset, includeImage = false): Promise<PdfBuffer> {
+  return buildPdfDocument(dataset, includeImage).render().bytes()
+}
+
+async function createPdfWithDocumentStream(dataset: Dataset, outputPath?: string): Promise<ScenarioOutput> {
+  return collectPdfStream(() => buildPdfDocument(dataset).render(), outputPath)
+}
+
+function buildPdfDocument(dataset: Dataset, includeImage = false): PdfDocument {
+  const document = new PdfDocument({
     metadata: {
       creator: 'pdf-benchmark',
       producer: 'pdf-crab-js',
@@ -710,15 +969,388 @@ function createPdfWithBuilder(dataset: Dataset, pageChunks: PdfElementInput[][][
     unit: 'mm',
   })
 
-  for (const chunks of pageChunks) {
-    builder.startPage({ height: pageHeight, width: pageWidth })
-    for (const chunk of chunks) {
-      builder.appendElements(chunk)
+  for (let pageIndex = 0; pageIndex < dataset.pages; pageIndex += 1) {
+    if (pageIndex > 0) {
+      document.addPage({ size: 'A4' })
     }
-    builder.endPage()
+    document
+      .font('HelveticaBold')
+      .fontSize(12)
+      .text(`Table page ${pageIndex + 1}`, { x: 10, y: 10 })
+      .font('Helvetica')
+      .fontSize(7)
+      .table({
+        columns: createTableColumns(),
+        rows: dataset.rows.slice(pageIndex * dataset.rowsPerPage, (pageIndex + 1) * dataset.rowsPerPage),
+        x: 10,
+        y: 25,
+        width: 190,
+        rowHeight: 9,
+        headerHeight: 10,
+        padding: 2,
+        stripe: '#f8fafc',
+        border: '#cbd5e1',
+        repeatHeader: true,
+      })
+    if (includeImage) {
+      document.image(benchmarkImage, { x: 175, y: 260, width: 25 })
+    }
   }
 
-  return builder.finish()
+  return document
+}
+
+function createTableColumns(): PdfTableColumn<TableRow>[] {
+  return columns.map((key) => ({ key, header: key.toUpperCase(), width: '*' }))
+}
+
+async function collectPdfStream(
+  createOutput: () => AsyncIterable<Uint8Array>,
+  outputPath?: string,
+): Promise<ScenarioOutput> {
+  let prefix = Buffer.alloc(0)
+  let suffix = Buffer.alloc(0)
+  let totalBytes = 0
+  const file = outputPath === undefined ? undefined : await open(outputPath, 'w')
+
+  try {
+    for await (const chunk of createOutput()) {
+      if (!(chunk instanceof Uint8Array) || chunk.byteLength === 0) {
+        throw new Error('PDF stream yielded an invalid chunk')
+      }
+      if (file !== undefined) await file.write(chunk)
+      const chunkBuffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk)
+      if (prefix.length < 5) prefix = Buffer.concat([prefix, chunkBuffer]).subarray(0, 5)
+      suffix = Buffer.concat([suffix, chunkBuffer]).subarray(-16)
+      totalBytes += chunk.byteLength
+    }
+  } finally {
+    await file?.close()
+  }
+
+  return {
+    outputWritten: outputPath !== undefined,
+    pdfPrefix: prefix,
+    pdfSizeBytes: totalBytes,
+    pdfSuffix: suffix,
+  }
+}
+
+function createPdfWithPdfKit(dataset: Dataset, includeImage = false): Promise<ScenarioOutput> {
+  const document = new PDFDocument({
+    autoFirstPage: false,
+    info: {
+      Creator: 'pdf-benchmark',
+      Producer: 'PDFKit',
+      Title: `table benchmark (${dataset.pages} pages)`,
+    },
+    margin: 0,
+  })
+  const chunks: Buffer[] = []
+
+  return new Promise((resolve, reject) => {
+    document.on('data', (chunk: Buffer) => {
+      chunks.push(chunk)
+    })
+    document.on('end', () => resolve({ pdf: Buffer.concat(chunks) }))
+    document.on('error', reject)
+
+    for (let pageIndex = 0; pageIndex < dataset.pages; pageIndex += 1) {
+      drawPdfKitPage(document, dataset, pageIndex, includeImage)
+    }
+
+    document.end()
+  })
+}
+
+function createPdfWithPdfKitTable(dataset: Dataset): Promise<ScenarioOutput> {
+  const document = new PDFDocument({
+    autoFirstPage: false,
+    info: {
+      Creator: 'pdf-benchmark',
+      Producer: 'PDFKit',
+      Title: `table benchmark (${dataset.pages} pages)`,
+    },
+    margin: 0,
+  })
+  const chunks: Buffer[] = []
+
+  return new Promise((resolve, reject) => {
+    document.on('data', (chunk: Buffer) => {
+      chunks.push(chunk)
+    })
+    document.on('end', () => resolve({ pdf: Buffer.concat(chunks) }))
+    document.on('error', reject)
+
+    for (let pageIndex = 0; pageIndex < dataset.pages; pageIndex += 1) {
+      drawPdfKitTablePage(document, dataset, pageIndex)
+    }
+
+    document.end()
+  })
+}
+
+type PdfKitPageRenderer = (document: PDFKit.PDFDocument, pageIndex: number) => void
+
+function createPdfWithPdfKitStream(
+  dataset: Dataset,
+  includeImage = false,
+  outputPath?: string,
+): Promise<ScenarioOutput> {
+  return createPdfKitStream(
+    dataset,
+    (document, pageIndex) => drawPdfKitPage(document, dataset, pageIndex, includeImage),
+    outputPath,
+  )
+}
+
+function createPdfWithPdfKitTableStream(dataset: Dataset, outputPath?: string): Promise<ScenarioOutput> {
+  return createPdfKitStream(
+    dataset,
+    (document, pageIndex) => drawPdfKitTablePage(document, dataset, pageIndex),
+    outputPath,
+  )
+}
+
+function createPdfKitStream(
+  dataset: Dataset,
+  renderPage: PdfKitPageRenderer,
+  outputPath?: string,
+): Promise<ScenarioOutput> {
+  const document = new PDFDocument({
+    autoFirstPage: false,
+    info: {
+      Creator: 'pdf-benchmark',
+      Producer: 'PDFKit',
+      Title: `table benchmark (${dataset.pages} pages)`,
+    },
+    margin: 0,
+  })
+  const output = collectPdfKitStream(document, outputPath)
+
+  setImmediate(() => {
+    try {
+      for (let pageIndex = 0; pageIndex < dataset.pages; pageIndex += 1) {
+        renderPage(document, pageIndex)
+      }
+
+      document.end()
+    } catch (error) {
+      document.destroy(error instanceof Error ? error : new Error(String(error)))
+    }
+  })
+
+  return output
+}
+
+async function collectPdfKitStream(
+  document: PDFKit.PDFDocument,
+  outputPath: string | undefined,
+): Promise<ScenarioOutput> {
+  let prefix = Buffer.alloc(0)
+  let suffix = Buffer.alloc(0)
+  let totalBytes = 0
+  const file = outputPath === undefined ? undefined : await open(outputPath, 'w')
+
+  try {
+    for await (const chunk of document as unknown as AsyncIterable<Buffer>) {
+      if (!(chunk instanceof Uint8Array) || chunk.byteLength === 0) {
+        throw new Error('PDFKit stream yielded an invalid chunk')
+      }
+      if (file !== undefined) await file.write(chunk)
+      if (prefix.length < 5) prefix = Buffer.concat([prefix, chunk]).subarray(0, 5)
+      suffix = Buffer.concat([suffix, chunk]).subarray(-16)
+      totalBytes += chunk.byteLength
+    }
+  } finally {
+    await file?.close()
+  }
+
+  return {
+    outputWritten: outputPath !== undefined,
+    pdfPrefix: prefix,
+    pdfSizeBytes: totalBytes,
+    pdfSuffix: suffix,
+  }
+}
+
+function drawPdfKitTablePage(document: PDFKit.PDFDocument, dataset: Dataset, pageIndex: number): void {
+  document.addPage({ margin: 0, size: [toPoints(pageWidth), toPoints(pageHeight)] })
+  document
+    .fillColor('#111827')
+    .font('Helvetica')
+    .fontSize(15)
+    .text('Simple Revenue Table', toPoints(tableX), toPoints(15), { lineBreak: false })
+  document
+    .fillColor('#64748b')
+    .fontSize(8)
+    .text(`Page ${pageIndex + 1} of ${dataset.pages}`, toPoints(tableX), toPoints(27), { lineBreak: false })
+
+  const startRow = pageIndex * dataset.rowsPerPage
+  const pageRows = dataset.rows.slice(startRow, startRow + dataset.rowsPerPage)
+  const header = columns.map((column) => ({
+    text: column.toUpperCase(),
+    type: 'TH' as const,
+    textColor: '#0f172a',
+    backgroundColor: '#e2e8f0',
+    font: { size: 6.8 },
+  }))
+  const rows = pageRows.map((row, rowIndex) =>
+    columns.map((column) => ({
+      text: truncate(row[column], columnTextLimits[column]),
+      textColor: '#111827',
+      backgroundColor: rowIndex % 2 === 0 ? '#ffffff' : '#f8fafc',
+    })),
+  )
+
+  document
+    .font('Helvetica')
+    .fontSize(6.6)
+    .table({
+      data: [header, ...rows],
+      position: { x: toPoints(tableX), y: toPoints(tableTopY) },
+      maxWidth: toPoints(tableWidth),
+      columnStyles: columns.map((column) => ({ width: toPoints(columnWidths[column]) })),
+      rowStyles: (rowIndex: number) => ({
+        height: toPoints(rowIndex === 0 ? headerHeight : rowHeight),
+      }),
+      defaultStyle: {
+        border: 0.4,
+        borderColor: '#cbd5e1',
+        padding: [0, toPoints(cellPaddingX)],
+        textOptions: { lineBreak: false },
+      },
+    })
+
+  document
+    .fillColor('#64748b')
+    .fontSize(7)
+    .text(`Rows ${startRow + 1}-${startRow + pageRows.length}`, toPoints(tableX), toPoints(272), {
+      lineBreak: false,
+    })
+}
+
+function drawPdfKitPage(
+  document: PDFKit.PDFDocument,
+  dataset: Dataset,
+  pageIndex: number,
+  includeImage: boolean,
+): void {
+  document.addPage({ margin: 0, size: [toPoints(pageWidth), toPoints(pageHeight)] })
+
+  const startRow = pageIndex * dataset.rowsPerPage
+  const pageRows = dataset.rows.slice(startRow, startRow + dataset.rowsPerPage)
+  const tableTop = tableTopY
+  const headerBottom = tableTop + headerHeight
+  const tableBottom = headerBottom + dataset.rowsPerPage * rowHeight
+
+  document
+    .fillColor('#111827')
+    .font('Helvetica-Bold')
+    .fontSize(15)
+    .text('Simple Revenue Table', toPoints(tableX), toPoints(15), { lineBreak: false })
+  document
+    .fillColor('#64748b')
+    .font('Helvetica')
+    .fontSize(8)
+    .text(`Page ${pageIndex + 1} of ${dataset.pages}`, toPoints(tableX), toPoints(27), { lineBreak: false })
+
+  document.rect(toPoints(tableX), toPoints(tableTop), toPoints(tableWidth), toPoints(headerHeight)).fill('#e2e8f0')
+
+  for (let rowIndex = 0; rowIndex < dataset.rowsPerPage; rowIndex += 1) {
+    document
+      .rect(toPoints(tableX), toPoints(headerBottom + rowIndex * rowHeight), toPoints(tableWidth), toPoints(rowHeight))
+      .fill(rowIndex % 2 === 0 ? '#ffffff' : '#f8fafc')
+  }
+
+  drawPdfKitGrid(document, tableTop, tableBottom)
+  drawPdfKitHeader(document, tableTop)
+
+  for (const [rowIndex, row] of pageRows.entries()) {
+    drawPdfKitRow(document, row, headerBottom + rowIndex * rowHeight)
+  }
+
+  document
+    .fillColor('#64748b')
+    .font('Helvetica')
+    .fontSize(7)
+    .text(`Rows ${startRow + 1}-${startRow + pageRows.length}`, toPoints(tableX), toPoints(272), {
+      lineBreak: false,
+    })
+
+  if (includeImage) {
+    document.image(benchmarkImage, toPoints(175), toPoints(260), { width: toPoints(25) })
+  }
+}
+
+function drawPdfKitGrid(document: PDFKit.PDFDocument, tableTop: number, tableBottom: number): void {
+  for (let lineIndex = 0; lineIndex <= rowsPerPage + 1; lineIndex += 1) {
+    const lineY = tableTop + (lineIndex === 0 ? 0 : headerHeight + (lineIndex - 1) * rowHeight)
+    const borderWidth = lineIndex === 0 || lineIndex === rowsPerPage + 1 ? 0.8 : 0.4
+
+    document
+      .moveTo(toPoints(tableX), toPoints(lineY))
+      .lineTo(toPoints(tableX + tableWidth), toPoints(lineY))
+      .lineWidth(toPoints(borderWidth))
+      .strokeColor('#cbd5e1')
+      .stroke()
+  }
+
+  let cursorX = tableX
+
+  for (const column of columns) {
+    document
+      .moveTo(toPoints(cursorX), toPoints(tableTop))
+      .lineTo(toPoints(cursorX), toPoints(tableBottom))
+      .lineWidth(toPoints(0.4))
+      .strokeColor('#cbd5e1')
+      .stroke()
+    cursorX += columnWidths[column]
+  }
+
+  document
+    .moveTo(toPoints(tableX + tableWidth), toPoints(tableTop))
+    .lineTo(toPoints(tableX + tableWidth), toPoints(tableBottom))
+    .lineWidth(toPoints(0.4))
+    .strokeColor('#cbd5e1')
+    .stroke()
+}
+
+function drawPdfKitHeader(document: PDFKit.PDFDocument, tableTop: number): void {
+  let cursorX = tableX
+
+  document.fillColor('#0f172a').font('Helvetica-Bold').fontSize(6.8)
+
+  for (const column of columns) {
+    document.text(column.toUpperCase(), toPoints(cursorX + cellPaddingX), toPoints(tableTop + 3.5), {
+      lineBreak: false,
+      width: toPoints(columnWidths[column] - cellPaddingX * 2),
+    })
+    cursorX += columnWidths[column]
+  }
+}
+
+function drawPdfKitRow(document: PDFKit.PDFDocument, row: TableRow, rowTop: number): void {
+  let cursorX = tableX
+
+  document.fillColor('#111827').font('Helvetica').fontSize(6.6)
+
+  for (const column of columns) {
+    document.text(
+      truncate(row[column], columnTextLimits[column]),
+      toPoints(cursorX + cellPaddingX),
+      toPoints(rowTop + 4.5),
+      {
+        lineBreak: false,
+        width: toPoints(columnWidths[column] - cellPaddingX * 2),
+      },
+    )
+    cursorX += columnWidths[column]
+  }
+}
+
+function toPoints(millimeters: number): number {
+  return (millimeters * 72) / 25.4
 }
 
 function createFailedResult(
@@ -730,11 +1362,15 @@ function createFailedResult(
   return {
     durationsMs: [],
     error,
+    group: scenario.group,
     id: scenario.id,
     language: scenario.language,
     meanMs: Number.POSITIVE_INFINITY,
     mode: scenario.mode,
+    output: scenario.output,
     pages: config.pages,
+    p50Ms: Number.POSITIVE_INFINITY,
+    p95Ms: Number.POSITIVE_INFINITY,
     pdfSizeBytes: 0,
     peakRssBytes: 0,
     status,
@@ -862,18 +1498,66 @@ function parseChildResult(output: string): ScenarioResult | undefined {
 }
 
 function printResults(config: BenchmarkConfig, results: readonly ScenarioResult[]): void {
-  const rankedResults = results.toSorted(compareScenarioResults)
-
-  console.log(`\nFor the ${config.pages}-page scenario, fastest to slowest by execution time is:`)
-
-  printTable(
-    {
-      headers: ['Order', 'Language', 'Mode', 'Execution time', 'Throughput', 'Peak RAM', 'PDF size', 'Status'],
-      rightAlignedColumns: new Set([0, 3, 4, 5, 6]),
-      rows: rankedResults.map((result, index) => formatResultRow(result, index, config.colors)),
+  const groupLabels: Record<ScenarioGroup, { description: string; title: string }> = {
+    declarative: {
+      description: 'Manual page elements: pdf-crab declarative input versus PDFKit drawing primitives.',
+      title: 'Declarative/manual drawing',
     },
-    config.colors,
-  )
+    'fluent-table': {
+      description: 'High-level tables: pdf-crab PdfDocument.table() versus PDFKit document.table().',
+      title: 'High-level table API',
+    },
+    image: {
+      description: 'Same table workload with one PNG embedded on every page.',
+      title: 'Image workload',
+    },
+    'html-css': {
+      description: 'HTML/CSS conversion; this is a separate workload, not part of the PDF API ranking.',
+      title: 'HTML/CSS conversion',
+    },
+    'remote-html': {
+      description: 'Optional external service; network and service startup costs are included.',
+      title: 'Remote HTML conversion',
+    },
+  }
+  const groupOrder: ScenarioGroup[] = ['declarative', 'fluent-table', 'image', 'html-css', 'remote-html']
+
+  console.log(`\n${config.pages}-page PDF benchmark (ranked only within the same workload and output contract):`)
+
+  for (const group of groupOrder) {
+    const label = groupLabels[group]
+
+    for (const outputMode of ['buffered', 'stream'] as const) {
+      const groupResults = results
+        .filter((result) => result.group === group && result.output === outputMode)
+        .toSorted(compareScenarioResults)
+
+      if (groupResults.length === 0) {
+        continue
+      }
+
+      console.log(`\n${label.title} — ${outputMode}`)
+      console.log(`${label.description} Output contract: ${outputMode}.`)
+      printTable(
+        {
+          headers: [
+            'Rank',
+            'Implementation',
+            'Mode',
+            'p50',
+            'p95',
+            'Throughput (p50)',
+            'Peak RAM',
+            'PDF size',
+            'Status',
+          ],
+          rightAlignedColumns: new Set([0, 3, 4, 5, 6, 7]),
+          rows: groupResults.map((result, index) => formatResultRow(result, index, config.colors)),
+        },
+        config.colors,
+      )
+    }
+  }
 }
 
 function compareScenarioResults(left: ScenarioResult, right: ScenarioResult): number {
@@ -885,7 +1569,7 @@ function compareScenarioResults(left: ScenarioResult, right: ScenarioResult): nu
     return 1
   }
 
-  return left.meanMs - right.meanMs
+  return left.p50Ms - right.p50Ms
 }
 
 function formatResultRow(result: ScenarioResult, index: number, useColors: boolean): string[] {
@@ -894,7 +1578,8 @@ function formatResultRow(result: ScenarioResult, index: number, useColors: boole
     String(index + 1),
     result.language,
     result.mode,
-    formatDuration(result.meanMs),
+    formatDuration(result.p50Ms),
+    formatDuration(result.p95Ms),
     formatThroughput(result.throughputPagesPerSecond),
     formatBytes(result.peakRssBytes),
     formatBytes(result.pdfSizeBytes),

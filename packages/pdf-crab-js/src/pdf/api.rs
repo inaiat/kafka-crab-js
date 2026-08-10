@@ -1,20 +1,55 @@
+#![cfg_attr(test, allow(dead_code))]
+
 use napi::{
   bindgen_prelude::{AsyncTask, Buffer},
   Env, Result, Task,
 };
 
 use super::{
-  document::{create_pdf_bytes, PdfDocumentState},
+  document::{create_pdf_bytes, IncrementalPdf, PdfDocumentState},
+  image::image_dimensions,
   input::{
-    CreatePdfInput, PdfAnnotationInput, PdfDocumentBuilderInput, PdfElementInput, PdfPageInput,
-    PdfPageSetupInput,
+    CreatePdfInput, PdfAnnotationInput, PdfDocumentBuilderInput, PdfElementInput,
+    PdfFontRegistrationInput, PdfPageInput, PdfPageSetupInput, PdfTextLineInput,
   },
   validation::invalid_arg,
 };
 
+#[napi(object)]
+pub struct PdfImageInfo {
+  pub width: u32,
+  pub height: u32,
+}
+
+#[napi]
+pub fn get_image_dimensions(data: Buffer) -> Result<PdfImageInfo> {
+  let (width, height) = image_dimensions(&data)?;
+  Ok(PdfImageInfo { width, height })
+}
+
 #[napi]
 pub fn create_pdf(input: CreatePdfInput) -> Result<Buffer> {
   create_pdf_bytes(input).map(Buffer::from)
+}
+
+#[napi]
+pub fn create_pdf_stream(
+  input: CreatePdfInput,
+  start_after_header: Option<bool>,
+) -> Result<PdfOutput> {
+  let pages = input
+    .pages
+    .ok_or_else(|| invalid_arg("pages must contain at least one page"))?;
+  if pages.is_empty() {
+    return Err(invalid_arg("pages must contain at least one page"));
+  }
+  let mut state = PdfDocumentState::new(input.title, input.unit, input.metadata)?;
+  for (index, page) in pages.into_iter().enumerate() {
+    state.add_page(page, &format!("pages[{index}]"))?;
+  }
+  Ok(PdfOutput {
+    state: Some(state.finish_stream(start_after_header.unwrap_or(false))?),
+  })
 }
 
 #[napi(ts_return_type = "Promise<Buffer>")]
@@ -46,6 +81,35 @@ impl PdfDocumentBuilder {
     self
       .state_mut()?
       .start_page(page.width, page.height, "currentPage")
+  }
+
+  #[napi]
+  pub fn register_font(&mut self, input: PdfFontRegistrationInput) -> Result<()> {
+    self.state_mut()?.register_font(input)
+  }
+
+  #[napi]
+  pub fn layout_text(
+    &mut self,
+    text: String,
+    font: String,
+    font_size: f64,
+    width: f64,
+    hyphenate: Option<bool>,
+  ) -> Result<Vec<PdfTextLineInput>> {
+    self
+      .state_mut()?
+      .layout_text(&text, &font, font_size, width, hyphenate.unwrap_or(false))
+  }
+
+  #[napi]
+  pub fn measure_texts(
+    &mut self,
+    texts: Vec<String>,
+    font: String,
+    font_size: f64,
+  ) -> Result<Vec<f64>> {
+    self.state_mut()?.measure_texts(texts, &font, font_size)
   }
 
   #[napi]
@@ -91,6 +155,17 @@ impl PdfDocumentBuilder {
     }))
   }
 
+  #[napi]
+  pub fn finish_stream(&mut self, start_after_header: Option<bool>) -> Result<PdfOutput> {
+    Ok(PdfOutput {
+      state: Some(
+        self
+          .take_state()?
+          .finish_stream(start_after_header.unwrap_or(false))?,
+      ),
+    })
+  }
+
   fn state_mut(&mut self) -> Result<&mut PdfDocumentState> {
     self
       .state
@@ -103,6 +178,36 @@ impl PdfDocumentBuilder {
       .state
       .take()
       .ok_or_else(|| invalid_arg("PdfDocumentBuilder has already finished"))
+  }
+}
+
+#[napi]
+pub struct PdfOutput {
+  state: Option<IncrementalPdf>,
+}
+
+#[napi]
+impl PdfOutput {
+  // Keep streaming pull-driven instead of storing a JS callback. NAPI callbacks
+  // need FunctionRef/ThreadsafeFunction lifetime management once they outlive
+  // the call; a synchronous next_chunk boundary gives us the same backpressure
+  // semantics in Node and zero-config single-threaded WASM.
+  #[napi]
+  pub fn next_chunk(&mut self, chunk_size: Option<u32>) -> Result<Option<Buffer>> {
+    let state = self
+      .state
+      .as_mut()
+      .ok_or_else(|| invalid_arg("PdfOutput has been cancelled or consumed"))?;
+    let bytes = state.next_chunk(chunk_size.unwrap_or(64 * 1024) as usize)?;
+    Ok(bytes.map(Buffer::from))
+  }
+
+  #[napi]
+  pub fn cancel(&mut self) {
+    if let Some(state) = self.state.as_mut() {
+      state.cancel();
+    }
+    self.state = None;
   }
 }
 

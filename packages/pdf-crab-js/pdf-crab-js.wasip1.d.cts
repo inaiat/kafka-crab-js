@@ -3,6 +3,9 @@
 export declare class PdfDocumentBuilder {
   constructor(input?: PdfDocumentBuilderInput | undefined | null)
   startPage(page: PdfPageSetupInput): void
+  registerFont(input: PdfFontRegistrationInput): void
+  layoutText(text: string, font: string, fontSize: number, width: number, hyphenate?: boolean | undefined | null): Array<PdfTextLineInput>
+  measureTexts(texts: Array<string>, font: string, fontSize: number): Array<number>
   appendElements(elements: Array<PdfElementInput>): void
   appendAnnotations(annotations: Array<PdfAnnotationInput>): void
   endPage(): void
@@ -10,6 +13,12 @@ export declare class PdfDocumentBuilder {
   addPages(pages: Array<PdfPageInput>): void
   finish(): Buffer
   finishAsync(): Promise<Buffer>
+  finishStream(startAfterHeader?: boolean | undefined | null): PdfOutput
+}
+
+export declare class PdfOutput {
+  nextChunk(chunkSize?: number | undefined | null): Buffer | null
+  cancel(): void
 }
 
 export declare function createPdf(input: CreatePdfInput): Buffer
@@ -22,6 +31,10 @@ export interface CreatePdfInput {
   metadata?: PdfMetadataInput
   pages?: Array<PdfPageInput>
 }
+
+export declare function createPdfStream(input: CreatePdfInput, startAfterHeader?: boolean | undefined | null): PdfOutput
+
+export declare function getImageDimensions(data: Buffer): PdfImageInfo
 
 export interface PdfAnnotationInput {
   type: 'link'
@@ -40,7 +53,7 @@ export interface PdfDocumentBuilderInput {
 }
 
 export interface PdfElementInput {
-  type: 'text' | 'line' | 'rect' | 'textBox' | 'polygon' | 'path'
+  type: 'text' | 'line' | 'rect' | 'textBox' | 'polygon' | 'path' | 'image'
   text?: string
   x?: number
   y?: number
@@ -56,11 +69,27 @@ export interface PdfElementInput {
   stroke?: string
   strokeWidth?: number
   align?: 'left' | 'center' | 'right' | 'justify'
+  overflow?: 'visible' | 'clip' | 'ellipsis' | 'paginate'
   lineHeight?: number
   hyphenate?: boolean
+  layoutLines?: Array<PdfTextLineInput>
   points?: Array<PdfPointInput>
   closed?: boolean
   winding?: 'nonZero' | 'evenOdd'
+  imageData?: Buffer | Uint8Array
+}
+
+export interface PdfFontRegistrationInput {
+  family: string
+  data: Buffer | Uint8Array
+  fallback?: string
+  weight?: number
+  style?: 'normal' | 'italic' | 'oblique'
+}
+
+export interface PdfImageInfo {
+  width: number
+  height: number
 }
 
 export interface PdfMetadataInput {
@@ -89,4 +118,9 @@ export interface PdfPointInput {
   x: number
   y: number
   bezier?: boolean
+}
+
+export interface PdfTextLineInput {
+  text: string
+  paragraphEnd: boolean
 }

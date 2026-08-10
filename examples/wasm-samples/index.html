@@ -1,0 +1,237 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="Interactive browser lab for pdf-crab-js and html-to-pdf-crab-js." />
+    <title>Crab PDF Studio</title>
+  </head>
+  <body>
+    <main class="app-shell">
+      <header class="hero">
+        <div class="hero-copy">
+          <p class="eyebrow">crab-js / browser laboratory</p>
+          <h1>Rich PDFs, directly in the browser.</h1>
+          <p class="hero-description">
+            Compare the structured 1.0 API with HTML/CSS reports without sending data to a server.
+          </p>
+          <div class="hero-links">
+            <a href="https://github.com/flash-tecnologia/crab-js" target="_blank" rel="noreferrer">GitHub</a>
+            <a
+              href="https://github.com/flash-tecnologia/crab-js/tree/main/packages/pdf-crab-js"
+              target="_blank"
+              rel="noreferrer"
+              >API 1.0</a
+            >
+          </div>
+        </div>
+        <div class="runtime-card">
+          <span id="runtimeBadge" class="runtime-badge is-ready">pdf-crab-js: zero-config</span>
+          <strong>Local WASM</strong>
+          <p id="runtimeDetail">The structured API works without SharedArrayBuffer.</p>
+        </div>
+      </header>
+
+      <nav class="mode-tabs" aria-label="PDF generator" role="tablist">
+        <button
+          id="structured-tab"
+          class="mode-tab is-active"
+          type="button"
+          data-mode="structured"
+          role="tab"
+          aria-controls="structured-panel"
+          aria-selected="true"
+        >
+          <span>01</span>
+          pdf-crab-js
+        </button>
+        <button
+          id="html-tab"
+          class="mode-tab"
+          type="button"
+          data-mode="html"
+          role="tab"
+          aria-controls="html-panel"
+          aria-selected="false"
+        >
+          <span>02</span>
+          HTML to PDF
+        </button>
+      </nav>
+
+      <p id="status" class="status" role="status">Initializing the local renderer...</p>
+
+      <section class="workspace">
+        <section class="controls-card" aria-label="Document options">
+          <form id="structured-panel" class="mode-panel is-active" data-panel="structured" role="tabpanel">
+            <div class="panel-heading">
+              <div>
+                <p class="eyebrow">Structured API</p>
+                <h2>Choose a real-world scenario</h2>
+              </div>
+              <span class="version-pill">v1.0.0</span>
+            </div>
+
+            <fieldset class="template-picker">
+              <legend>Document</legend>
+              <label class="template-card is-selected">
+                <input type="radio" name="template" value="invoice" checked />
+                <span class="template-icon">IN</span>
+                <strong>Invoice</strong>
+                <small>Font, table, shapes, and link</small>
+              </label>
+              <label class="template-card">
+                <input type="radio" name="template" value="report" />
+                <span class="template-icon">RP</span>
+                <strong>Report</strong>
+                <small>Landscape and multi-page table</small>
+              </label>
+              <label class="template-card">
+                <input type="radio" name="template" value="catalog" />
+                <span class="template-icon">DC</span>
+                <strong>Catalog</strong>
+                <small>Declarative API and image</small>
+              </label>
+            </fieldset>
+
+            <div class="two-column">
+              <label class="field">
+                <span>Company</span>
+                <input id="companyName" maxlength="48" value="Crab Labs" />
+              </label>
+              <label class="field">
+                <span>Client / audience</span>
+                <input id="recipientName" maxlength="48" value="Flash team" />
+              </label>
+            </div>
+
+            <div class="three-column">
+              <label class="field">
+                <span>Accent color</span>
+                <input id="accentColor" type="color" value="#f33690" aria-label="Accent color" />
+              </label>
+              <label class="field">
+                <span>Volume</span>
+                <select id="rowCount">
+                  <option value="12">12 rows</option>
+                  <option value="36" selected>36 rows</option>
+                  <option value="72">72 rows</option>
+                </select>
+              </label>
+              <label class="field">
+                <span>Consumption</span>
+                <select id="deliveryMode">
+                  <option value="bytes">bytes()</option>
+                  <option value="stream">stream()</option>
+                </select>
+              </label>
+            </div>
+
+            <div class="capability-list" aria-label="Demonstrated features">
+              <span>TTF + ToUnicode</span>
+              <span>typed table</span>
+              <span>pagination</span>
+              <span>lazy output</span>
+            </div>
+
+            <section class="source-viewer" aria-label="Live TypeScript source">
+              <header class="source-toolbar">
+                <div>
+                  <span class="source-label">Live TypeScript used by this sample</span>
+                  <strong id="sourceFilename">src/samples/invoice.ts</strong>
+                </div>
+                <button id="copySourceButton" class="copy-source" type="button">Copy source</button>
+              </header>
+              <ol id="sourceCode" class="source-code"></ol>
+            </section>
+
+            <button class="primary-action generate-action" type="submit">Generate structured example</button>
+          </form>
+
+          <form id="html-panel" class="mode-panel" data-panel="html" role="tabpanel" hidden>
+            <div class="panel-heading">
+              <div>
+                <p class="eyebrow">HTML + CSS</p>
+                <h2>Edit the report</h2>
+              </div>
+              <span class="version-pill">v0.3.0</span>
+            </div>
+
+            <div id="htmlRuntimeNotice" class="notice"></div>
+
+            <div class="two-column compact-grid">
+              <label class="field">
+                <span>Page</span>
+                <select id="pageSize">
+                  <option value="A4">A4</option>
+                  <option value="LETTER">Letter</option>
+                  <option value="A3">A3</option>
+                </select>
+              </label>
+              <label class="field">
+                <span>Margin (mm)</span>
+                <input id="pageMargin" type="number" min="0" max="60" step="1" value="12" />
+              </label>
+            </div>
+
+            <div class="editor-tabs" role="tablist" aria-label="HTML and CSS editor">
+              <button class="editor-tab is-active" type="button" data-editor="html">HTML</button>
+              <button class="editor-tab" type="button" data-editor="css">CSS</button>
+            </div>
+            <label class="field editor-field is-active" data-editor-panel="html">
+              <span class="sr-only">HTML</span>
+              <textarea id="htmlInput" class="code-input" spellcheck="false"></textarea>
+            </label>
+            <label class="field editor-field" data-editor-panel="css" hidden>
+              <span class="sr-only">CSS</span>
+              <textarea id="cssInput" class="code-input" spellcheck="false"></textarea>
+            </label>
+
+            <div class="html-preview">
+              <span>Live HTML preview</span>
+              <iframe id="htmlPreviewFrame" title="Live HTML preview" sandbox="allow-same-origin"></iframe>
+            </div>
+
+            <button class="primary-action generate-action" type="submit">Render HTML to PDF</button>
+          </form>
+        </section>
+
+        <section class="output-card" aria-label="Generated PDF">
+          <header class="output-toolbar">
+            <div>
+              <p class="eyebrow">Local output</p>
+              <h2 id="outputTitle">Structured invoice</h2>
+            </div>
+            <div class="pdf-actions">
+              <a id="downloadLink" class="secondary-action is-disabled" href="#" download="crab-pdf.pdf">Download</a>
+              <button id="openButton" class="secondary-action" type="button" disabled>Open</button>
+            </div>
+          </header>
+
+          <div class="output-metrics" aria-live="polite">
+            <div><span>Size</span><strong id="sizeMetric">-</strong></div>
+            <div><span>Time</span><strong id="timeMetric">-</strong></div>
+            <div><span>Delivery</span><strong id="deliveryMetric">-</strong></div>
+          </div>
+
+          <div class="preview-stage">
+            <div id="emptyPreview" class="empty-preview">
+              <div class="empty-mark">PDF</div>
+              <strong>Your document appears here</strong>
+              <p>All processing happens in this browser.</p>
+            </div>
+            <iframe id="pdfPreview" title="Generated PDF preview"></iframe>
+          </div>
+        </section>
+      </section>
+
+      <footer class="page-footer">
+        <span>Browser WASM · no upload · public 1.0 API</span>
+        <a href="https://github.com/flash-tecnologia/crab-js" target="_blank" rel="noreferrer"
+          >flash-tecnologia/crab-js</a
+        >
+      </footer>
+    </main>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

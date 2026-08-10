@@ -137,7 +137,7 @@ jobs:
           if-no-files-found: error
 
   build-wasm:
-    name: stable - wasm32-wasip1-threads - node@24
+    name: stable - wasm32-wasip1 (single + threaded) - node@24
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -152,7 +152,7 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: stable
-          targets: wasm32-wasip1-threads
+          targets: wasm32-wasip1,wasm32-wasip1-threads
       - name: Cache cargo
         uses: actions/cache@v5
         with:
@@ -163,22 +163,19 @@ jobs:
             ~/.napi-rs
             .cargo-cache
             packages/pdf-crab-js/target/
-          key: pdf-crab-js-wasm32-wasip1-threads-cargo-ubuntu-latest
+          key: pdf-crab-js-wasm-cargo-ubuntu-latest
       - name: Install dependencies
         run: pnpm install --filter pdf-crab-js
-      - name: Build WASM
-        run: pnpm --filter pdf-crab-js build:wasm
-      - name: Test WASM
+      - name: Test WASM single-thread
         run: pnpm --filter pdf-crab-js test:wasm
+      - name: Test WASM threaded
+        run: pnpm --filter pdf-crab-js test:wasm-threaded
       - name: Upload artifact
         uses: actions/upload-artifact@v7
         with:
-          name: bindings-wasm32-wasip1-threads
+          name: bindings-wasm
           path: |
-            packages/pdf-crab-js/${{ env.APP_NAME }}.*.wasm
-            packages/pdf-crab-js/${{ env.APP_NAME }}.wasi.cjs
-            packages/pdf-crab-js/${{ env.APP_NAME }}.wasi*.js
-            packages/pdf-crab-js/${{ env.APP_NAME }}.wasi*.d.cts
+            packages/pdf-crab-js/${{ env.APP_NAME }}.*
             packages/pdf-crab-js/wasi-worker*.mjs
           if-no-files-found: error
 
@@ -223,8 +220,10 @@ jobs:
       - name: List package files
         run: ls -R packages/pdf-crab-js
         shell: bash
+      - name: Build JavaScript package
+        run: pnpm --filter pdf-crab-js build:js
       - name: Test bindings
-        run: pnpm --filter pdf-crab-js test
+        run: pnpm --filter pdf-crab-js test:unit
 
   test-linux-binding:
     name: Test ${{ matrix.target }} - node@${{ matrix.node }}
@@ -285,7 +284,7 @@ jobs:
           image: ${{ steps.docker.outputs.IMAGE }}
           name: pdf-crab-js-test-${{ matrix.target }}-node${{ matrix.node }}
           options: -v ${{ steps.docker.outputs.PNPM_STORE_PATH }}:${{ steps.docker.outputs.PNPM_STORE_PATH }} -v ${{ github.workspace }}:${{ github.workspace }} -w ${{ github.workspace }}/packages/pdf-crab-js --platform ${{ steps.docker.outputs.PLATFORM }}
-          args: npm run test
+          args: sh -lc 'npm run build:js && npm run test:unit'
 
   publish-pdf-crab-js:
     name: Publish pdf-crab-js
@@ -313,9 +312,12 @@ jobs:
           path: artifacts
       - name: Restore WASI wrappers
         run: |
-          cp artifacts/bindings-wasm32-wasip1-threads/${APP_NAME}.wasi.cjs packages/pdf-crab-js/
-          cp artifacts/bindings-wasm32-wasip1-threads/${APP_NAME}.wasi*.js packages/pdf-crab-js/
-          cp artifacts/bindings-wasm32-wasip1-threads/wasi-worker*.mjs packages/pdf-crab-js/
+          cp artifacts/bindings-wasm/${APP_NAME}.* packages/pdf-crab-js/
+          if compgen -G 'artifacts/bindings-wasm/wasi-worker*.mjs' > /dev/null; then
+            cp artifacts/bindings-wasm/wasi-worker*.mjs packages/pdf-crab-js/
+          fi
+      - name: Build JavaScript package
+        run: pnpm --filter pdf-crab-js build:js
       - name: Create npm dirs
         run: pnpm napi create-npm-dirs
         working-directory: packages/pdf-crab-js
@@ -325,6 +327,9 @@ jobs:
       - name: List package files
         run: ls -R packages/pdf-crab-js
         shell: bash
+      - name: Verify npm package contents
+        working-directory: packages/pdf-crab-js
+        run: npm pack --dry-run
       - name: Publish pdf-crab-js
         working-directory: packages/pdf-crab-js
         run: |

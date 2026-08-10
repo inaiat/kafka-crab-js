@@ -2,6 +2,10 @@
 
 Complete API reference for kafka-crab-js v3.0.0+.
 
+Looking for PDF generation? Start with the separate [pdf-crab-js 1.0 guide](./PDF-Guide.md), then
+use the [complete package reference](../../packages/pdf-crab-js/README.md) when you need every
+option and exported type.
+
 ## Table of Contents
 
 - [KafkaClient](#kafkaclient)
