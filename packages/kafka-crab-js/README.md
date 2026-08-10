@@ -58,7 +58,7 @@ breakdown are documented in [BENCHMARKS.md](../../BENCHMARKS.md) and [Performanc
 
 ## Requirements
 
-- Node.js `>= 22`.
+- Node.js `24`.
 - A Kafka broker reachable from the Node.js process.
 - No separate librdkafka install is required for the published binaries.
 

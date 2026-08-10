@@ -168,6 +168,8 @@ jobs:
         run: pnpm install --filter pdf-crab-js
       - name: Test WASM single-thread
         run: pnpm --filter pdf-crab-js test:wasm
+      - name: Test Workerd lifecycle
+        run: pnpm --filter pdf-crab-js test:workerd
       - name: Test WASM threaded
         run: pnpm --filter pdf-crab-js test:wasm-threaded
       - name: Upload artifact
@@ -197,7 +199,6 @@ jobs:
             target: x86_64-apple-darwin
             architecture: x64
         node:
-          - '22'
           - '24'
     runs-on: ${{ matrix.settings.host }}
     steps:
@@ -238,7 +239,6 @@ jobs:
           - aarch64-unknown-linux-gnu
           - aarch64-unknown-linux-musl
         node:
-          - '22'
           - '24'
     runs-on: ${{ contains(matrix.target, 'aarch64') && 'ubuntu-24.04-arm' || 'ubuntu-latest' }}
     steps:
@@ -329,7 +329,9 @@ jobs:
         shell: bash
       - name: Verify npm package contents
         working-directory: packages/pdf-crab-js
-        run: npm pack --dry-run
+        run: |
+          pnpm napi pre-publish -t npm --dry-run
+          npm pack --dry-run
       - name: Publish pdf-crab-js
         working-directory: packages/pdf-crab-js
         run: |

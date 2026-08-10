@@ -41,7 +41,7 @@ browser layout engine.
 
 ## Requirements and installation
 
-The native Node.js entry point requires Node.js 22 or newer.
+The native Node.js entry point requires Node.js 24.
 
 ```bash
 npm install pdf-crab-js
@@ -684,8 +684,36 @@ import { renderPdf } from 'pdf-crab-js/browser/threaded'
 The threaded entry point requires the normal COOP/COEP cross-origin isolation setup. Both browser
 entry points expose the same PDF API, but file path sources are Node-only.
 
+The root package carries the threadless browser artifact. The generated WASI flavor package can be
+installed separately when a runtime needs the low-level binding directly:
+
+```bash
+npm install pdf-crab-js-wasm32-wasip1
+```
+
 See the complete [Vite browser studio](../../examples/wasm-samples/README.md) for structured PDF,
 HTML-to-PDF, live preview, downloads, and the TypeScript source behind every sample.
+
+### Workerd
+
+For Cloudflare Workers, workerd, or another host that supplies the WebAssembly module itself,
+install the root package and use the generated deferred loader:
+
+```bash
+npm install pdf-crab-js
+```
+
+```ts
+import wasmModule from 'pdf-crab-js/wasm.wasm'
+import { dispose, instantiate } from 'pdf-crab-js/workerd'
+
+const binding = await instantiate(wasmModule)
+const pdf = binding.createPdf({ pages: [{ elements: [] }] })
+await dispose()
+```
+
+The Workerd loader is deferred and safe to initialize more than once; dispose instances when a
+request or isolate is complete.
 
 ## Errors
 

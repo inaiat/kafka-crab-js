@@ -45,8 +45,8 @@ next to the project that owns them.
 - `pdf-crab-js` owns fast explicit PDF construction from structured page and drawing-element inputs.
 - `html-to-pdf-crab-js` owns easy HTML/CSS rendering to PDF without a Chromium service. It carries the renderer
   dependency separately from `pdf-crab-js`.
-- The default `pdf-crab-js/browser` build is single-threaded and needs no cross-origin isolation. Threaded PDF and
-  HTML-to-PDF browser deployments use COOP/COEP as documented by their packages.
+- The default `pdf-crab-js/browser` and `html-to-pdf-crab-js/browser` builds are threadless and need no cross-origin
+  isolation. Optional threaded browser deployments use COOP/COEP as documented by their packages.
 
 ## Install
 
@@ -92,7 +92,7 @@ Focused commands are documented in the owning project READMEs:
 
 ## Requirements
 
-- Node.js `>= 22` for published packages.
+- Node.js `24` for published packages.
 - Rust toolchain when building native bindings from source.
 - Kafka broker access only for Kafka integration tests, Kafka examples, and Kafka benchmarks.
 - No separate librdkafka install is required for published Kafka binaries.

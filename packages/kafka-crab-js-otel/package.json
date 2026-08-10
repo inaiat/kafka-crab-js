@@ -48,6 +48,6 @@
     "kafka-crab-js": ">=3"
   },
   "engines": {
-    "node": ">=22"
+    "node": "24"
   }
 }

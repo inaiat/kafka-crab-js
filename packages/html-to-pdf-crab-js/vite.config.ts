@@ -9,6 +9,11 @@ const napiGeneratedFiles = [
   '*.wasi.d.cts',
   '*.wasi.cjs',
   '*.wasi-browser.js',
+  '*.wasip1.d.cts',
+  '*.wasip1.cjs',
+  '*.wasip1-browser.js',
+  '*.wasip1-deferred.js',
+  '*.wasip1-deferred.d.ts',
   'wasi-worker*.mjs',
 ]
 

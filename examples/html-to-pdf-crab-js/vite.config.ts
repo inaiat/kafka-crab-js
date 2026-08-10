@@ -35,23 +35,19 @@ export default defineConfig({
     ],
   },
   optimizeDeps: {
-    exclude: ['html-to-pdf-crab-js', 'html-to-pdf-crab-js/browser.js', 'html-to-pdf-crab-js-wasm32-wasi'],
+    exclude: ['html-to-pdf-crab-js', 'html-to-pdf-crab-js/browser.js', 'html-to-pdf-crab-js-wasm32-wasip1'],
   },
   resolve: {
     alias: {
-      'html-to-pdf-crab-js-wasm32-wasi': path.resolve(
+      'html-to-pdf-crab-js-wasm32-wasip1': path.resolve(
         currentDirectory,
-        '../../packages/html-to-pdf-crab-js/html-to-pdf-crab-js.wasi-browser.js',
+        '../../packages/html-to-pdf-crab-js/html-to-pdf-crab-js.wasip1-browser.js',
       ),
     },
   },
   server: {
     fs: {
       allow: [workspaceRoot],
-    },
-    headers: {
-      'Cross-Origin-Embedder-Policy': 'require-corp',
-      'Cross-Origin-Opener-Policy': 'same-origin',
     },
     open: '/wasm/',
   },

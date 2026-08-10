@@ -55,8 +55,9 @@ npm install html-to-pdf-crab-js
 
 Requirements:
 
-- Node.js `>=22` for the native package.
-- A browser or static host with `SharedArrayBuffer` enabled for the WASM package.
+- Node.js `24` for the native package.
+- Browser WASM works without cross-origin isolation by default. The optional threaded entry point
+  requires `SharedArrayBuffer` and COOP/COEP headers.
 
 ## Quick Start
 
@@ -140,21 +141,35 @@ calling the WASI binding.
 
 ## Browser and WASM
 
-Browser, Deno, Bun, and portable runtimes can use the NAPI-RS WebAssembly build:
+Browser, Deno, Bun, and portable runtimes can use the threadless NAPI-RS WebAssembly build:
 
 ```js
-import { createPdfFromHtml } from 'html-to-pdf-crab-js/wasm'
+import { createPdfFromHtml } from 'html-to-pdf-crab-js/browser'
 ```
 
-Browser deployments must enable `SharedArrayBuffer`, which requires cross-origin isolation:
+The default browser build does not require `SharedArrayBuffer` or cross-origin isolation. An
+optional threaded build is available for isolated deployments:
+
+```js
+import { createPdfFromHtml } from 'html-to-pdf-crab-js/browser/threaded'
+```
+
+The threaded entry point requires the normal cross-origin isolation headers:
 
 ```text
 Cross-Origin-Embedder-Policy: require-corp
 Cross-Origin-Opener-Policy: same-origin
 ```
 
-The combined Netlify browser sample lives in `examples/wasm-samples/` and demonstrates
-`html-to-pdf-crab-js` with `pdf-crab-js` using the required WASM headers.
+The combined Netlify browser sample lives in `examples/wasm-samples/` and demonstrates both
+packages using the threadless browser entries. Both browser entries expose the same API.
+
+The root package carries the threadless browser artifact. The generated WASI flavor package can be
+installed separately when a runtime needs the low-level binding directly:
+
+```bash
+npm install html-to-pdf-crab-js-wasm32-wasip1
+```
 
 Published sample: https://pdf-crab-js.netlify.app/#html-to-pdf-crab-js
 
@@ -180,7 +195,7 @@ This command rebuilds the local WASI browser binding before starting Vite.
 Open `/wasm/` on the local Vite server. The page previews `report.html` and renders that same
 HTML/CSS into a PDF iframe.
 
-Browser builds use the generated `*.wasi-browser.js` loader. The package build rewrites that loader
+Browser builds use the generated `*.wasip1-browser.js` loader. The package build rewrites that loader
 to use async WASM instantiation because browser engines reject synchronous compilation for the
 current WASM artifact size. Restart the Vite dev server after rebuilding the package so the page
 loads the regenerated loader cleanly.
@@ -213,10 +228,34 @@ pnpm --filter html-to-pdf-crab-js fmt:check
 Build and smoke-test the WebAssembly binding:
 
 ```bash
-rustup target add wasm32-wasip1-threads
+rustup target add wasm32-wasip1
 pnpm --filter html-to-pdf-crab-js build:wasm
 pnpm --filter html-to-pdf-crab-js test:wasm
 ```
+
+Build and test the optional threaded target with `build:wasm-threaded` and
+`test:wasm-threaded` when cross-origin isolation is available.
+
+### Workerd
+
+For Cloudflare Workers, workerd, or another host that supplies the WebAssembly module itself,
+install the root package and use the generated deferred loader:
+
+```bash
+npm install html-to-pdf-crab-js
+```
+
+```js
+import wasmModule from 'html-to-pdf-crab-js/wasm.wasm'
+import { dispose, instantiate } from 'html-to-pdf-crab-js/workerd'
+
+const binding = await instantiate(wasmModule)
+const pdf = await binding.createPdfFromHtml({ html: '<h1>Hello</h1>' })
+await dispose()
+```
+
+The Workerd loader is deferred and safe to initialize more than once; dispose instances when a
+request or isolate is complete.
 
 ## Release
 

@@ -3,7 +3,7 @@
 An interactive browser lab for both PDF APIs in this monorepo:
 
 - `pdf-crab-js` 1.0: a structured invoice, multi-page report, and declarative catalog.
-- `html-to-pdf-crab-js`: a live HTML/CSS editor and threaded WASM renderer.
+- `html-to-pdf-crab-js`: a live HTML/CSS editor and threadless WASM renderer.
 
 The structured examples exercise embedded TTF fonts, typed tables, shapes, links, images,
 landscape pages, automatic pagination, and consumption through either `bytes()` or `stream()`.
@@ -19,9 +19,10 @@ pnpm install
 pnpm --filter crab-js-pdf-studio dev
 ```
 
-This compiles both WASM bindings and starts Vite at `http://127.0.0.1:5174`. The server adds the
-COOP/COEP headers required by the threaded HTML renderer. The `pdf-crab-js/browser` entry does not
-depend on those headers.
+This compiles both WASM bindings and starts Vite at `http://127.0.0.1:5174`. The default browser
+entries use threadless WASM and do not require COOP/COEP headers. The optional
+`html-to-pdf-crab-js/browser/threaded` and `pdf-crab-js/browser/threaded` entries remain available
+for isolated deployments.
 
 To reuse bindings that are already compiled:
 
@@ -37,8 +38,7 @@ pnpm --filter crab-js-pdf-studio build
 pnpm --filter crab-js-pdf-studio preview
 ```
 
-The build writes `dist/` and copies `_headers` into the deployable artifact. For a Netlify site
-connected to this repository, use:
+The build writes `dist/`. For a Netlify site connected to this repository, use:
 
 - Build command: `pnpm --filter crab-js-pdf-studio build`
 - Publish directory: `examples/wasm-samples/dist`

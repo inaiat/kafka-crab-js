@@ -17,8 +17,8 @@ const argValue = (name) => {
 
 const hasFlag = (...names) => names.some((name) => process.argv.includes(name))
 
-const useAsyncBrowserWasmInstantiation = async () => {
-  const path = new URL('./html-to-pdf-crab-js.wasi-browser.js', import.meta.url)
+const useAsyncBrowserWasmInstantiation = async (fileName) => {
+  const path = new URL(`./${fileName}`, import.meta.url)
   let content
 
   try {
@@ -49,9 +49,42 @@ const useAsyncBrowserWasmInstantiation = async () => {
   await writeFile(path, rewritten)
 }
 
+const preserveHighLevelBrowserEntry = async (fileName) => {
+  // NAPI-RS uses the metadata export list to replace browser.js with a raw flavor re-export.
+  // Keep this package's high-level browser facade instead.
+  const path = new URL(`./${fileName}`, import.meta.url)
+  let content
+
+  try {
+    content = await readFile(path, 'utf8')
+  } catch (error) {
+    if (error && typeof error === 'object' && 'code' in error && error.code === 'ENOENT') return
+    throw error
+  }
+
+  const lineEnd = content.indexOf('\n')
+  const metadataPrefix = '// napi-rs-artifact-metadata:'
+  if (lineEnd === -1 || !content.startsWith(metadataPrefix)) return
+
+  const metadata = JSON.parse(content.slice(metadataPrefix.length, lineEnd))
+  if (!Array.isArray(metadata.exports)) return
+
+  delete metadata.exports
+  await writeFile(path, `${metadataPrefix}${JSON.stringify(metadata)}\n${content.slice(lineEnd + 1)}`)
+}
+
+const writeBrowserEntrypoints = async () => {
+  await writeFile(new URL('./browser.js', import.meta.url), "export * from './html-to-pdf-crab-js.wasip1-browser.js'\n")
+  await writeFile(
+    new URL('./browser-threaded.js', import.meta.url),
+    "export * from './html-to-pdf-crab-js.wasi-browser.js'\n",
+  )
+}
+
 const build = async () => {
   const target = argValue('--target')
   const isWasi = target?.startsWith('wasm32-wasi') ?? false
+  const isThreadedWasi = target?.endsWith('-threads') ?? false
   const commonOptions = {
     constEnum: false,
     crossCompile: hasFlag('-x', '--cross-compile'),
@@ -68,7 +101,15 @@ const build = async () => {
   })
   await result.task
 
-  await useAsyncBrowserWasmInstantiation()
+  if (isWasi) {
+    await preserveHighLevelBrowserEntry(
+      isThreadedWasi ? 'html-to-pdf-crab-js.wasi.cjs' : 'html-to-pdf-crab-js.wasip1.cjs',
+    )
+    await useAsyncBrowserWasmInstantiation(
+      isThreadedWasi ? 'html-to-pdf-crab-js.wasi-browser.js' : 'html-to-pdf-crab-js.wasip1-browser.js',
+    )
+    await writeBrowserEntrypoints()
+  }
 }
 
 build().catch((error) => {
