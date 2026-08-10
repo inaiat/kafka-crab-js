@@ -4,6 +4,8 @@ Fast, typed PDF generation for Node.js and browser/WASM, powered by Rust, NAPI-R
 `pdf-writer`. Build invoices, reports, statements, labels, tables, and other structured
 documents without running a browser.
 
+Try the interactive browser demo at [pdf-crab-js.netlify.app](https://pdf-crab-js.netlify.app/).
+
 - Two APIs: declarative `renderPdf(input)` and fluent `PdfDocument`.
 - One lazy output contract for bytes, blobs, Web streams, and async iteration.
 - Typed tables with automatic widths, pagination, and repeated headers.

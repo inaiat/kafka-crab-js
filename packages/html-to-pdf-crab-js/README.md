@@ -2,6 +2,8 @@
 
 Chromium-free HTML-to-PDF rendering for Node.js and WebAssembly, built with Rust and NAPI-RS.
 
+Try the interactive browser demo at [pdf-crab-js.netlify.app](https://pdf-crab-js.netlify.app/).
+
 Use this package when the source document is already HTML and CSS: invoices, reports, printable
 screens, exports, letters, and documents that benefit from normal web layout. If you need low-level,
 coordinate-based PDF generation, use [`pdf-crab-js`](../pdf-crab-js/README.md).
@@ -20,19 +22,21 @@ native Rust exposed through NAPI-RS, with a WASM build for browser and portable 
 
 ## Benchmark Snapshot
 
-Local 10-page benchmark, fastest to slowest by execution time:
+Current local reference run from [`benchmarks/pdf/table.ts`](../../benchmarks/pdf/table.ts) on Node.js
+24.19.0/Darwin arm64: 10 pages, 10 rows per page, 3 warmups, and 10 measured runs. Each row is a
+separate workload; structured PDF and HTML/CSS conversion are not a global leaderboard.
 
-| Order | Language                | Mode       | Execution time |       Throughput |
-| ----- | ----------------------- | ---------- | -------------: | ---------------: |
-| 1     | Node + pdf-crab         | local      |       4.116 ms | 2429.253 pages/s |
-| 2     | Node + pdf-crab         | builder    |       4.232 ms | 2362.863 pages/s |
-| 3     | Node + html-to-pdf-crab | local-html |      62.327 ms |  160.443 pages/s |
-| 4     | Node + Gotenberg        | gotenberg  |     128.304 ms |   77.940 pages/s |
+| Workload               | Implementation          | Output   |        p50 |        p95 |  Throughput (p50) |
+| ---------------------- | ----------------------- | -------- | ---------: | ---------: | ----------------: |
+| Declarative/manual     | Node + pdf-crab         | Buffered |   5.733 ms |   8.363 ms | 1,744.402 pages/s |
+| High-level table       | Node + pdf-crab         | Buffered |  10.491 ms |  11.625 ms |   953.202 pages/s |
+| HTML/CSS conversion    | Node + html-to-pdf-crab | Buffered |  18.306 ms |  18.972 ms |   546.270 pages/s |
+| Remote HTML conversion | Node + Gotenberg        | Buffered | 134.139 ms | 202.919 ms |    74.550 pages/s |
 
-Benchmark results are workload and machine dependent. The important comparison is practical:
-`html-to-pdf-crab-js` keeps the HTML/CSS workflow while avoiding Chromium service overhead. It is
-not as fast as `pdf-crab-js` because it still performs HTML/CSS layout, but it is the simpler path
-when HTML is already the document source.
+In the HTML/CSS workload, `html-to-pdf-crab-js` rendered 10 pages at 546.270 pages/s in this run,
+while the remote Gotenberg scenario rendered 74.550 pages/s. `html-to-pdf-crab-js` keeps the
+HTML/CSS workflow without a Chromium service; the structured PDF rows solve a different problem and
+are included only as context. Benchmark results are workload and machine dependent.
 
 ## PDF Results
 
