@@ -159,10 +159,6 @@ const build = async () => {
       isThreadedWasi ? 'pdf-crab-js.wasi-browser.js' : 'pdf-crab-js.wasip1-browser.js',
     )
   }
-  await Promise.all([
-    removeIfPresent('pdf-crab-js.wasip1-deferred.d.ts'),
-    removeIfPresent('pdf-crab-js.wasip1-deferred.js'),
-  ])
   await writeBrowserEntrypoints()
 }
 
