@@ -62,11 +62,6 @@
       "types": "./browser.d.ts",
       "import": "./browser-threaded.js",
       "default": "./browser-threaded.js"
-    },
-    "./wasm": {
-      "types": "./browser.d.ts",
-      "import": "./browser.js",
-      "default": "./browser.js"
     }
   },
   "publishConfig": {
