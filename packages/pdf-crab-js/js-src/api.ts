@@ -488,19 +488,42 @@ function abortedError(): PdfError {
   return new PdfError('PDF_ABORTED', 'PDF rendering was aborted')
 }
 
-function normalizePdfError(error: unknown): PdfError {
-  if (error instanceof PdfError) return error
+function normalizePdfError(error: unknown, path?: string): PdfError {
+  if (error instanceof PdfError) {
+    if (error.path !== undefined || path === undefined) return error
+    return new PdfError(error.code, error.message, { path, cause: error.cause })
+  }
   if (error instanceof Error) {
     const code: PdfErrorCode = /unsupported glyph|missing glyph/i.test(error.message)
       ? 'PDF_MISSING_GLYPH'
       : /built-in PDF fonts|font not found/i.test(error.message)
         ? 'PDF_FONT_NOT_FOUND'
-        : /unsupported image|format/i.test(error.message)
+        : /unsupported image|unsupported format|image format/i.test(error.message)
           ? 'PDF_UNSUPPORTED_FORMAT'
           : 'PDF_INVALID_ARGUMENT'
-    return new PdfError(code, error.message, { cause: error })
+    return new PdfError(code, error.message, { path, cause: error })
   }
-  return new PdfError('PDF_INVALID_ARGUMENT', String(error), { cause: error })
+  return new PdfError('PDF_INVALID_ARGUMENT', String(error), { path, cause: error })
+}
+
+function callNative<Result>(operation: () => Result, path?: string): Result {
+  try {
+    return operation()
+  } catch (error) {
+    throw normalizePdfError(error, path)
+  }
+}
+
+function callUserCallback<Result>(operation: () => Result, path: string): Result {
+  try {
+    return operation()
+  } catch (error) {
+    if (error instanceof PdfError) throw normalizePdfError(error, path)
+    throw new PdfError('PDF_INVALID_ARGUMENT', error instanceof Error ? error.message : String(error), {
+      path,
+      cause: error,
+    })
+  }
 }
 
 function output(producer: PdfOutputProducer): PdfOutput {
@@ -711,7 +734,7 @@ function normalizeElement(element: PdfElementInput, unit: PdfUnit): Record<strin
   if (fit !== undefined && (!Array.isArray(fit) || fit.length !== 2)) {
     throw new PdfError('PDF_INVALID_ARGUMENT', 'image.fit must contain width and height', { path: 'image.fit' })
   }
-  const dimensions = getRuntime().binding.getImageDimensions(bytes)
+  const dimensions = callNative(() => getRuntime().binding.getImageDimensions(bytes), 'image.source')
   const naturalWidth = unit === 'mm' ? (dimensions.width * 25.4) / 72 : dimensions.width
   const naturalHeight = unit === 'mm' ? (dimensions.height * 25.4) / 72 : dimensions.height
   let width = elementWidth
@@ -768,11 +791,11 @@ function appendDeclarativePage(builder: NativeBuilder, page: PdfPageInput, unit:
   let annotations: Record<string, unknown>[] = Array.from(page.annotations ?? [], (annotation) => ({ ...annotation }))
   let cursorY = margins.top
 
-  const startPage = (): void => builder.startPage({ width, height })
+  const startPage = (): void => callNative(() => builder.startPage({ width, height }), 'page')
   const flushPage = (): void => {
-    builder.appendElements(elements)
-    if (annotations.length > 0) builder.appendAnnotations(annotations)
-    builder.endPage()
+    callNative(() => builder.appendElements(elements), 'page.elements')
+    if (annotations.length > 0) callNative(() => builder.appendAnnotations(annotations), 'page.annotations')
+    callNative(() => builder.endPage(), 'page')
     elements = []
     annotations = []
   }
@@ -800,7 +823,10 @@ function appendDeclarativePage(builder: NativeBuilder, page: PdfPageInput, unit:
     const fontSize = assertFinitePositive(element.fontSize ?? 12, 'text.fontSize')
     const lineHeightPoints = assertFinitePositive(element.lineHeight ?? fontSize * 1.2, 'text.lineHeight')
     const lineHeight = fromPoints(lineHeightPoints, unit)
-    const lines = builder.layoutText(element.text, element.font ?? 'Helvetica', fontSize, textWidth, element.hyphenate)
+    const lines = callNative(
+      () => builder.layoutText(element.text, element.font ?? 'Helvetica', fontSize, textWidth, element.hyphenate),
+      'text',
+    )
     const overflow = element.overflow ?? 'paginate'
 
     if (overflow === 'paginate') {
@@ -952,10 +978,13 @@ export class PdfDocument {
     const layout = normalizeLayout(options.layout)
     const [width, height] = pageDimensions(options, this.unit)
     const Binding = getRuntime().binding.PdfDocumentBuilder
-    this.builder = new Binding({ title: options.title, unit: this.unit, metadata: options.metadata })
+    this.builder = callNative(
+      () => new Binding({ title: options.title, unit: this.unit, metadata: options.metadata }),
+      'document',
+    )
     this.defaults = { size, layout, margin: margins }
     this.page = { width, height, size, layout, margin: margins, elements: [], annotations: [] }
-    this.builder.startPage({ width, height })
+    callNative(() => this.builder.startPage({ width, height }), 'page')
     this.cursorX = margins.left
     this.cursorY = margins.top
   }
@@ -977,7 +1006,7 @@ export class PdfDocument {
     const margin = normalizeMargins(options.margin ?? this.defaults.margin, this.unit)
     const [width, height] = pageDimensions({ size, layout }, this.unit)
     this.page = { width, height, size, layout, margin, elements: [], annotations: [] }
-    this.builder.startPage({ width, height })
+    callNative(() => this.builder.startPage({ width, height }), 'page')
     this.cursorX = margin.left
     this.cursorY = margin.top
     return this
@@ -1019,7 +1048,7 @@ export class PdfDocument {
     const width =
       options.width ?? (flowing ? this.page.width - this.page.margin.left - this.page.margin.right : undefined)
     const lines = width
-      ? this.builder.layoutText(text, style.font, style.fontSize, width, options.hyphenate)
+      ? callNative(() => this.builder.layoutText(text, style.font, style.fontSize, width, options.hyphenate), 'text')
       : [{ text, paragraphEnd: true }]
     const totalHeight = lineHeight * Math.max(1, lines.length)
     if (flowing && width !== undefined && (options.overflow ?? 'paginate') === 'paginate') {
@@ -1251,7 +1280,7 @@ export class PdfDocument {
     }
     if (options.x !== undefined) assertFiniteNumber(options.x, 'image.x')
     if (options.y !== undefined) assertFiniteNumber(options.y, 'image.y')
-    const dimensions = getRuntime().binding.getImageDimensions(bytes)
+    const dimensions = callNative(() => getRuntime().binding.getImageDimensions(bytes), 'image.source')
     const naturalWidth = this.unit === 'mm' ? (dimensions.width * 25.4) / 72 : dimensions.width
     const naturalHeight = this.unit === 'mm' ? (dimensions.height * 25.4) / 72 : dimensions.height
     const flowing = !hasX && !hasY
@@ -1338,13 +1367,16 @@ export class PdfDocument {
           path: `table.rows[${rowIndex}]`,
         })
       }
-      return options.columns.map((column) => {
+      return options.columns.map((column, columnIndex) => {
+        const path = `table.rows[${rowIndex}].columns[${columnIndex}]`
         const rawValue = column.value
-          ? column.value(row, rowIndex)
+          ? callUserCallback(() => column.value!(row, rowIndex), path)
           : column.key
             ? (row[column.key] as PdfTableCellValue)
             : ''
-        const formatted = column.formatter ? column.formatter(rawValue, row, rowIndex) : rawValue
+        const formatted = column.formatter
+          ? callUserCallback(() => column.formatter!(rawValue, row, rowIndex), path)
+          : rawValue
         return String(formatted ?? '')
       })
     })
@@ -1497,10 +1529,10 @@ export class PdfDocument {
       if (typeof column.width === 'number') return assertFinitePositive(column.width, `table.columns[${index}].width`)
       if (column.width === '*') return 0
       const candidates = [headers[index] ?? '', ...values.map((row) => row[index] ?? '')]
-      const measured = this.builder.measureTexts(
-        candidates,
-        column.font ?? this.style.font,
-        column.fontSize ?? this.style.fontSize,
+      const measured = callNative(
+        () =>
+          this.builder.measureTexts(candidates, column.font ?? this.style.font, column.fontSize ?? this.style.fontSize),
+        `table.columns[${index}]`,
       )
       const estimate = fromPoints(Math.max(...measured, 0) + 8, this.unit)
       const minWidth = column.minWidth ?? 0
@@ -1542,9 +1574,9 @@ export class PdfDocument {
   }
 
   private flushPage(): void {
-    this.builder.appendElements(this.page.elements)
-    this.builder.appendAnnotations(this.page.annotations)
-    this.builder.endPage()
+    callNative(() => this.builder.appendElements(this.page.elements), 'currentPage.elements')
+    callNative(() => this.builder.appendAnnotations(this.page.annotations), 'currentPage.annotations')
+    callNative(() => this.builder.endPage(), 'currentPage')
   }
 
   private assertNoPendingPath(): void {
@@ -1572,7 +1604,7 @@ export function renderPdf(input: PdfDocumentInput): PdfOutput {
   return output(async (signal) => {
     if (signal?.aborted) throw abortedError()
     const Binding = getRuntime().binding.PdfDocumentBuilder
-    const builder = new Binding({ title: input.title, unit, metadata: input.metadata })
+    const builder = callNative(() => new Binding({ title: input.title, unit, metadata: input.metadata }), 'document')
     const registeredFonts = new Set<string>()
     for (const [index, font] of fonts.entries()) {
       if (signal?.aborted) throw abortedError()

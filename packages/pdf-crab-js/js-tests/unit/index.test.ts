@@ -134,6 +134,52 @@ test('font registration embeds a Unicode subset with ToUnicode', async () => {
     )
 })
 
+test('fluent renderer and callback failures are normalized to PdfError', () => {
+  throws(
+    () => new PdfDocument().text('漢'),
+    (error: unknown) => {
+      ok(error instanceof PdfError)
+      equal(error.code, 'PDF_MISSING_GLYPH')
+      equal(error.path, 'text')
+      ok(error.cause instanceof Error)
+      return true
+    },
+  )
+
+  const invalidColor = new PdfDocument().fillColor('red').text('invalid color')
+  throws(
+    () => invalidColor.render(),
+    (error: unknown) => {
+      ok(error instanceof PdfError)
+      equal(error.code, 'PDF_INVALID_ARGUMENT')
+      equal(error.path, 'currentPage.elements')
+      ok(error.cause instanceof Error)
+      return true
+    },
+  )
+
+  throws(
+    () =>
+      new PdfDocument().table({
+        columns: [
+          {
+            value: () => {
+              throw new Error('formatter failed')
+            },
+          },
+        ],
+        rows: [{ value: 1 }],
+      }),
+    (error: unknown) => {
+      ok(error instanceof PdfError)
+      equal(error.code, 'PDF_INVALID_ARGUMENT')
+      equal(error.path, 'table.rows[0].columns[0]')
+      ok(error.cause instanceof Error)
+      return true
+    },
+  )
+})
+
 test('declarative documents share custom fonts, fallback, and metric pagination', async () => {
   const pdf = await renderPdf({
     unit: 'pt',

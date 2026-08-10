@@ -4,13 +4,14 @@ import type {
   PdfImageBytes,
   PdfImageElement as NodePdfImageElement,
   PdfImageOptions,
+  PdfOutput,
   PdfFontRegistrationOptions,
   PdfFontInput as NodePdfFontInput,
   PdfElementInput as NodePdfElementInput,
   PdfPageInput as NodePdfPageInput,
 } from './dist/api.js'
 
-export { PdfError, renderPdf } from './dist/api.js'
+export { PdfError } from './dist/api.js'
 export type {
   PdfAnnotationInput,
   PdfDocumentOptions,
@@ -72,3 +73,5 @@ export interface PdfDocumentInput extends Omit<NodePdfDocumentInput, 'fonts' | '
   fonts?: readonly PdfFontInput[]
   pages: readonly PdfPageInput[]
 }
+
+export declare function renderPdf(input: PdfDocumentInput): PdfOutput

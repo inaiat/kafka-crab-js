@@ -149,7 +149,7 @@ Cross-Origin-Embedder-Policy: require-corp
 Cross-Origin-Opener-Policy: same-origin
 ```
 
-The combined Netlify browser sample lives in `examples/netlify-pdf-samples/` and demonstrates
+The combined Netlify browser sample lives in `examples/wasm-samples/` and demonstrates
 `html-to-pdf-crab-js` with `pdf-crab-js` using the required WASM headers.
 
 Published sample: https://pdf-crab-js.netlify.app/#html-to-pdf-crab-js

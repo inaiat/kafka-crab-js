@@ -13,43 +13,33 @@ Modes are explicit about the public output contract: `*-buffered` collects bytes
 they are produced. The displayed `p50` and `p95` are calculated from measured runs (with warmups excluded). Throughput
 uses p50.
 
-## 5,120-page Reference Run
+## 1,000-page reference run
 
-This is a one-run reference (`PDF_BENCHMARK_RUNS=1`, no warmup), so p50 and p95 are equal. It is intentionally split by
-workload instead of ranking unrelated APIs together.
+This reference uses 10 rows per page, 3 warmups, and 10 measured runs on Node.js 24.19.0/Darwin arm64. Throughput is
+calculated from p50. Results are environment-dependent; reproduce them on the target system before using them for
+capacity planning.
 
-### Declarative/manual drawing — buffered
+### Latency and throughput
 
-| Rank | Implementation  | Mode                 |     p50 |     p95 | Peak RSS |  PDF size |   Throughput |
-| ---: | --------------- | -------------------- | ------: | ------: | -------: | --------: | -----------: |
-|    1 | Node + pdf-crab | declarative-buffered | 1.782 s | 1.782 s | 351.8 MB |  8.262 MB | 2873 pages/s |
-|    2 | Node + PDFKit   | manual-buffered      | 2.380 s | 2.380 s | 582.3 MB | 10.005 MB | 2151 pages/s |
+| Workload           | Output   |   pdf-crab p50 / p95 |     PDFKit p50 / p95 | pdf-crab throughput | PDFKit throughput |   Speedup |
+| ------------------ | -------- | -------------------: | -------------------: | ------------------: | ----------------: | --------: |
+| Declarative/manual | Buffered | 261.112 / 262.760 ms | 322.669 / 331.236 ms |   3,829.772 pages/s | 3,099.153 pages/s | **1.24x** |
+| Declarative/manual | Stream   | 270.564 / 272.054 ms | 323.439 / 331.698 ms |   3,695.985 pages/s | 3,091.771 pages/s | **1.20x** |
+| High-level table   | Buffered | 658.476 / 669.829 ms |      1.268 / 1.312 s |   1,518.659 pages/s |   788.529 pages/s | **1.93x** |
+| High-level table   | Stream   | 656.514 / 690.399 ms |      1.281 / 1.295 s |   1,523.197 pages/s |   780.357 pages/s | **1.95x** |
 
-### Declarative/manual drawing — stream
+### Peak RSS and artifact size
 
-| Rank | Implementation  | Mode               |     p50 |     p95 | Peak RSS |  PDF size |   Throughput |
-| ---: | --------------- | ------------------ | ------: | ------: | -------: | --------: | -----------: |
-|    1 | Node + pdf-crab | declarative-stream | 1.838 s | 1.838 s | 375.0 MB |  8.262 MB | 2785 pages/s |
-|    2 | Node + PDFKit   | manual-stream      | 2.297 s | 2.297 s | 592.9 MB | 10.005 MB | 2229 pages/s |
+| Workload           | Output   | pdf-crab peak RSS | PDFKit peak RSS |  Less RAM | pdf-crab PDF | PDFKit PDF | Smaller PDF |
+| ------------------ | -------- | ----------------: | --------------: | --------: | -----------: | ---------: | ----------: |
+| Declarative/manual | Buffered |        231.219 MB |      407.797 MB | **43.3%** |     1.611 MB |   1.952 MB |   **17.5%** |
+| Declarative/manual | Stream   |        228.484 MB |      328.516 MB | **30.4%** |     1.611 MB |   1.952 MB |   **17.5%** |
+| High-level table   | Buffered |        232.047 MB |      423.016 MB | **45.1%** |     2.859 MB |   3.187 MB |   **10.3%** |
+| High-level table   | Stream   |        223.969 MB |      372.188 MB | **39.8%** |     2.859 MB |   3.187 MB |   **10.3%** |
 
-### High-level table API — buffered
-
-| Rank | Implementation  | Mode                  |     p50 |     p95 | Peak RSS |  PDF size |   Throughput |
-| ---: | --------------- | --------------------- | ------: | ------: | -------: | --------: | -----------: |
-|    1 | Node + pdf-crab | fluent-table-buffered | 4.662 s | 4.662 s | 363.5 MB | 14.654 MB | 1098 pages/s |
-|    2 | Node + PDFKit   | table-buffered        | 8.852 s | 8.852 s | 509.7 MB | 16.334 MB |  578 pages/s |
-
-### High-level table API — stream
-
-| Rank | Implementation  | Mode                |     p50 |     p95 | Peak RSS |  PDF size |   Throughput |
-| ---: | --------------- | ------------------- | ------: | ------: | -------: | --------: | -----------: |
-|    1 | Node + pdf-crab | fluent-table-stream | 4.615 s | 4.615 s | 339.5 MB | 14.654 MB | 1109 pages/s |
-|    2 | Node + PDFKit   | table-stream        | 9.202 s | 9.202 s | 493.3 MB | 16.334 MB |  556 pages/s |
-
-The stream tables consume PDFKit's native Node stream and pdf-crab's `AsyncIterable` with the same chunk-level checks.
-
-The declarative artifact in this run was 8.262 MB with a roughly 378 MB peak RSS, compared with the previous
-implementation's 60.251 MB artifact and roughly 1.24 GB peak RSS.
+At 1,000 pages, pdf-crab delivered 20-24% more throughput for manual/declarative drawing and roughly 1.9x the
+throughput for high-level tables. It used 30-45% less peak RSS and generated PDFs that were 10-17% smaller in this run.
+The stream scenarios consume every chunk from PDFKit's native Node stream and pdf-crab's `AsyncIterable`.
 
 ## Setup
 

@@ -28,13 +28,14 @@ next to the project that owns them.
 | [kafka-examples](./examples/kafka)                             | Producer, consumer, stream, retry, OpenTelemetry, and Grafana examples. |
 | [pdf-crab-js-examples](./examples/pdf-crab-js)                 | Node and browser WASM examples for low-level PDF generation.            |
 | [html-to-pdf-crab-js-examples](./examples/html-to-pdf-crab-js) | Node and browser WASM examples for HTML-to-PDF rendering.               |
+| [wasm-samples](./examples/wasm-samples)                        | Interactive Vite studio for structured PDF and HTML-to-PDF examples.    |
 
 ### Benchmarks
 
 | Benchmark Package                     | Purpose                                                                                           |
 | ------------------------------------- | ------------------------------------------------------------------------------------------------- |
 | [kafka-benchmark](./benchmarks/kafka) | Isolated-process consumer benchmark with memory, GC, throughput charts, and V8 profiling scripts. |
-| [pdf-benchmark](./benchmarks/pdf)     | PDF generation benchmark comparing `pdf-crab-js`, `html-to-pdf-crab-js`, and Gotenberg.           |
+| [pdf-benchmark](./benchmarks/pdf)     | Comparable structured-PDF, table, image, and optional HTML/CSS workloads.                         |
 | [BENCHMARKS.md](./BENCHMARKS.md)      | Latest captured Kafka benchmark snapshot and notes.                                               |
 
 ## Package Boundaries
@@ -44,8 +45,8 @@ next to the project that owns them.
 - `pdf-crab-js` owns fast explicit PDF construction from structured page and drawing-element inputs.
 - `html-to-pdf-crab-js` owns easy HTML/CSS rendering to PDF without a Chromium service. It carries the renderer
   dependency separately from `pdf-crab-js`.
-- Browser WASM usage for PDF packages is demonstrated in each example package and requires COOP/COEP headers for
-  `SharedArrayBuffer`.
+- The default `pdf-crab-js/browser` build is single-threaded and needs no cross-origin isolation. Threaded PDF and
+  HTML-to-PDF browser deployments use COOP/COEP as documented by their packages.
 
 ## Install
 
@@ -85,6 +86,7 @@ Focused commands are documented in the owning project READMEs:
 | Run Kafka examples                       | [examples/kafka](./examples/kafka/README.md)                             |
 | Run PDF examples                         | [examples/pdf-crab-js](./examples/pdf-crab-js/README.md)                 |
 | Run HTML-to-PDF examples                 | [examples/html-to-pdf-crab-js](./examples/html-to-pdf-crab-js/README.md) |
+| Run the interactive WASM studio          | [examples/wasm-samples](./examples/wasm-samples/README.md)               |
 | Run Kafka benchmarks                     | [benchmarks/kafka](./benchmarks/kafka/README.md)                         |
 | Run PDF benchmarks                       | [benchmarks/pdf](./benchmarks/pdf/README.md)                             |
 

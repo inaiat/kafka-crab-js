@@ -204,6 +204,31 @@ const output = renderPdf({
 await pipeline(Readable.from(output.stream({ chunkSize: 64 * 1024 })), createWriteStream('streamed.pdf'))
 ```
 
+### Send a PDF over HTTP
+
+`Uint8Array` can be sent directly by Node.js HTTP servers. Set a filename only when the response
+should download instead of opening inline.
+
+```ts
+import type { ServerResponse } from 'node:http'
+import { renderPdf } from 'pdf-crab-js'
+
+async function sendReport(response: ServerResponse) {
+  const bytes = await renderPdf({
+    pages: [{ elements: [{ type: 'text', text: 'Quarterly report' }] }],
+  }).bytes()
+
+  response.writeHead(200, {
+    'Content-Type': 'application/pdf',
+    'Content-Length': bytes.byteLength,
+    'Content-Disposition': 'inline; filename="report.pdf"',
+  })
+  response.end(bytes)
+}
+```
+
+For large documents, pipe `output.stream()` as shown above instead of buffering the complete PDF.
+
 ### Iterate over chunks
 
 ```ts
@@ -657,6 +682,9 @@ import { renderPdf } from 'pdf-crab-js/browser/threaded'
 The threaded entry point requires the normal COOP/COEP cross-origin isolation setup. Both browser
 entry points expose the same PDF API, but file path sources are Node-only.
 
+See the complete [Vite browser studio](../../examples/wasm-samples/README.md) for structured PDF,
+HTML-to-PDF, live preview, downloads, and the TypeScript source behind every sample.
+
 ## Errors
 
 All public failures are normalized to `PdfError`:
@@ -790,44 +818,23 @@ Choose pdf-crab-js when typed structured documents, predictable pagination, brow
 and throughput are the priority. PDFKit remains a strong choice when an application depends on its
 broader drawing surface or existing PDFKit-specific integrations.
 
-### Benchmark methodology
+### Benchmark snapshot
 
-The repository benchmark generates the same table dataset for comparable implementations and keeps
-different workloads in separate rankings:
+The benchmark keeps declarative/manual drawing and high-level table APIs in separate rankings. It
+also compares buffered output only with buffered output, and fully consumed streams only with
+streams. Each scenario runs in its own child process for peak RSS sampling.
 
-- Declarative/manual drawing compares `renderPdf` elements with PDFKit drawing primitives.
-- High-level table compares `PdfDocument.table()` with PDFKit's `document.table()`.
-- Buffered scenarios collect all bytes; stream scenarios consume every emitted chunk.
-- Each scenario runs in its own child process for peak RSS sampling.
+In a 1,000-page reference run with 10 rows per page, 3 warmups, and 10 measured runs on Node.js
+24.19.0/Darwin arm64, the results were:
 
-The following reference used 1,000 pages with 10 rows per page, 3 warmups, and 10 measured runs on
-Node.js 24.19.0/Darwin arm64. Throughput is calculated from p50. Results are environment-dependent,
-so use them as directional evidence and reproduce them on the target system.
+| Comparable workload | Buffered speedup | Stream speedup | Lower peak RSS | Smaller PDF |
+| ------------------- | ---------------: | -------------: | -------------: | ----------: |
+| Declarative/manual  |        **1.24x** |      **1.20x** |     **30-43%** |   **17.5%** |
+| High-level table    |        **1.93x** |      **1.95x** |     **40-45%** |   **10.3%** |
 
-#### Latency and throughput
-
-| Workload           | Output   |   pdf-crab p50 / p95 |     PDFKit p50 / p95 | pdf-crab throughput | PDFKit throughput |   Speedup |
-| ------------------ | -------- | -------------------: | -------------------: | ------------------: | ----------------: | --------: |
-| Declarative/manual | Buffered | 261.112 / 262.760 ms | 322.669 / 331.236 ms |   3,829.772 pages/s | 3,099.153 pages/s | **1.24x** |
-| Declarative/manual | Stream   | 270.564 / 272.054 ms | 323.439 / 331.698 ms |   3,695.985 pages/s | 3,091.771 pages/s | **1.20x** |
-| High-level table   | Buffered | 658.476 / 669.829 ms |      1.268 / 1.312 s |   1,518.659 pages/s |   788.529 pages/s | **1.93x** |
-| High-level table   | Stream   | 656.514 / 690.399 ms |      1.281 / 1.295 s |   1,523.197 pages/s |   780.357 pages/s | **1.95x** |
-
-#### Peak RSS and artifact size
-
-| Workload           | Output   | pdf-crab peak RSS | PDFKit peak RSS |  Less RAM | pdf-crab PDF | PDFKit PDF | Smaller PDF |
-| ------------------ | -------- | ----------------: | --------------: | --------: | -----------: | ---------: | ----------: |
-| Declarative/manual | Buffered |        231.219 MB |      407.797 MB | **43.3%** |     1.611 MB |   1.952 MB |   **17.5%** |
-| Declarative/manual | Stream   |        228.484 MB |      328.516 MB | **30.4%** |     1.611 MB |   1.952 MB |   **17.5%** |
-| High-level table   | Buffered |        232.047 MB |      423.016 MB | **45.1%** |     2.859 MB |   3.187 MB |   **10.3%** |
-| High-level table   | Stream   |        223.969 MB |      372.188 MB | **39.8%** |     2.859 MB |   3.187 MB |   **10.3%** |
-
-At 1,000 pages, pdf-crab-js delivered 20-24% more throughput for manual/declarative drawing and
-roughly 1.9x the throughput for high-level tables. It also used 30-45% less peak RSS and generated
-PDFs that were 10-17% smaller in this run.
-
-Small documents place more weight on fixed startup costs and can show larger speedup ratios. The
-1,000-page result is reported here to make sustained throughput and memory behavior more visible.
+Results are environment-dependent. See the
+[benchmark documentation](../../benchmarks/pdf/README.md) for the full p50/p95, throughput, memory,
+artifact-size, methodology, and reproduction details.
 
 ### Reproduce the benchmark
 
@@ -840,9 +847,7 @@ pnpm --filter pdf-benchmark benchmark
 ```
 
 Use `PDF_BENCHMARK_RUNS`, `PDF_BENCHMARK_WARMUP`, and
-`PDF_BENCHMARK_MEMORY_SAMPLE_MS` to tune the run. See the
-[benchmark documentation](../../benchmarks/pdf/README.md) for every scenario, including images,
-optional HTML/CSS conversion, and optional Gotenberg conversion.
+`PDF_BENCHMARK_MEMORY_SAMPLE_MS` to tune the run.
 
 ## Current scope
 
@@ -863,6 +868,7 @@ Runnable examples:
 - [PNG image](../../examples/pdf-crab-js/src/node/image.ts)
 - [Node.js and browser streaming](../../examples/pdf-crab-js/stream/README.md)
 - [Browser/WASM](../../examples/pdf-crab-js/src/browser/declarative.ts)
+- [Interactive Vite browser studio](../../examples/wasm-samples/README.md)
 
 Run them from the repository root:
 

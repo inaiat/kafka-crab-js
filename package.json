@@ -30,7 +30,7 @@
     "kafka-crab-js": "workspace:*",
     "kafka-crab-js-otel": "workspace:*",
     "nanoid": "catalog:",
-    "tsx": "^4.23.11",
+    "tsx": "^4.23.12",
     "typescript": "^7.0.2",
     "vite-plus": "0.2.8"
   },

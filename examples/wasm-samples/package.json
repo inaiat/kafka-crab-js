@@ -1,0 +1,28 @@
+{
+  "name": "crab-js-pdf-studio",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "pnpm run build:wasm && vite build",
+    "build:wasm": "pnpm --dir ../.. --filter pdf-crab-js build:wasm && pnpm --dir ../.. --filter html-to-pdf-crab-js build:wasm",
+    "check": "vp check",
+    "dev": "pnpm run build:wasm && vite --host 127.0.0.1 --port 5174",
+    "fmt": "vp fmt",
+    "fmt:check": "vp fmt --check",
+    "lint": "vp lint",
+    "lint:fix": "vp lint --fix",
+    "preview": "vite preview --host 127.0.0.1 --port 4174"
+  },
+  "dependencies": {
+    "@emnapi/core": "catalog:",
+    "@emnapi/runtime": "catalog:",
+    "@napi-rs/wasm-runtime": "catalog:",
+    "buffer": "^6.0.3",
+    "html-to-pdf-crab-js": "workspace:*",
+    "pdf-crab-js": "workspace:*"
+  },
+  "engines": {
+    "node": "24"
+  }
+}

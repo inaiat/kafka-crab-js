@@ -1,5 +1,6 @@
 [build]
-publish = "."
+command = "pnpm --filter crab-js-pdf-studio build"
+publish = "dist"
 
 [[headers]]
 for = "/*"
