@@ -92,7 +92,7 @@
     "test": "pnpm run build && pnpm run test:unit",
     "test:wasm": "pnpm run build:wasm && NAPI_RS_FORCE_WASI=error node js-tests/wasm-smoke.mjs",
     "test:wasm-threaded": "pnpm run build:wasm-threaded && NAPI_RS_FORCE_WASI=error PDF_CRAB_WASM_THREADED=1 node js-tests/wasm-smoke.mjs",
-    "test:unit": "pnpm run typecheck && vp test run js-tests/unit",
+    "test:unit": "npm run typecheck && vp test run js-tests/unit",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
