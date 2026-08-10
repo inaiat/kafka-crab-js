@@ -19,7 +19,7 @@ const napiGeneratedFiles = [
   'dist/**',
 ]
 
-const pdfLintIgnorePatterns = [...(sharedLintConfig?.ignorePatterns ?? []), ...napiGeneratedFiles, 'npm/**']
+const pdfLintIgnorePatterns = [...(sharedLintConfig?.ignorePatterns ?? []), ...napiGeneratedFiles, 'npm/**', 'js-tests/types/**']
 
 export default defineConfig({
   fmt: {

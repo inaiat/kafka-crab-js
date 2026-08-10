@@ -2,8 +2,8 @@ import { readFileSync } from 'node:fs'
 import { equal, match, ok, throws } from 'node:assert/strict'
 import { test } from 'vite-plus/test'
 
-import * as pdfCrab from '../../dist/index.js'
-import { PdfDocument, PdfError, renderPdf, type PdfDocumentInput } from '../../dist/index.js'
+import * as pdfCrab from '../../js-src/index.js'
+import { PdfDocument, PdfError, renderPdf, type PdfDocumentInput } from '../../js-src/index.js'
 
 function assertPdfBuffer(pdf: Uint8Array): void {
   ok(pdf instanceof Uint8Array)
@@ -138,7 +138,7 @@ test('fluent renderer and callback failures are normalized to PdfError', () => {
   throws(
     () => new PdfDocument().text('漢'),
     (error: unknown) => {
-      ok(error instanceof PdfError)
+      if (!(error instanceof PdfError)) return false
       equal(error.code, 'PDF_MISSING_GLYPH')
       equal(error.path, 'text')
       ok(error.cause instanceof Error)
@@ -150,7 +150,7 @@ test('fluent renderer and callback failures are normalized to PdfError', () => {
   throws(
     () => invalidColor.render(),
     (error: unknown) => {
-      ok(error instanceof PdfError)
+      if (!(error instanceof PdfError)) return false
       equal(error.code, 'PDF_INVALID_ARGUMENT')
       equal(error.path, 'currentPage.elements')
       ok(error.cause instanceof Error)
@@ -171,7 +171,7 @@ test('fluent renderer and callback failures are normalized to PdfError', () => {
         rows: [{ value: 1 }],
       }),
     (error: unknown) => {
-      ok(error instanceof PdfError)
+      if (!(error instanceof PdfError)) return false
       equal(error.code, 'PDF_INVALID_ARGUMENT')
       equal(error.path, 'table.rows[0].columns[0]')
       ok(error.cause instanceof Error)
